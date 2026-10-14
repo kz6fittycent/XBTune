@@ -32,6 +32,7 @@ pub enum View {
     Dashboard,
     Data,
     Charts,
+    Diagnostics,
 }
 
 /// What the UI knows about the link.
@@ -95,6 +96,11 @@ pub struct XbApp {
     pub plugs: Vec<PlugState>,
     pub messages: Vec<Message>,
     pub chart_paused: Option<f64>,
+    pub diag: crate::diagnostics::DiagUi,
+    /// The demo ECM, to start and stop its engine.
+    demo_sim: Option<xbtune_sim::SharedSim>,
+    /// ECM commands allowed for the current session.
+    permitted: bool,
     egui_ctx: egui::Context,
     shot: Option<Shot>,
 }
@@ -107,6 +113,8 @@ struct Shot {
     after: Duration,
     started: Instant,
     requested: bool,
+    /// `XBTUNE_SHOT_RUN=fan`: stop the demo engine and start this test first.
+    run: Option<xbtune_proto::Function>,
 }
 
 fn write_ppm(path: &std::path::Path, img: &egui::ColorImage) -> std::io::Result<()> {
@@ -127,6 +135,7 @@ impl XbApp {
             ),
             started: Instant::now(),
             requested: false,
+            run: std::env::var("XBTUNE_SHOT_RUN").ok().and_then(|n| xbtune_core::diag::function_by_name(&n)),
         });
         let settings_path = if shot.is_some() { None } else { Settings::path() };
         let mut settings = Settings::load(settings_path.as_deref());
@@ -151,6 +160,9 @@ impl XbApp {
             plugs: xbtune_core::env::plug_states(),
             messages: Vec::new(),
             chart_paused: None,
+            diag: Default::default(),
+            demo_sim: None,
+            permitted: false,
             egui_ctx: cc.egui_ctx.clone(),
             shot,
         };
@@ -163,6 +175,7 @@ impl XbApp {
                 "data" => View::Data,
                 "charts" => View::Charts,
                 "connect" => View::Connect,
+                "diag" => View::Diagnostics,
                 _ => View::Dashboard,
             };
         }
@@ -196,6 +209,7 @@ impl XbApp {
                 });
                 sim.set_wire_baud(Some(9600));
                 let sim = xbtune_sim::shared(sim);
+                self.demo_sim = Some(sim.clone());
                 let opener: session::Opener = Arc::new(move || {
                     let sim = sim.clone();
                     Box::pin(async move { Ok(xbtune_sim::in_process(sim)) })
@@ -214,7 +228,12 @@ impl XbApp {
                 (session::target_opener(t.clone()), t.to_string())
             }
         };
-        let cfg = SessionConfig::new(label, EcmAddress::Stock);
+        let mut cfg = SessionConfig::new(label, EcmAddress::Stock);
+        cfg.permit = xbtune_core::diag::permit(target == SavedTarget::Demo).ok();
+        self.permitted = cfg.permit.is_some();
+        if target != SavedTarget::Demo {
+            self.demo_sim = None;
+        }
         let ctx = self.egui_ctx.clone();
         let notify: session::Notify = Arc::new(move || ctx.request_repaint());
         let catalog = self.catalog.clone();
@@ -223,6 +242,7 @@ impl XbApp {
         self.link = LinkView { target: Some(target.clone()), ..Default::default() };
         self.history = History::default();
         self.chart_paused = None;
+        self.diag = Default::default();
         self.settings.last = Some(target);
         self.save_settings();
     }
@@ -237,6 +257,26 @@ impl XbApp {
             *st = LinkState::Stopped { reason: None };
         }
         self.link.log = None;
+    }
+
+    pub fn session_permitted(&self) -> bool {
+        self.permitted
+    }
+
+    pub fn is_demo(&self) -> bool {
+        self.demo_sim.is_some() && self.link.target == Some(SavedTarget::Demo)
+    }
+
+    pub fn demo_engine_running(&self) -> bool {
+        self.demo_sim.as_ref().is_some_and(|s| s.lock().map(|s| s.engine_running()).unwrap_or(false))
+    }
+
+    pub fn set_demo_engine_running(&self, running: bool) {
+        if let Some(s) = &self.demo_sim
+            && let Ok(mut s) = s.lock()
+        {
+            s.set_engine_running(running);
+        }
     }
 
     pub fn send(&self, c: Command) {
@@ -272,6 +312,7 @@ impl XbApp {
                     if matches!(st, LinkState::Stopped { .. }) {
                         self.session = None;
                         self.link.log = None;
+                        self.diag.running = None;
                     }
                     self.link.state = Some(st);
                 }
@@ -296,6 +337,13 @@ impl XbApp {
                         None => self.say(format!("Saved {rows} rows to {}", path.display()), false),
                     }
                 }
+                Event::FunctionProgress { function, stage } => {
+                    self.diag.running = Some((function, Some(stage)))
+                }
+                Event::FunctionDone { function, result } => {
+                    self.diag.running = None;
+                    self.diag.last = Some((function, result));
+                }
                 Event::Warning(w) => self.say(w, true),
             }
             if self.session.is_none() {
@@ -313,6 +361,24 @@ impl XbApp {
             let (r, painter) = ui.allocate_painter(egui::vec2(10.0, 10.0), egui::Sense::hover());
             painter.circle_filled(r.rect.center(), 5.0, dot);
             ui.label(text);
+            if let (Some(id), Some(s)) = (&self.link.identity, self.history.latest()) {
+                let codes = xbtune_core::diag::codes_from_runtime(
+                    &id.definition,
+                    &s.frame,
+                    xbtune_core::diag::CodeKind::Current,
+                );
+                if !codes.is_empty() {
+                    let list: Vec<&str> = codes.iter().map(|c| c.code.as_str()).collect();
+                    let b = egui::Button::new(
+                        RichText::new(format!("Code {}", list.join(", "))).color(Color32::WHITE),
+                    )
+                    .fill(p.bad)
+                    .small();
+                    if ui.add(b).on_hover_text("Current trouble codes: open Diagnostics").clicked() {
+                        self.view = View::Diagnostics;
+                    }
+                }
+            }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let next = match self.settings.theme {
                     ThemePref::System => ThemePref::Dark,
@@ -387,6 +453,7 @@ impl XbApp {
             (View::Dashboard, "Dashboard"),
             (View::Data, "Live data"),
             (View::Charts, "Charts"),
+            (View::Diagnostics, "Diagnostics"),
         ] {
             let selected = self.view == v;
             let text = RichText::new(label).size(15.0);
@@ -399,7 +466,7 @@ impl XbApp {
         ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
             ui.add_space(6.0);
             ui.label(RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).small().weak());
-            ui.label(RichText::new("Read-only: nothing is written to the ECM").small().weak());
+            ui.label(RichText::new("Never writes the EEPROM").small().weak());
         });
     }
 
@@ -439,6 +506,22 @@ impl XbApp {
     fn screenshot(&mut self, ui: &mut Ui) {
         let Some(shot) = &mut self.shot else { return };
         ui.ctx().request_repaint_after(Duration::from_millis(100));
+        if self.link.live()
+            && let Some(f) = shot.run.take()
+        {
+            self.set_demo_engine_running(false);
+            self.diag.running = Some((f, None));
+            self.send(Command::Function(f));
+        }
+        if self.link.live()
+            && self.diag.running.is_none()
+            && let Some(f) = std::env::var("XBTUNE_SHOT_CONFIRM")
+                .ok()
+                .and_then(|n| xbtune_core::diag::function_by_name(&n))
+        {
+            self.diag.ask(f);
+        }
+        let Some(shot) = &mut self.shot else { return };
         if !shot.requested && shot.started.elapsed() >= shot.after {
             shot.requested = true;
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Screenshot(Default::default()));
@@ -504,6 +587,7 @@ impl eframe::App for XbApp {
                     View::Dashboard => crate::dashboard::show(self, ui),
                     View::Data => crate::table::show(self, ui),
                     View::Charts => crate::charts::show(self, ui),
+                    View::Diagnostics => crate::diagnostics::show(self, ui),
                 }
             });
     }

@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! `xbtune-cli`: headless XBTune. Read-only: it identifies the ECM, measures
-//! the link, reads and saves the EEPROM, and decodes images. Nothing here
-//! writes to the ECM.
+//! `xbtune-cli`: headless XBTune. It identifies the ECM, measures the link,
+//! reads and saves the EEPROM, decodes images, and shows and logs live data.
+//! The only commands that change the ECM are `codes --clear`, `test` and
+//! `tps-reset` (see `diag.rs`); they are locked on real hardware until the
+//! owner unlocks them. Nothing writes the EEPROM.
 
+mod diag;
 mod live;
 mod render;
 
@@ -72,6 +75,12 @@ enum Cmd {
     },
     /// Show live data from the ECM (read-only).
     Live(live::LiveArgs),
+    /// Read current and stored trouble codes; --clear clears stored ones.
+    Codes(diag::CodesArgs),
+    /// Run an active test (coil, injector, pump, fan, ...). Changes the ECM's outputs.
+    Test(diag::TestArgs),
+    /// TPS reset (DDFI-2), following the documented procedure.
+    TpsReset(diag::TpsArgs),
     /// Record live data to a CSV log (read-only).
     Log(live::LogArgs),
     /// Show what XBTune knows about an ECM ID's definition, and data issues.
@@ -167,6 +176,12 @@ struct Connection {
     /// Testing: simulated K-line baud rate (0 = instant).
     #[arg(long, hide = true)]
     sim_baud: Option<u32>,
+    /// Testing: keep the simulated engine running for codes/test/tps-reset.
+    #[arg(long, hide = true)]
+    sim_engine_running: bool,
+    /// Testing: how long simulated tests keep the ECM busy, in milliseconds.
+    #[arg(long, hide = true)]
+    sim_test_ms: Option<u64>,
 }
 
 impl Connection {
@@ -241,6 +256,9 @@ async fn run(cmd: Cmd) -> Result<()> {
         Cmd::Convert { input, output, id } => convert(&input, &output, id.as_deref()),
         Cmd::Defs { id, list } => defs(&id, list),
         Cmd::Live(a) => live::live(a).await,
+        Cmd::Codes(a) => diag::codes(a).await,
+        Cmd::Test(a) => diag::test(a).await,
+        Cmd::TpsReset(a) => diag::tps_reset(a).await,
         Cmd::Log(a) => live::log(a).await,
     }
 }

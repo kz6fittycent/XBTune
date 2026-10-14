@@ -18,8 +18,8 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 | Unknown ECM type → clear error, point to supported list | ✅ read-only, writes refused | 1 |
 | Fetch EEPROM on connect, with progress | 🟡 `dump` (CLI); app in 5 | 2/5 |
 | Online / offline modes (edit an in-memory copy offline) | ⬜ | 5 |
-| Trouble codes work even without a definition for the ECM | ⬜ | 4 |
-| Status-bar error indicator when a code is set | 🟡 current codes on the dashboard; header indicator in 4 | 3/4 |
+| Trouble codes work even without a definition for the ECM | ⬜ needs the code bytes' offsets from somewhere; not in EcmDroid | later |
+| Status-bar error indicator when a code is set | ✅ red "Code NN" in the app header | 4 |
 | Supported-ECM list, per-ECM runtime/EEPROM info pages | 🟡 `ecms`, `defs`, `docs/SUPPORTED_ECMS.md` | 2 |
 
 ## Live data and logging
@@ -40,14 +40,14 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 
 | Feature | XBTune | Phase |
 |---|---|---|
-| Fetch current and historic trouble codes | ⬜ (decoding tested in phase 2) | 4 |
-| Clear historic codes (current ones stay while the fault exists) | ⬜ | 4 |
+| Fetch current and historic trouble codes | ✅ `codes`, app Diagnostics | 4 |
+| Clear historic codes (current ones stay while the fault exists) | ✅ `codes --clear`, app (locked on hardware until sign-off) | 4 |
 | **NEW** Error masks: choose which faults set a code and light the CEL (sensor/actuator/ECM) | ⬜ bit editors | 5 |
-| Active tests (coils, injectors, pump, tach, fan, exhaust valve, …) with run-safety prompt | ⬜ | 4 |
+| Active tests (coils, injectors, pump, tach, fan, exhaust valve, …) with run-safety prompt | ✅ `test`, app; engine-stopped check; locked on hardware until sign-off | 4 |
 | **NEW** LED-style input/output pin state indicators on the tests page | 🟡 DOut/DIn chips on the dashboard | 4 |
 | **NEW** Static timing check aid | ⬜ protocol unknown; investigate | 4 |
-| TPS reset (DDFI-2) with stored zero voltage / range shown | ⬜ | 4 |
-| AFV reset ("Clear") | ⬜ | 4 |
+| TPS reset (DDFI-2) with stored zero voltage / range shown | 🟡 reset done (`tps-reset`, app); stored values shown with the EEPROM view (5) | 4/5 |
+| AFV reset ("Clear") | ⬜ page-0 EEPROM write (`LFuel1`); needs the burn path | 6 |
 
 ## EEPROM and maps
 

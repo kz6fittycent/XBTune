@@ -169,3 +169,39 @@ fn log_writes_csv_through_dropouts() {
     let t: Vec<f64> = rows[1..].iter().map(|r| r.split(',').next().unwrap().parse().unwrap()).collect();
     assert!(t.windows(2).all(|w| w[0] < w[1]));
 }
+
+#[test]
+fn codes_read_and_clear_on_sim() {
+    let (ok, out) = cli(&["codes", "--sim"]);
+    assert!(ok, "{out}");
+    assert!(out.contains("Current codes:\n   21  AMC open"), "{out}");
+    let (ok, out) = cli(&["codes", "--sim", "--clear", "--yes"]);
+    assert!(ok, "{out}");
+    assert!(out.ends_with("Stored codes:\n  none\n"), "{out}");
+}
+
+#[test]
+fn active_tests_are_guarded() {
+    let (ok, out) = cli(&["test", "fan", "--sim", "--yes", "--sim-test-ms", "300"]);
+    assert!(ok, "{out}");
+    assert!(out.contains("Fan: done after"), "{out}");
+    // Engine running: refused before anything is sent.
+    let (ok, out) = cli(&["test", "fan", "--sim", "--yes", "--sim-engine-running"]);
+    assert!(!ok);
+    assert!(out.contains("the engine is running"), "{out}");
+    // Real hardware stays locked (the test environment has no unlock file).
+    let (ok, out) = cli(&["test", "fan", "--serial", "/dev/null", "--yes"]);
+    assert!(!ok);
+    assert!(out.contains("locked on real hardware"), "{out}");
+    let (ok, out) = cli(&["test", "warp-drive", "--sim"]);
+    assert!(!ok);
+    assert!(out.contains("no test 'warp-drive'"), "{out}");
+    // Without --yes, anything but "yes" cancels.
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_xbtune-cli"))
+        .args(["test", "fan", "--sim"])
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("cancelled"));
+}

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! XBTune desktop app: connection, dashboard, live data table and charts.
-//! Read-only: it never writes to the ECM.
+//! XBTune desktop app: connection, dashboard, live data table, charts and
+//! diagnostics. It never writes the EEPROM; active tests, clearing codes and
+//! TPS reset are locked on real hardware until the owner unlocks them.
 
 mod app;
 mod charts;
 mod connect;
 mod dashboard;
+mod diagnostics;
 mod gauge;
 mod settings;
 mod table;

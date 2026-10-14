@@ -146,6 +146,18 @@ known-good source:**
 | CSV log format | XB, see `docs/FILE_FORMATS.md` |
 | Unit abbreviations `ms`, `s`, `°F` | XB (EcmDroid's `Units.getSymbol()` covers °, %, V only) |
 
+## Diagnostics (`crates/xbtune-core/src/diag.rs`)
+
+| Detail | Source |
+|---|---|
+| Current codes = set bits of runtime `CDiag<n>`, stored = `HDiag<n>_LD` (EEPROM `HDiag<n>` without live data), n from 0 until missing; code = bit DTC, text = bit remark | ED `ECM.getErrors()`, `Bit.java` |
+| Function codes (clear codes 0x01 ... shift light 0x0C) as SET to the control page, ACK required | ED `ECM.runTest()`, `PDU.commandRequest()` (see Protocol) |
+| Busy state polled every 500 ms until 0 after a test | ED `ActiveTestsFragment.FunctionTask` |
+| Test list and order | ED `ActiveTestsFragment.functions` |
+| TPS reset instructions; DDFI-3: "follow the Service Manual" | ED `strings.xml` `tps_reset_instructions`, `tps_reset_notice` |
+| No AFV reset (EcmDroid only writes `LFuel1`/`KBaro` in page 0 during a burn) | ED `ECM.PAGE_ZERO_VARS_TO_WRITE` |
+| Engine-stopped check (RPM 0), busy check, never re-send, lost reply resolved by busy state, hardware permit, safety notices | XB |
+
 ## App assets (`crates/xbtune-app/assets`)
 
 | File | Source |
@@ -182,3 +194,9 @@ Nothing outside tests may rely on them.
   written through the definition's offsets and scaling. Its values are
   plausible only; they are not reference data for anything.
 - Missing page 0 bytes in an image are served as zeros.
+- After an active test or TPS reset the busy state reads 1 for
+  `test_duration` (default 3 s). Real durations are unknown.
+- Clear codes zeroes the runtime `HDiag<n>_LD` bytes immediately; current
+  codes (`CDiag`) stay. What the real ECM does to `RDiag`/EEPROM `HDiag` is
+  unknown.
+- Runtime data is answered normally while busy.

@@ -22,7 +22,10 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   the BuellTooth); with the old 1 s timeout each loss cost 1.3 s -> 3.7 Hz.
   Live timeout is now 400 ms and failures are logged as `# event:` lines;
   next owner log should show the new rate and the failure pattern.
-  Don't start phase 4 until the owner says so.
+- **Phase 4 (diagnostics): built 2026-10-14, waiting for the owner's
+  hardware test.** ECM commands are LOCKED on real hardware until the owner
+  signs off on the simulator results and creates the unlock file (below).
+  Don't start phase 5 until the owner says so.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the
@@ -35,6 +38,26 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 - Snap confinement checks on this PC: see "Snap notes" below.
 - Repo is private, with no remote. Don't add a remote or push without asking.
   Don't publish to the store.
+
+### Phase 4 contents
+
+- `xbtune-core::diag`: trouble codes (`codes_from_runtime`,
+  `stored_codes_from_image`), `TESTS`, `safety_notice`, `Permit`,
+  `run_function` (engine-stopped + idle checks, send once, busy polling,
+  lost reply resolved by the busy state).
+- Session `Command::Function` -> `FunctionProgress`/`FunctionDone` events;
+  `SessionConfig.permit`.
+- CLI: `codes [--clear]`, `test <name>|--list`, `tps-reset`; typed "yes"
+  unless `--yes`; permit checked before connecting.
+- App: Diagnostics view (codes, clear, tests, TPS reset, AFV note), confirm
+  modal with safety checkbox, header "Code NN" alert, demo engine toggle.
+- Sim (ASSUMED): busy for `test_duration` after a test, clear zeroes
+  `HDiag*_LD`, `set_engine_running`, `Fault::LoseRequest`.
+- Hardware unlock: `<Dirs.config>/hardware.toml` with `ecm_commands = true`
+  (snap: `~/snap/xbtune/common/config/hardware.toml`). Created by the
+  OWNER only, after sign-off. Never create it ourselves.
+- AFV reset is NOT in phase 4: AFV is page-0 `LFuel1`, so it's an EEPROM
+  write -> phase 6 burn path.
 
 ### Phase 3 contents
 
@@ -56,7 +79,8 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   change; named I/O bits; current DTCs), Live data table, Charts (stacked,
   linked time axis), Record button, theme toggle. Settings in
   `Dirs.config/settings.toml`.
-- UI check hook: `XBTUNE_SCREENSHOT=out.ppm XBTUNE_VIEW=dashboard|data|charts|connect
+- UI check hook: `XBTUNE_SCREENSHOT=out.ppm XBTUNE_VIEW=dashboard|data|charts|connect|diag
+  XBTUNE_SHOT_RUN=fan XBTUNE_SHOT_CONFIRM=front-injector
   XBTUNE_THEME=light XBTUNE_SHOT_AFTER=6 xbtune` (demo, no settings saved).
 
 ### Phase 2 contents
@@ -166,14 +190,23 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 
 ## Next steps
 
-1. Owner runs the phase 3 checklist below on the laptop and sends the CSV
-   log(s) and anything that looks wrong (screenshots welcome).
+1. Owner runs the phase 4 checklist (read-only part first).
 2. Optional: btsnoop capture of EcmDroid reading the EEPROM / live data, to
    confirm frames byte for byte.
-3. Phase 4 (only after the owner says go): diagnostics - trouble codes,
-   actuator tests, TPS/AFV reset. Every actuator path tested against the sim
-   first (KICKOFF §6.7); nothing that writes/actuates on the bike without
-   sign-off.
+3. Phase 5 (only after the owner says go): offline map editing.
+
+## Phase 4 hardware checklist
+
+Read-only part (no unlock needed), engine OFF, ignition ON:
+1. `xbtune.cli codes --bt 00:11:22:33:44:55`; compare with EcmDroid's
+   Trouble Codes screen.
+2. App -> Diagnostics: same codes; a current code shows red in the header.
+3. `xbtune.cli test fan --bt ...` must say "locked on real hardware".
+Then, only if the owner signs off on the sim results and unlocks:
+4. Engine OFF: `xbtune.cli test tachometer --bt ...`, then `test fan`.
+5. Optional: `xbtune.cli codes --clear --bt ...` (stored codes only).
+6. TPS reset only when the owner actually wants one (it changes the stored
+   TPS zero; follow the printed procedure).
 
 ## Phase 3 hardware checklist (read-only)
 
