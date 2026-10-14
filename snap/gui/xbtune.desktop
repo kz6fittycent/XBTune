@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=XBTune
+GenericName=ECM tuner
+Comment=Diagnostics, live data and tuning for Buell XB motorcycles
+Exec=xbtune
+Icon=${SNAP}/meta/gui/xbtune.svg
+Terminal=false
+Categories=Utility;Engineering;
+Keywords=Buell;ECM;DDFI;motorcycle;tuning;
+StartupWMClass=xbtune

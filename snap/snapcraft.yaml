@@ -7,8 +7,8 @@ description: |
   Buell XB9 and XB12 motorcycles, over Bluetooth (BuellTooth and other SPP
   adapters) or a USB serial cable.
 
-  This is an early, read-only build. It identifies the ECM and measures the
-  link quality. It never writes to the ECM.
+  This is an early, read-only build: it identifies the ECM, reads and saves
+  the EEPROM, shows and logs live data. It never writes to the ECM.
 
   After installing, connect the interfaces it needs:
 
@@ -16,7 +16,7 @@ description: |
     sudo snap connect xbtune:raw-usb
     sudo snap connect xbtune:removable-media
 
-  Then try:
+  Then open XBTune from the app menu, or try the command line:
 
     xbtune.cli doctor
     xbtune.cli scan
@@ -34,9 +34,16 @@ platforms:
     build-on: [amd64]
     build-for: [amd64]
 
-# The egui desktop app (phase 3) will be the `xbtune` command and will add
-# the gnome extension plus desktop/wayland/x11/opengl plugs.
 apps:
+  xbtune:
+    command: bin/xbtune
+    desktop: meta/gui/xbtune.desktop
+    extensions: [gnome]
+    plugs:
+      - bluez
+      - raw-usb
+      - home
+      - removable-media
   cli:
     command: bin/xbtune-cli
     plugs:
@@ -55,6 +62,7 @@ parts:
     source: .
     rust-channel: stable
     rust-path:
+      - crates/xbtune-app
       - crates/xbtune-cli
       - crates/xbtune-sim
     build-packages:
