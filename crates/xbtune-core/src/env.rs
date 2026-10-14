@@ -98,7 +98,14 @@ pub fn plug_states() -> Vec<PlugState> {
 
 /// Advice for a "permission denied" opening a transport.
 pub fn permission_hint(plug: &str) -> String {
-    if in_snap() {
+    let connected = plug_states().into_iter().find(|p| p.plug == plug).and_then(|p| p.connected);
+    if in_snap() && connected == Some(true) {
+        format!(
+            "The '{plug}' interface is connected, but confinement still refused this operation.\n\
+             This is an XBTune bug. Please report it with the output of:\n    \
+             sudo journalctl -k --since -5min | grep xbtune"
+        )
+    } else if in_snap() {
         format!(
             "The snap is not allowed to use this device. Run:\n    sudo snap connect {}:{plug}",
             snap_name().unwrap_or_else(|| "xbtune".into())

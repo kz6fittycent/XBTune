@@ -68,7 +68,9 @@ impl EcmClient {
         self.stats.record_request();
         let attempts = self.policy.attempts_for(request);
         let mut last = None;
+        let mut made = 0;
         for attempt in 1..=attempts {
+            made = attempt;
             let started = Instant::now();
             let result = self.attempt(request).await;
             let retry = attempt > 1;
@@ -98,8 +100,8 @@ impl EcmClient {
         }
         let last = last.expect("at least one attempt");
         warn!(?request, error = %last, "ECM request failed");
-        if attempts > 1 && last.is_transient() {
-            Err(TransactionError::Exhausted { attempts, last: Box::new(last) })
+        if made > 1 {
+            Err(TransactionError::Exhausted { attempts: made, last: Box::new(last) })
         } else {
             Err(last)
         }
