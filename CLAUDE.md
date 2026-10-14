@@ -7,6 +7,19 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 
 - **Phase 1 (foundation): built and waiting for the owner's hardware test.**
   Don't start phase 2 until the owner says so.
+- Snap verified on this PC (2026-10-14, rev x2, git b5fa645), strict confinement,
+  with bluez, raw-usb and removable-media connected:
+  - `doctor`, `info --sim`, and the "interface not connected" hints: OK.
+  - `scan` (BlueZ over D-Bus): OK.
+  - RFCOMM socket: reaches the radio (absent device -> "Host is down" after
+    ~5 s), no seccomp/AppArmor denials. **Not yet tested against a real SPP
+    device.**
+  - USB serial: not tested (no adapter here). The AppArmor profile grants
+    `/dev/tty{USB,ACM}[0-9]* rwk`, which covers serialport's flock.
+  - The pty simulator can't be used *inside* the snap: AppArmor refuses
+    file_lock on /dev/pts/*, and serialport always flocks. Use the pty sim
+    from `cargo run` instead.
+  - Harmless AppArmor noise: tokio reading cgroup `cpu.max`.
 - Owner's bike: **2005 Buell XB9SX**, so expected ECM **BUEIB** (DDFI-2).
   Not yet confirmed on hardware.
 - Repo is private, with no remote. Don't add a remote or push without asking.
@@ -38,7 +51,7 @@ cargo deny check
 cargo run -p xbtune-cli -- info --sim
 cargo run -p xbtune-sim -- --drop 0.1 --fragment 0.3   # prints /dev/pts/N
 cargo run -p xbtune-cli -- info --serial /dev/pts/N
-snapcraft pack && sudo snap install --dangerous xbtune_*.snap
+snapcraft pack && sudo snap install --dangerous xbtune_*.snap   # LXD works again since the Docker fix
 ```
 
 Regenerating the data file needs EcmDroid's db (it is not in the repo):
@@ -55,6 +68,11 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
   commands are never retried** (`Request::is_idempotent`).
 - `Layout::write_plan` refuses page 0. Page 0 writes need variable
   definitions (EcmDroid writes only `LFuel1`, `KBaro`). That is phase 6.
+- RFCOMM connect (`xbtune_link::bluetooth::connect`) works around two
+  problems in bluer 0.17's `Stream::connect`: it skips `bind()`, which the snap
+  seccomp filter refuses with EPERM, and it waits with `poll()` for the real
+  connection, because bluer returns early on a stale tokio writable event and
+  the first write then fails with ENOTCONN.
 - Bluetooth uses a direct RFCOMM socket (default channel 1, `--channel`).
   Discovery and pairing state come over D-Bus (bluer). No SDP lookup yet;
   if BuellTooth isn't on channel 1, add SDP via a BlueZ Profile.
