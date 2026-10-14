@@ -50,7 +50,8 @@ fn decoded_values_match_ecmdroid() {
     let c = Catalog::builtin().unwrap();
     let img = Image::load(&fixture("xbtune.xbt"), None, &c).unwrap();
     let def = c.definition(c.lookup(&img.ecm_id).unwrap()).unwrap();
-    let exp: Expected = toml::from_str(&std::fs::read_to_string(fixture("ecmdroid_values.toml")).unwrap()).unwrap();
+    let exp: Expected =
+        toml::from_str(&std::fs::read_to_string(fixture("ecmdroid_values.toml")).unwrap()).unwrap();
     let mut bad = Vec::new();
     for (name, want) in &exp.values {
         let var = def.eeprom.get(name).unwrap_or_else(|| panic!("no variable {name}"));
