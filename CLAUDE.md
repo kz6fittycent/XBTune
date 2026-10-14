@@ -11,17 +11,26 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   with bluez, raw-usb and removable-media connected:
   - `doctor`, `info --sim`, and the "interface not connected" hints: OK.
   - `scan` (BlueZ over D-Bus): OK.
-  - RFCOMM socket: reaches the radio (absent device -> "Host is down" after
-    ~5 s), no seccomp/AppArmor denials. **Not yet tested against a real SPP
-    device.**
+  - RFCOMM socket: reaches the radio, no seccomp/AppArmor denials. Works with
+    the real BuellTooth (see hardware results above).
   - USB serial: not tested (no adapter here). The AppArmor profile grants
     `/dev/tty{USB,ACM}[0-9]* rwk`, which covers serialport's flock.
   - The pty simulator can't be used *inside* the snap: AppArmor refuses
     file_lock on /dev/pts/*, and serialport always flocks. Use the pty sim
     from `cargo run` instead.
   - Harmless AppArmor noise: tokio reading cgroup `cpu.max`.
-- Owner's bike: **2005 Buell XB9SX**, so expected ECM **BUEIB** (DDFI-2).
-  Not yet confirmed on hardware.
+- Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
+  `BUEIB310 12-11-03`. Confirmed on hardware 2026-10-14.
+- **Hardware tests run on a separate laptop** (the desktop can't reach the
+  garage). Build the snap here, then hand the user the `.snap` file to install
+  on the laptop with `sudo snap install --dangerous`. Interfaces must be
+  connected on the laptop too. Can't run commands on the laptop: give the
+  user exact commands and ask for the output.
+- Hardware results (2026-10-14, laptop, snap git b5fa645):
+  - BuellTooth `00:11:22:33:44:55`, RFCOMM channel 1: `info` OK. BUEIB,
+    107-byte runtime frame, idle, 23/23 requests OK, 0 retries,
+    RTT avg 65 ms (min 50, max 147).
+  - USB serial: not yet tested.
 - Repo is private, with no remote. Don't add a remote or push without asking.
   Don't publish to the store.
 
