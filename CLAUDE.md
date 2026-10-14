@@ -101,7 +101,8 @@ cargo deny check
 cargo run -p xbtune-cli -- info --sim
 cargo run -p xbtune-sim -- --drop 0.1 --fragment 0.3   # prints /dev/pts/N
 cargo run -p xbtune-cli -- info --serial /dev/pts/N
-snapcraft pack && sudo snap install --dangerous xbtune_*.snap   # LXD works again since the Docker fix
+snapcraft clean xbtune && snapcraft pack   # clean first, or the version label stays stale
+sudo snap install --dangerous ./xbtune_0.1.0+git<HEAD>_amd64.snap   # name the file; never a glob
 XBTUNE_SCREENSHOT=~/snap/xbtune/common/s.ppm XBTUNE_VIEW=charts xbtune   # GUI check inside the snap
 ```
 
