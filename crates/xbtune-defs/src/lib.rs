@@ -6,10 +6,19 @@
 //! be replaced without touching code. Which bikes an ECM ID shipped on is
 //! XBTune's own data in `data/ecm_models.toml`. See `docs/PROVENANCE.md`.
 //!
-//! Phase 1 covers ECM identification and EEPROM page layouts. Variables,
-//! tables, scalars and bit fields arrive in phase 2.
+//! [`Catalog`] holds every known ECM ID and, for the in-scope (DDFI-2 and
+//! DDFI-3) ones, a checked [`Definition`]: EEPROM variables, runtime
+//! variables and bit sets. Anything in the data that doesn't add up is kept
+//! out of decoding and listed in [`Definition::issues`].
 
-use std::collections::BTreeMap;
+pub mod decode;
+pub mod model;
+
+use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
+
+pub use decode::{DecodeError, ImageView, Value, format_number, unit_symbol};
+pub use model::{BitDef, BitSetDef, Definition, EeKind, EeVar, Names, RtKind, RtVar, Shape};
 use std::fmt;
 
 use serde::Deserialize;
@@ -57,6 +66,8 @@ pub struct EcmDef {
     /// Definition set the ID uses. Race and regional IDs share the street
     /// definitions, e.g. `B2RIB` uses `BUEIB`.
     pub definition: String,
+    /// ecmdroid.db category: which variable set applies.
+    pub category: u32,
     pub family: Family,
     /// EEPROM size without page 0.
     pub size: usize,
@@ -96,6 +107,16 @@ pub enum DefsError {
 #[derive(Deserialize)]
 struct EcmFile {
     ecm: Vec<EcmDef>,
+    #[serde(default)]
+    eeprom_vars: Vec<model::EeRow>,
+    #[serde(default)]
+    runtime_vars: Vec<model::RtRow>,
+    #[serde(default)]
+    bits: Vec<model::BitsRow>,
+    #[serde(default)]
+    names: Vec<model::NameRow>,
+    #[serde(default)]
+    conflicts: Vec<model::Conflict>,
 }
 
 #[derive(Deserialize)]
@@ -113,6 +134,7 @@ struct Model {
 #[derive(Debug, Clone)]
 pub struct Catalog {
     ecms: BTreeMap<String, EcmDef>,
+    defs: BTreeMap<u32, Arc<Definition>>,
 }
 
 impl Catalog {
@@ -122,10 +144,10 @@ impl Catalog {
     }
 
     pub fn from_toml(ecms: &str, models: &str) -> Result<Self, DefsError> {
-        let file: EcmFile = toml::from_str(ecms)?;
+        let mut file: EcmFile = toml::from_str(ecms)?;
         let models: ModelFile = toml::from_str(models)?;
         let mut map = BTreeMap::new();
-        for mut def in file.ecm {
+        for mut def in std::mem::take(&mut file.ecm) {
             let layout = def.layout().map_err(|source| DefsError::Layout { id: def.id.clone(), source })?;
             if layout.size_without_page_zero() != def.size {
                 return Err(DefsError::Size {
@@ -137,7 +159,8 @@ impl Catalog {
             def.bikes = models.model.iter().find(|m| m.id == def.id).map(|m| m.bikes.clone());
             map.insert(def.id.clone(), def);
         }
-        Ok(Self { ecms: map })
+        let defs = build_definitions(&map, &file);
+        Ok(Self { ecms: map, defs })
     }
 
     /// Find the definition for a version string such as `"BUEIB310 12-11-03"`.
@@ -150,6 +173,95 @@ impl Catalog {
     pub fn iter(&self) -> impl Iterator<Item = &EcmDef> {
         self.ecms.values()
     }
+
+    /// The variable definitions for `ecm`, if it is in scope.
+    pub fn definition(&self, ecm: &EcmDef) -> Option<&Arc<Definition>> {
+        self.defs.get(&ecm.category)
+    }
+
+    /// Find ECM IDs whose image size (with or without page 0) is `len`, like
+    /// EcmDroid's `EEPROM.size2id()`.
+    pub fn ids_for_image_len(&self, len: usize) -> Vec<&EcmDef> {
+        self.ecms.values().filter(|d| d.size == len || d.xsize == len).collect()
+    }
+}
+
+fn build_definitions(ecms: &BTreeMap<String, EcmDef>, file: &EcmFile) -> BTreeMap<u32, Arc<Definition>> {
+    let names: HashMap<&str, &model::NameRow> = file.names.iter().map(|n| (n.var.as_str(), n)).collect();
+    let bits: HashMap<&str, BitSetDef> = file.bits.iter().map(|b| (b.var.as_str(), b.to_def())).collect();
+    let mut out = BTreeMap::new();
+    for ecm in ecms.values().filter(|e| e.family.in_scope()) {
+        if out.contains_key(&ecm.category) {
+            continue;
+        }
+        let zero = ecm.xsize - ecm.size;
+        let mut def = Definition {
+            category: ecm.category,
+            eeprom: BTreeMap::new(),
+            runtime: BTreeMap::new(),
+            conflicts: file.conflicts.iter().filter(|c| c.c == ecm.category).map(|c| c.var.clone()).collect(),
+            issues: Vec::new(),
+        };
+        for row in file.eeprom_vars.iter().filter(|r| r.c == ecm.category) {
+            let name = names.get(row.var.as_str());
+            if name.is_none() {
+                def.issues.push(format!("{}: no names entry (EcmDroid hides it)", row.var));
+            }
+            let Some(mut var) = row.to_var(
+                name.map(|n| n.names()).unwrap_or_default(),
+                bits.get(row.var.as_str()).cloned(),
+                ecm.size,
+                zero,
+            ) else {
+                def.issues.push(format!("{}: unknown type '{}'", row.var, row.kind));
+                continue;
+            };
+            var.secret = name.is_some_and(|n| n.secret);
+            if let Shape::Invalid(why) = &var.shape {
+                def.issues.push(format!("{}: {why}; shown as raw bytes only", var.name));
+            }
+            def.eeprom.insert(var.name.clone(), var);
+        }
+        // Map axes must exist and match the grid.
+        let mut axis_issues = Vec::new();
+        for v in def.eeprom.values() {
+            if let Shape::Grid { rows, cols, .. } = v.shape {
+                for (axis, want) in [(&v.x_axis, cols), (&v.y_axis, rows)] {
+                    if let Some(a) = axis {
+                        match def.eeprom.get(a) {
+                            Some(av) if av.element_count() == want => {}
+                            Some(av) => axis_issues.push(format!(
+                                "{}: axis {a} has {} entries, map needs {want}",
+                                v.name,
+                                av.element_count()
+                            )),
+                            None => axis_issues.push(format!("{}: axis {a} not defined", v.name)),
+                        }
+                    }
+                }
+            }
+        }
+        def.issues.extend(axis_issues);
+        for row in file.runtime_vars.iter().filter(|r| r.c == ecm.category) {
+            // EcmDroid lists only variables with a names entry and neither
+            // row marked secret.
+            let Some(name) = names.get(row.var.as_str()) else { continue };
+            if row.secret || name.secret {
+                continue;
+            }
+            match row.to_var(name, bits.get(row.var.as_str()).cloned()) {
+                Some(v) if v.offset + v.size <= ecm.runtime_len => {
+                    def.runtime.insert(v.name.clone(), v);
+                }
+                Some(v) => {
+                    def.issues.push(format!("runtime {}: outside the {}-byte frame", v.name, ecm.runtime_len))
+                }
+                None => def.issues.push(format!("runtime {}: unknown type '{}'", row.var, row.kind)),
+            }
+        }
+        out.insert(ecm.category, Arc::new(def));
+    }
+    out
 }
 
 #[cfg(test)]
