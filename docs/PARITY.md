@@ -16,18 +16,18 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 |---|---|---|
 | Pick port / adapter, ECM type detected from version | ✅ `info`, `scan`, `ports` | 1 |
 | Unknown ECM type → clear error, point to supported list | ✅ read-only, writes refused | 1 |
-| Fetch EEPROM on connect, with progress | ✅ `dump` (CLI); app in 3 | 2 |
+| Fetch EEPROM on connect, with progress | 🟡 `dump` (CLI); app in 5 | 2/5 |
 | Online / offline modes (edit an in-memory copy offline) | ⬜ | 5 |
 | Trouble codes work even without a definition for the ECM | ⬜ | 4 |
-| Status-bar error indicator when a code is set | ⬜ | 3/4 |
+| Status-bar error indicator when a code is set | 🟡 current codes on the dashboard; header indicator in 4 | 3/4 |
 | Supported-ECM list, per-ECM runtime/EEPROM info pages | 🟡 `ecms`, `defs`, `docs/SUPPORTED_ECMS.md` | 2 |
 
 ## Live data and logging
 
 | Feature | XBTune | Phase |
 |---|---|---|
-| Overview/dashboard while polling; switch tabs while polling | ⬜ | 3 |
-| Log to file, new timestamped file each time | ⬜ CSV | 3 |
+| Overview/dashboard while polling; switch tabs while polling | ✅ app: dashboard, live data, charts; CLI `live` | 3 |
+| Log to file, new timestamped file each time | ✅ CSV (`log`, app Record), raw frames kept | 3 |
 | **NEW** Binary log format (compact) and EcmDroid binary log import | ⬜ | 3/7 |
 | **NEW** MegaLogViewer `.msl` text log export | ⬜ | 3/7 |
 | Log playback in real time, driving the live views | ⬜ | 7 |
@@ -44,7 +44,7 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 | Clear historic codes (current ones stay while the fault exists) | ⬜ | 4 |
 | **NEW** Error masks: choose which faults set a code and light the CEL (sensor/actuator/ECM) | ⬜ bit editors | 5 |
 | Active tests (coils, injectors, pump, tach, fan, exhaust valve, …) with run-safety prompt | ⬜ | 4 |
-| **NEW** LED-style input/output pin state indicators on the tests page | ⬜ runtime bitfields | 4 |
+| **NEW** LED-style input/output pin state indicators on the tests page | 🟡 DOut/DIn chips on the dashboard | 4 |
 | **NEW** Static timing check aid | ⬜ protocol unknown; investigate | 4 |
 | TPS reset (DDFI-2) with stored zero voltage / range shown | ⬜ | 4 |
 | AFV reset ("Clear") | ⬜ | 4 |

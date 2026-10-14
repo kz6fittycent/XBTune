@@ -12,9 +12,10 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   161/161 requests, 0 retries, RTT avg 65 ms; CRC-32 3b54974e;
   `diff` against EcmDroid's own save (`BUEIB_20261014-162837.xpr`) =
   "Identical (1210 bytes compared)". Fuel/spark maps decode sensibly.
-  Owner's dumps are in `tests/fixtures/owner/` and the golden test runs;
-  still waiting for Setup values (`ecmdroid_values.toml`).
-  Don't start phase 3 until the owner says so.
+  Owner's dumps and 26 Setup-screen values are in `tests/fixtures/owner/`;
+  all golden tests pass.
+- **Phase 3 (live data + logging + first app): built 2026-10-14, waiting for
+  the owner's hardware test.** Don't start phase 4 until the owner says so.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the
@@ -27,6 +28,29 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 - Snap confinement checks on this PC: see "Snap notes" below.
 - Repo is private, with no remote. Don't add a remote or push without asking.
   Don't publish to the store.
+
+### Phase 3 contents
+
+- `xbtune-core::session`: one tokio task owns the link (version, then
+  runtime frames back to back); reconnect with backoff (1/8 of
+  `reconnect_delay`, doubling); stops on unknown ECM, a different ECM after
+  reconnect, or a runtime frame length that doesn't match the definition.
+  CSV logging runs inside the task. `target_opener` + `open_error_text`
+  shared by CLI and app.
+- `xbtune-core::live`: channels (frame order), units, CSV logger
+  (`docs/FILE_FORMATS.md`), rate meter.
+- `xbtune-sim::engine`: made-up 30 s ride so live views move
+  (`Simulator::bueib_running()`); CLI/app demo add 60 ms latency.
+- CLI: `live` (`--channels/--all/--list/--count`), `log` (`--duration`,
+  `--note`, Ctrl+C).
+- `xbtune-app` (binary `xbtune`, snap app `xbtune` with gnome extension):
+  Connect (BT scan/paired, manual address, USB ports, demo, snap-plug
+  banner, last-used + connect-on-start), Dashboard (gauges, right-click to
+  change; named I/O bits; current DTCs), Live data table, Charts (stacked,
+  linked time axis), Record button, theme toggle. Settings in
+  `Dirs.config/settings.toml`.
+- UI check hook: `XBTUNE_SCREENSHOT=out.ppm XBTUNE_VIEW=dashboard|data|charts|connect
+  XBTUNE_THEME=light XBTUNE_SHOT_AFTER=6 xbtune` (demo, no settings saved).
 
 ### Phase 2 contents
 
@@ -50,14 +74,14 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 crates/xbtune-proto  PDU framing, checksum, decoder, EEPROM page model, transaction rules (no I/O)
 crates/xbtune-link   serial + RFCOMM transports (BoxIo), EcmClient (retries/stats), BlueZ scan
 crates/xbtune-defs   catalog + definitions (EEPROM/runtime vars, bit sets) from data/ecmdroid.toml; decoding
-crates/xbtune-core   env (snap, paths), image (.xbt/.xpr), read (full EEPROM read), time
-crates/xbtune-sim    simulated ECM + fault injection; in-process and pty; bin xbtune-sim
-crates/xbtune-cli    xbtune-cli: info, ports, scan, ecms, doctor, dump, show, diff, convert, defs
-crates/xbtune-app    placeholder (egui app is phase 3)
+crates/xbtune-core   env (snap, paths), image (.xbt/.xpr), read (full EEPROM read), live, session, time
+crates/xbtune-sim    simulated ECM + fault injection + made-up engine; in-process and pty; bin xbtune-sim
+crates/xbtune-cli    xbtune-cli: info, ports, scan, ecms, doctor, dump, show, diff, convert, defs, live, log
+crates/xbtune-app    egui app, binary xbtune (connect, dashboard, live data, charts); assets/fonts (Inter)
 data/                ecmdroid.toml (ED-DB derived, RESTRICTED), ecm_models.toml (ours)
 tools/               extract_ecmdroid_db.py
 tests/fixtures/      EcmDroid test images and runtime frame
-snap/snapcraft.yaml  core24, rust plugin, apps: cli, sim
+snap/snapcraft.yaml  core24, rust plugin, apps: xbtune (gnome ext), cli, sim; snap/gui desktop+icon
 ```
 
 ## Commands
@@ -96,8 +120,16 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
   Discovery and pairing state come over D-Bus (bluer). No SDP lookup yet;
   if BuellTooth isn't on channel 1, add SDP via a BlueZ Profile.
 - Snap stores everything under `$SNAP_USER_COMMON` (`xbtune_core::env::Dirs`).
-- Snap apps: `xbtune.cli`, `xbtune.sim`. In phase 3 the GUI becomes `xbtune`,
-  with the gnome extension.
+- Snap apps: `xbtune` (GUI, gnome extension), `xbtune.cli`, `xbtune.sim`.
+- GUI deps (listed in KICKOFF §4): eframe/egui 0.36 (default features off:
+  glow, wayland, x11, accesskit), egui_plot 0.37. egui's bundled fonts are
+  off (UFL/OFL in a crate fail cargo-deny); Inter 4.1 is bundled instead.
+  `deny.toml` checks Linux targets only.
+- Flags0-6 bit meanings are NOT in ecmdroid.db (all names empty), so idle /
+  closed loop / WOT flags are shown raw. Need a real source before naming
+  them (KICKOFF §5 lists them).
+- Gauge ranges are XBTune display presets (`xbtune-app/src/gauge.rs`); the
+  db's runtime low/high are raw-type limits (Bat 0-2000 V).
 - Publishing workflows are gated by the repo variable `XBTUNE_STORE_PUBLISH`.
 - Tables/maps: layout is XBTune's reading of the db columns (EcmDroid only
   shows raw bytes). Maps = rows of `cols` values + `skip` pad bytes; `Table` =
@@ -112,13 +144,31 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 
 ## Next steps
 
-1. Owner runs the phase 2 checklist below on the bike and sends: the `.xbt`
-   dump, an EcmDroid `.xpr` save of the same ECM, and a few Setup-screen
-   values. Put them in `tests/fixtures/owner/` and run the golden tests.
-2. Ask for a btsnoop capture of EcmDroid reading the EEPROM to confirm the
-   GET frames and page 0 reads byte for byte.
-3. Phase 3 (only after the owner says go): runtime polling, CLI logging,
-   first egui app.
+1. Owner runs the phase 3 checklist below on the laptop and sends the CSV
+   log(s) and anything that looks wrong (screenshots welcome).
+2. Optional: btsnoop capture of EcmDroid reading the EEPROM / live data, to
+   confirm frames byte for byte.
+3. Phase 4 (only after the owner says go): diagnostics - trouble codes,
+   actuator tests, TPS/AFV reset. Every actuator path tested against the sim
+   first (KICKOFF §6.7); nothing that writes/actuates on the bike without
+   sign-off.
+
+## Phase 3 hardware checklist (read-only)
+
+Bike on its stand, somewhere ventilated. Snap: build here, install on the
+laptop with `sudo snap install --dangerous xbtune_*.snap`; check
+`snap connections xbtune` (bluez, raw-usb, removable-media connected).
+1. Ignition ON, engine OFF: `xbtune.cli live --bt 00:11:22:33:44:55`.
+   Expect RPM 0, sensible engine/air temp, battery ~12-13 V, ~12-16 Hz,
+   0% errors. Compare a few values with EcmDroid's live screen.
+2. Start the engine: RPM ~1000-1100 at idle, engine temp rising, O2 moving
+   once warm. `xbtune.cli log --bt ... --duration 60 -o ~/idle.csv`.
+3. GUI: open XBTune from the app menu. Connect -> Paired devices ->
+   BuellTooth -> Connect. Check Dashboard, Live data, Charts; Record ~30 s.
+4. Dropout: engine off, switch the ignition off for ~10 s and back on. The
+   app should show "reconnecting" and come back by itself.
+5. Close and reopen the app: "Last used" offers the BuellTooth.
+6. Send: the CSV logs, and screenshots of anything odd.
 
 ## Phase 2 hardware checklist (read-only)
 
