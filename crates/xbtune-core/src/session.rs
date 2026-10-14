@@ -7,8 +7,10 @@
 //! task, so the log rate never depends on the UI. The UI (or the CLI) sends
 //! [`Command`]s and receives [`Event`]s; it never blocks on I/O.
 //!
-//! The session is read-only: it sends only the version and runtime-data
-//! requests.
+//! Polling is read-only (version and runtime-data requests). The only
+//! requests that change the ECM are [`Command::Function`] (active tests,
+//! clearing codes, TPS reset), which run through `diag::run_function` and
+//! need the [`crate::diag::Permit`] given in the config.
 
 use std::fs::File;
 use std::future::Future;
@@ -83,6 +85,9 @@ pub struct SessionConfig {
     pub max_reconnects: Option<u32>,
     /// Failed requests in a row (each after its retries) before reconnecting.
     pub fails_before_reconnect: u32,
+    /// Allows [`Command::Function`]; `None` refuses them.
+    pub permit: Option<crate::diag::Permit>,
+    pub function_timing: crate::diag::FunctionTiming,
 }
 
 impl SessionConfig {
@@ -95,14 +100,21 @@ impl SessionConfig {
             reconnect_delay: Duration::from_secs(2),
             max_reconnects: None,
             fails_before_reconnect: 2,
+            permit: None,
+            function_timing: crate::diag::FunctionTiming::default(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum Command {
-    StartLog { path: PathBuf, note: Option<String> },
+    StartLog {
+        path: PathBuf,
+        note: Option<String>,
+    },
     StopLog,
+    /// Run an active test, clear codes or reset the TPS (between polls).
+    Function(xbtune_proto::Function),
     Stop,
 }
 
@@ -147,6 +159,16 @@ pub enum Event {
         path: PathBuf,
         rows: u64,
         error: Option<String>,
+    },
+    /// A function is under way.
+    FunctionProgress {
+        function: xbtune_proto::Function,
+        stage: crate::diag::Stage,
+    },
+    /// A function finished (or was refused).
+    FunctionDone {
+        function: xbtune_proto::Function,
+        result: Result<crate::diag::Outcome, String>,
     },
     /// Something worth showing that doesn't stop the session.
     Warning(String),
@@ -284,6 +306,10 @@ impl Worker {
         match c {
             Command::StartLog { path, note } => self.start_log(path, note),
             Command::StopLog => self.stop_log(None),
+            Command::Function(function) => self.out.send(Event::FunctionDone {
+                function,
+                result: Err("not connected to the ECM right now".into()),
+            }),
             Command::Stop => {}
         }
     }
@@ -322,10 +348,11 @@ impl Worker {
         let mut fails = 0;
         loop {
             while let Ok(c) = self.commands.try_recv() {
-                if matches!(c, Command::Stop) {
-                    return End::Stop(None);
+                match c {
+                    Command::Stop => return End::Stop(None),
+                    Command::Function(f) => self.function(&mut client, f).await,
+                    c => self.handle(c),
                 }
-                self.handle(c);
             }
             let asked = Instant::now();
             let before = client.stats().clone();
@@ -377,6 +404,31 @@ impl Worker {
                 tokio::time::sleep(self.cfg.min_interval - spent).await;
             }
         }
+    }
+
+    /// Run one function on the connected ECM and report it.
+    async fn function(&mut self, client: &mut EcmClient, f: xbtune_proto::Function) {
+        self.log_event(&format!("{}: starting", f.label()));
+        let result = match (&self.cfg.permit, &self.identity) {
+            (None, _) => Err(crate::diag::locked_message()),
+            (_, None) => Err("the ECM hasn't been identified yet".into()),
+            (Some(permit), Some(id)) => {
+                let (ecm, def) = (id.ecm.clone(), id.definition.clone());
+                let out = &self.out;
+                crate::diag::run_function(client, &ecm, &def, f, permit, self.cfg.function_timing, |stage| {
+                    out.send(Event::FunctionProgress { function: f, stage })
+                })
+                .await
+                .map_err(|e| e.to_string())
+            }
+        };
+        let what = match &result {
+            Ok(o) => format!("{}: done after {:.1} s", f.label(), o.busy_for.as_secs_f64()),
+            Err(e) => format!("{}: {e}", f.label()),
+        };
+        tracing::info!("{what}");
+        self.log_event(&what);
+        self.out.send(Event::FunctionDone { function: f, result });
     }
 
     fn start_log(&mut self, path: PathBuf, note: Option<String>) {
@@ -574,5 +626,54 @@ mod tests {
         let ev = collect_until(&mut s, |e| matches!(e, Event::State(LinkState::Stopped { .. }))).await;
         let Some(Event::State(LinkState::Stopped { reason: Some(r) })) = ev.last() else { panic!("{ev:?}") };
         assert!(r.contains("gave up after 2") && r.contains("Host is down"), "{r}");
+    }
+
+    fn stopped_sim() -> xbtune_sim::SharedSim {
+        let mut sim = Simulator::bueib_running();
+        sim.set_engine_running(false);
+        sim.set_test_duration(Duration::from_millis(100));
+        shared(sim)
+    }
+
+    #[tokio::test]
+    async fn function_runs_then_polling_resumes() {
+        let sim = stopped_sim();
+        let mut cfg = SessionConfig::new("sim", EcmAddress::Stock);
+        fast(&mut cfg);
+        cfg.permit = Some(crate::diag::test_permit());
+        cfg.function_timing.poll = Duration::from_millis(20);
+        let mut s = start(cfg, sim_opener(sim.clone()), Arc::new(Catalog::builtin().unwrap()), None);
+        collect_until(&mut s, |e| matches!(e, Event::Identified(_))).await;
+        s.send(Command::Function(xbtune_proto::Function::Fan));
+        let ev = collect_until(&mut s, |e| matches!(e, Event::FunctionDone { .. })).await;
+        let Some(Event::FunctionDone { result, .. }) = ev.last() else { panic!("{ev:?}") };
+        assert!(result.as_ref().is_ok_and(|o| o.acknowledged), "{result:?}");
+        assert!(
+            ev.iter().any(|e| matches!(
+                e,
+                Event::FunctionProgress { stage: crate::diag::Stage::Running { .. }, .. }
+            ))
+        );
+        assert_eq!(sim.lock().unwrap().journal.functions, vec![xbtune_proto::Function::Fan.code()]);
+        // Live data carries on afterwards.
+        let ev = collect_until(&mut s, |e| matches!(e, Event::Sample(_))).await;
+        assert!(matches!(ev.last(), Some(Event::Sample(_))));
+        s.send(Command::Stop);
+        s.task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn function_without_permit_is_refused() {
+        let sim = stopped_sim();
+        let mut cfg = SessionConfig::new("sim", EcmAddress::Stock);
+        fast(&mut cfg);
+        let mut s = start(cfg, sim_opener(sim.clone()), Arc::new(Catalog::builtin().unwrap()), None);
+        collect_until(&mut s, |e| matches!(e, Event::Identified(_))).await;
+        s.send(Command::Function(xbtune_proto::Function::FuelPump));
+        let ev = collect_until(&mut s, |e| matches!(e, Event::FunctionDone { .. })).await;
+        let Some(Event::FunctionDone { result: Err(e), .. }) = ev.last() else { panic!("{ev:?}") };
+        assert!(e.contains("locked"), "{e}");
+        assert!(sim.lock().unwrap().journal.functions.is_empty());
+        s.send(Command::Stop);
     }
 }

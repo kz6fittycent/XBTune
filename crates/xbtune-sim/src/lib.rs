@@ -59,6 +59,9 @@ pub enum Fault {
     /// Like `SilentFlip`, but with a different wrong value every time, so
     /// repeated reads never agree.
     SilentFlipVarying,
+    /// The request is lost on the way: the ECM never sees it (nothing is
+    /// executed) and nothing comes back.
+    LoseRequest,
 }
 
 /// Random faults, as probabilities per reply (0.0..=1.0).
@@ -93,6 +96,9 @@ pub struct SimConfig {
     /// Model the K-line: each reply takes 10 bits per byte at this rate to
     /// arrive (a real 107-byte runtime frame is ~111 ms at 9600 baud).
     pub wire_baud: Option<u32>,
+    /// How long the ECM reports busy after an active test or TPS reset.
+    /// ASSUMED: real durations are not documented in EcmDroid.
+    pub test_duration: Duration,
 }
 
 impl SimConfig {
@@ -107,6 +113,7 @@ impl SimConfig {
             rates: FaultRates::default(),
             seed: 0x5EED_B0E1,
             wire_baud: None,
+            test_duration: Duration::from_secs(3),
         }
     }
 
@@ -138,6 +145,9 @@ pub struct Simulator {
     /// Made-up live data: the engine, when it started, and a fixed time
     /// for tests.
     engine: Option<(engine::Engine, Instant, Option<f64>)>,
+    engine_running: bool,
+    /// Busy (state 1) until then, after a test command.
+    busy_until: Option<Instant>,
     pub journal: Journal,
 }
 
@@ -167,6 +177,8 @@ impl Simulator {
             rng,
             flips: 0,
             engine: None,
+            engine_running: true,
+            busy_until: None,
             journal: Journal::default(),
         }
     }
@@ -188,6 +200,20 @@ impl Simulator {
     pub fn with_engine(mut self, def: Arc<xbtune_defs::Definition>) -> Self {
         self.engine = Some((engine::Engine::new(def), Instant::now(), None));
         self
+    }
+
+    /// Start or stop the made-up engine (stopped: ignition on, RPM 0).
+    pub fn set_engine_running(&mut self, running: bool) {
+        self.engine_running = running;
+    }
+
+    pub fn engine_running(&self) -> bool {
+        self.engine_running
+    }
+
+    /// How long tests keep the ECM busy.
+    pub fn set_test_duration(&mut self, d: Duration) {
+        self.cfg.test_duration = d;
     }
 
     /// Freeze the engine at `t` seconds (tests), or let it run (`None`).
@@ -236,6 +262,10 @@ impl Simulator {
             out.push(Emission::Write(frame.as_bytes().to_vec()));
         }
         let fault = self.next_fault();
+        if fault == Some(Fault::LoseRequest) {
+            self.journal.requests -= 1;
+            return out;
+        }
         if let Some(Fault::Nak(code)) = fault {
             out.push(Emission::Write(self.reply(code, &[])));
             return out;
@@ -265,12 +295,15 @@ impl Simulator {
             }
             [CMD_RTDATA] => match &self.engine {
                 Some((e, start, fixed)) => {
-                    e.frame(&self.runtime, fixed.unwrap_or_else(|| start.elapsed().as_secs_f64()))
+                    let t = fixed.unwrap_or_else(|| start.elapsed().as_secs_f64());
+                    e.frame_with(&self.runtime, t, self.engine_running)
                 }
                 None => self.runtime.clone(),
             },
             [CMD_GET, 0, CONTROL_PAGE, 1] => {
-                let s = self.state;
+                let busy = self.busy_until.is_some_and(|t| Instant::now() < t);
+                // ASSUMED: busy reads as 1 during a test.
+                let s = if busy { 1 } else { self.state };
                 self.reply(ACK, &[s])
             }
             [CMD_GET, offset, page, len] => match self.map(*page, *offset, *len as usize) {
@@ -283,7 +316,11 @@ impl Simulator {
             [CMD_SET, 0, CONTROL_PAGE, code] => {
                 self.journal.functions.push(*code);
                 if *code == Function::ClearCodes.code() {
-                    // ASSUMED: nothing else to model until trouble codes exist.
+                    // ASSUMED: clearing zeroes the stored-code bytes; current
+                    // codes stay while the fault exists.
+                    self.clear_stored_codes();
+                } else {
+                    self.busy_until = Some(Instant::now() + self.cfg.test_duration);
                 }
                 self.reply(ACK, &[])
             }
@@ -298,6 +335,22 @@ impl Simulator {
                 }
             }
             _ => self.reply(SIM_NAK, &[]),
+        }
+    }
+
+    /// Zero the stored-code bytes (`HDiag<n>_LD`) in the runtime frame.
+    fn clear_stored_codes(&mut self) {
+        let Ok(c) = Catalog::builtin() else { return };
+        let Some(def) = c.lookup(&self.cfg.version).and_then(|e| c.definition(e)) else { return };
+        for v in def.runtime.values().filter(|v| v.varname.starts_with("HDiag") && v.varname.ends_with("_LD"))
+        {
+            if let Some(b) = self.runtime.get_mut(v.offset) {
+                *b = 0;
+            }
+        }
+        let n = self.runtime.len();
+        if n > 1 {
+            self.runtime[n - 1] = xbtune_proto::pdu::checksum(&self.runtime);
         }
     }
 
@@ -346,7 +399,7 @@ impl Simulator {
     fn apply(&mut self, fault: Option<Fault>, mut reply: Vec<u8>, out: &mut Vec<Emission>) {
         match fault {
             None | Some(Fault::Nak(_)) => out.push(Emission::Write(reply)),
-            Some(Fault::Drop) => {}
+            Some(Fault::Drop | Fault::LoseRequest) => {}
             Some(Fault::Corrupt) => {
                 let n = reply.len();
                 reply[n - 1] ^= 0x5A;

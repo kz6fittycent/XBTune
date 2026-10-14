@@ -80,7 +80,22 @@ impl Engine {
     /// `template` (a whole runtime reply frame) with the ride at `t`
     /// written in, and the checksum fixed.
     pub fn frame(&self, template: &[u8], t: f64) -> Vec<u8> {
-        let s = state_at(t);
+        self.frame_with(template, t, true)
+    }
+
+    /// Like [`Engine::frame`]; with `running` false the engine is stopped
+    /// (ignition on): no RPM, throttle closed, no fuel or spark.
+    pub fn frame_with(&self, template: &[u8], t: f64, running: bool) -> Vec<u8> {
+        let mut s = state_at(t);
+        if !running {
+            s.rpm = 0.0;
+            s.tps = 0.0;
+            s.pw = (0.0, 0.0);
+            s.spark = (0.0, 0.0);
+            s.o2_volts = 0.0;
+            s.ego = 100.0;
+            s.battery = 12.6;
+        }
         let mut f = template.to_vec();
         // Database variable names, which are the same across the XB
         // definitions. Variables an ECM doesn't have are skipped.
