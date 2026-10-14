@@ -37,7 +37,6 @@ platforms:
 apps:
   xbtune:
     command: bin/xbtune
-    desktop: meta/gui/xbtune.desktop
     extensions: [gnome]
     plugs:
       - bluez
@@ -57,20 +56,28 @@ apps:
       - home
 
 parts:
-  xbtune:
-    plugin: rust
-    source: .
-    rust-channel: stable
-    rust-path:
-      - crates/xbtune-app
-      - crates/xbtune-cli
-      - crates/xbtune-sim
-    # snapd 2.76 in the build instance refuses to run snap apps as root
-    # ("cannot track application process"), so the rust plugin's rustup snap
-    # is unusable. Ubuntu's rustup deb (/usr/bin, ahead of /snap/bin) is used
-    # instead and installs the stable toolchain.
+  # The gnome extension exports LD_LIBRARY_PATH/PKG_CONFIG_PATH into every
+  # part's build environment, and the SDK's libc there breaks host tools
+  # (rustup, cargo, rustc). The rust plugin can't opt out, so both parts
+  # build with plain scripts that clear those variables. Ubuntu's rustup deb
+  # is used because snapd 2.76 won't run the rustup snap as root in the
+  # build instance.
+  rust-deps:
+    plugin: nil
     build-packages:
       - rustup
+    override-build: |
+      unset LD_LIBRARY_PATH PKG_CONFIG_PATH PYTHONPATH
+      # The deb's rustup exits 1 after installing ("rustup is not installed
+      # at ~/.cargo": it isn't, it's in /usr/bin), so check the result instead.
+      /usr/bin/rustup toolchain install stable --profile minimal || true
+      /usr/bin/rustup run stable cargo --version
+
+  xbtune:
+    plugin: nil
+    source: .
+    after: [rust-deps]
+    build-packages:
       - pkg-config
       - libdbus-1-dev
       - libudev-dev
@@ -81,3 +88,11 @@ parts:
       craftctl default
       version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
       craftctl set version="${version}+git$(git rev-parse --short HEAD 2>/dev/null || echo local)"
+    override-build: |
+      unset LD_LIBRARY_PATH PKG_CONFIG_PATH PYTHONPATH
+      cargo() { /usr/bin/rustup run stable cargo "$@"; }
+      cargo --version
+      for crate in xbtune-app xbtune-cli xbtune-sim; do
+        cargo install --locked --path "crates/${crate}" --root "${CRAFT_PART_INSTALL}"
+      done
+      rm -f "${CRAFT_PART_INSTALL}/.crates.toml" "${CRAFT_PART_INSTALL}/.crates2.json"
