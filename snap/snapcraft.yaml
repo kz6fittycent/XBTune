@@ -1,0 +1,70 @@
+name: xbtune
+adopt-info: xbtune
+title: XBTune
+summary: Diagnostics, logging and tuning for Buell XB motorcycles
+description: |
+  XBTune reads, logs and tunes the DDFI-2 and DDFI-3 ECMs on 2003-2009
+  Buell XB9 and XB12 motorcycles, over Bluetooth (BuellTooth and other SPP
+  adapters) or a USB serial cable.
+
+  This is an early, read-only build. It identifies the ECM and measures the
+  link quality. It never writes to the ECM.
+
+  After installing, connect the interfaces it needs:
+
+    sudo snap connect xbtune:bluez
+    sudo snap connect xbtune:raw-usb
+    sudo snap connect xbtune:removable-media
+
+  Then try:
+
+    xbtune.cli doctor
+    xbtune.cli scan
+    xbtune.cli info --bt 00:11:22:AA:BB:CC
+    xbtune.cli info --serial /dev/ttyUSB0
+
+base: core24
+grade: devel
+confinement: strict
+license: GPL-3.0-or-later
+contact: https://github.com/kz6fittycent/XBTune/issues
+
+platforms:
+  amd64:
+    build-on: [amd64]
+    build-for: [amd64]
+
+# The egui desktop app (phase 3) will be the `xbtune` command and will add
+# the gnome extension plus desktop/wayland/x11/opengl plugs.
+apps:
+  cli:
+    command: bin/xbtune-cli
+    plugs:
+      - bluez
+      - raw-usb
+      - home
+      - removable-media
+  sim:
+    command: bin/xbtune-sim
+    plugs:
+      - home
+
+parts:
+  xbtune:
+    plugin: rust
+    source: .
+    rust-channel: stable
+    rust-path:
+      - crates/xbtune-cli
+      - crates/xbtune-sim
+    build-packages:
+      - pkg-config
+      - libdbus-1-dev
+      - libudev-dev
+    stage-packages:
+      - libdbus-1-3
+      - libudev1
+    override-pull: |
+      craftctl default
+      version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
+      craftctl set version="${version}+git$(git rev-parse --short HEAD 2>/dev/null || echo local)"

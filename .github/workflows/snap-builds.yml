@@ -1,0 +1,35 @@
+name: 🧪 Snap Builds
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Build Snap
+        uses: snapcore/action-build@v1
+        id: build
+        with:
+          # Not "args" - the action renamed this input at some point;
+          # "args" is silently ignored now (just an unrecognized-input
+          # warning, not a hard failure), which meant this was actually
+          # running bare `snapcraft` instead of `snapcraft pack` the
+          # whole time.
+          snapcraft-args: pack
+
+      - name: Snapcraft Review
+        uses: diddlesnaps/snapcraft-review-action@v1
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          isClassic: 'false'
