@@ -12,7 +12,8 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   161/161 requests, 0 retries, RTT avg 65 ms; CRC-32 3b54974e;
   `diff` against EcmDroid's own save (`BUEIB_20261014-162837.xpr`) =
   "Identical (1210 bytes compared)". Fuel/spark maps decode sensibly.
-  Still waiting for the files + Setup values for the golden test.
+  Owner's dumps are in `tests/fixtures/owner/` and the golden test runs;
+  still waiting for Setup values (`ecmdroid_values.toml`).
   Don't start phase 3 until the owner says so.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).

@@ -6,12 +6,39 @@
 
 use std::path::PathBuf;
 
-use xbtune_core::image::{Image, diff_ranges};
+use xbtune_core::image::{Image, crc32, diff_ranges};
 use xbtune_defs::{Catalog, Value, format_number};
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/owner").join(name)
 }
+
+/// XBTune's dump: the `.xbt`, or the `--xpr` copy written by the same dump.
+const OURS: &[&str] = &["xbtune.xbt", "BUEIB_xbtune.xpr"];
+/// EcmDroid's save: `ecmdroid.xpr`, or EcmDroid's own `BUEIB_<date>-<time>.xpr` name.
+fn theirs() -> Option<PathBuf> {
+    let dir = fixture("");
+    if dir.join("ecmdroid.xpr").exists() {
+        return Some(dir.join("ecmdroid.xpr"));
+    }
+    let mut found: Vec<_> = std::fs::read_dir(&dir)
+        .ok()?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| {
+            let n = p.file_name().unwrap().to_string_lossy().into_owned();
+            n.starts_with("BUEIB_2") && n.ends_with(".xpr")
+        })
+        .collect();
+    found.sort();
+    found.pop()
+}
+
+fn ours() -> Option<PathBuf> {
+    OURS.iter().map(|n| fixture(n)).find(|p| p.exists())
+}
+
+/// CRC-32 of the full 1210-byte image read off the owner's ECM on 2026-10-14.
+const BIKE_CRC: u32 = 0x3b54974e;
 
 fn present(names: &[&str]) -> bool {
     let missing: Vec<_> = names.iter().filter(|n| !fixture(n).exists()).collect();
@@ -23,13 +50,16 @@ fn present(names: &[&str]) -> bool {
 
 #[test]
 fn xbtune_dump_matches_ecmdroid_save() {
-    if !present(&["xbtune.xbt", "ecmdroid.xpr"]) {
+    let (Some(ours), Some(theirs)) = (ours(), theirs()) else {
+        eprintln!("SKIPPED: owner dump or EcmDroid save missing (see tests/fixtures/owner/README.md)");
         return;
-    }
+    };
     let c = Catalog::builtin().unwrap();
-    let ours = Image::load(&fixture("xbtune.xbt"), None, &c).unwrap();
-    let theirs = Image::load(&fixture("ecmdroid.xpr"), Some(&ours.ecm_id), &c).unwrap();
+    let ours = Image::load(&ours, Some("BUEIB"), &c).unwrap();
+    let theirs = Image::load(&theirs, Some("BUEIB"), &c).unwrap();
     assert_eq!(ours.ecm_id, "BUEIB");
+    assert!(ours.page_zero && theirs.page_zero);
+    assert_eq!(crc32(&ours.bytes), BIKE_CRC);
     let ecm = c.lookup(&ours.ecm_id).unwrap();
     let n = if ours.page_zero && theirs.page_zero { ecm.xsize } else { ecm.size };
     let d = diff_ranges(&ours.bytes[..n], &theirs.bytes[..n]);
@@ -40,7 +70,8 @@ fn xbtune_dump_matches_ecmdroid_save() {
 /// EcmDroid displays, e.g. `KRPM_Hard_Hi = "6800"`.
 #[test]
 fn decoded_values_match_ecmdroid() {
-    if !present(&["xbtune.xbt", "ecmdroid_values.toml"]) {
+    let Some(ours) = ours() else { return };
+    if !present(&["ecmdroid_values.toml"]) {
         return;
     }
     #[derive(serde::Deserialize)]
@@ -48,7 +79,7 @@ fn decoded_values_match_ecmdroid() {
         values: std::collections::BTreeMap<String, String>,
     }
     let c = Catalog::builtin().unwrap();
-    let img = Image::load(&fixture("xbtune.xbt"), None, &c).unwrap();
+    let img = Image::load(&ours, Some("BUEIB"), &c).unwrap();
     let def = c.definition(c.lookup(&img.ecm_id).unwrap()).unwrap();
     let exp: Expected =
         toml::from_str(&std::fs::read_to_string(fixture("ecmdroid_values.toml")).unwrap()).unwrap();
@@ -65,4 +96,30 @@ fn decoded_values_match_ecmdroid() {
         }
     }
     assert!(bad.is_empty(), "{bad:#?}");
+}
+
+/// The front fuel and spark maps as `xbtune.cli show` printed them on the
+/// owner's laptop (snap git 23ea31c, 2026-10-14). Guards the map layout
+/// against regressions; EcmDroid itself only shows these as raw bytes.
+#[test]
+fn owner_maps_decode_as_on_the_bike() {
+    let Some(ours) = ours() else { return };
+    let c = Catalog::builtin().unwrap();
+    let img = Image::load(&ours, Some("BUEIB"), &c).unwrap();
+    let def = c.definition(c.lookup("BUEIB").unwrap()).unwrap();
+    let grid = |name: &str| match def.eeprom.get(name).unwrap().decode(&img.view()).unwrap() {
+        Value::Grid(g) => g,
+        other => panic!("{name}: {other:?}"),
+    };
+    let fuel = grid("Tab_Fuel_Front");
+    assert_eq!(fuel.len(), 12);
+    assert_eq!(fuel[0], [20.0, 20.0, 22.0, 22.0, 23.0, 23.0, 23.0, 24.0, 30.0, 34.0, 40.0, 54.0, 56.0]);
+    assert_eq!(
+        fuel[11],
+        [185.0, 210.0, 203.0, 185.0, 185.0, 182.0, 160.0, 165.0, 185.0, 200.0, 175.0, 145.0, 145.0]
+    );
+    let spark = grid("Tab_Spark_Front");
+    assert_eq!(spark.len(), 10);
+    assert_eq!(spark[3], [0.0, 45.0, 45.0, 45.0, 41.5, 37.5, 24.0, 12.0, 7.5, 5.0]);
+    assert_eq!(spark[9], [0.0, 42.5, 37.25, 37.5, 35.0, 27.0, 21.5, 7.0, 5.0, 5.0]);
 }
