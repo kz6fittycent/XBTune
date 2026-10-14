@@ -1,5 +1,6 @@
 [package]
 name = "xbtune-sim"
+description = "Simulated Buell DDFI ECM with fault injection, in-process or over a pty"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,6 +8,15 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+anyhow.workspace = true
+clap.workspace = true
+libc.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+xbtune-defs.workspace = true
+xbtune-link.workspace = true
+xbtune-proto.workspace = true
 
 [lints]
 workspace = true

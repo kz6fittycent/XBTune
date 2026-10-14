@@ -1,0 +1,69 @@
+# Which bikes each ECM ID shipped on. XBTune's own data, NOT from ecmdroid.db.
+#
+# Sources (public web pages, read 2026-10-14):
+# - Revision Moto, "Buell Motorcycle ECM Basics", https://www.rev-mo.com/ecmbasics
+#   (that page credits ecmspy.com for its table)
+# - BUELLXB.com forum, https://www.buellxb.com/threads/general-tuning-options-and-discussion-in-2017-ecmdroid-ecmspy-etc.53158/
+#
+# ECMs get swapped between bikes, so this is a hint for the UI, never a check.
+# "XB, 1125" IDs are shared by 2008+ XBs and the 1125. The 1125 is out of scope.
+
+[[model]]
+id = "BUECB"
+bikes = "XB9 (2003)"
+
+[[model]]
+id = "BUEGB"
+bikes = "XB (2004)"
+
+[[model]]
+id = "BUEIB"
+bikes = "XB (2005-2007)"
+
+[[model]]
+id = "BUEIC"
+bikes = "XB (2005-2007), Japan model"
+
+[[model]]
+id = "B2RIB"
+bikes = "XB (2005-2007), factory race ECM"
+
+[[model]]
+id = "BUEOD"
+bikes = "XB (2008+)"
+
+[[model]]
+id = "BUEWD"
+bikes = "XB or 1125 (2008+)"
+
+[[model]]
+id = "BUEYD"
+bikes = "XB or 1125 (2008+)"
+
+[[model]]
+id = "BUEZD"
+bikes = "XB or 1125 (2008+)"
+
+[[model]]
+id = "BUE1D"
+bikes = "XB or 1125 (2008+)"
+
+[[model]]
+id = "BUE2D"
+bikes = "XB or 1125 (2008+)"
+
+[[model]]
+id = "BUE3D"
+bikes = "XB or 1125 (2008+)"
+
+[[model]]
+id = "B3R1D"
+bikes = "XB or 1125 (2008+), EBR race ECM"
+
+[[model]]
+id = "B3R2D"
+bikes = "XB or 1125 (2008+), EBR race ECM"
+
+[[model]]
+id = "B3R3D"
+bikes = "XB or 1125 (2008+), EBR race ECM"
