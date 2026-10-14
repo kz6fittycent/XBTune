@@ -65,6 +65,10 @@ parts:
       - crates/xbtune-app
       - crates/xbtune-cli
       - crates/xbtune-sim
+    # The gnome extension replaces the part's build environment, so the
+    # rust plugin's implicit rustup snap must be named here.
+    build-snaps:
+      - rustup
     build-packages:
       - pkg-config
       - libdbus-1-dev
