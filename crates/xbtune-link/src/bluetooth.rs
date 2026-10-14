@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 
 use bluer::rfcomm::{SocketAddr, Stream};
-use bluer::{Address, AdapterEvent};
+use bluer::{AdapterEvent, Address};
 use futures::StreamExt;
 
 /// Serial Port Profile UUID.

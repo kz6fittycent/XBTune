@@ -84,11 +84,7 @@ pub struct RetryPolicy {
 
 impl Default for RetryPolicy {
     fn default() -> Self {
-        Self {
-            timeout: Duration::from_millis(1000),
-            max_attempts: 3,
-            settle: Duration::from_millis(150),
-        }
+        Self { timeout: Duration::from_millis(1000), max_attempts: 3, settle: Duration::from_millis(150) }
     }
 }
 

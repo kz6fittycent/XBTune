@@ -99,9 +99,7 @@ impl Layout {
 
     /// Pages that contain any byte of `range` (flat image offsets).
     pub fn pages_touching(&self, range: std::ops::Range<usize>) -> impl Iterator<Item = &Page> {
-        self.pages
-            .iter()
-            .filter(move |p| range.start < p.start + p.len && p.start < range.end)
+        self.pages.iter().filter(move |p| range.start < p.start + p.len && p.start < range.end)
     }
 
     /// Requests that read page `nr` completely, in order.
@@ -179,8 +177,7 @@ mod tests {
 
     /// BUEIB (category 8) from ecmdroid.db `pages`/`eeprom` tables.
     fn bueib() -> Layout {
-        Layout::new(1210, &[(0, 4), (1, 256), (2, 256), (3, 158), (4, 256), (5, 256), (6, 24)])
-            .unwrap()
+        Layout::new(1210, &[(0, 4), (1, 256), (2, 256), (3, 158), (4, 256), (5, 256), (6, 24)]).unwrap()
     }
 
     #[test]

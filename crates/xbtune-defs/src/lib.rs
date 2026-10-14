@@ -126,9 +126,7 @@ impl Catalog {
         let models: ModelFile = toml::from_str(models)?;
         let mut map = BTreeMap::new();
         for mut def in file.ecm {
-            let layout = def
-                .layout()
-                .map_err(|source| DefsError::Layout { id: def.id.clone(), source })?;
+            let layout = def.layout().map_err(|source| DefsError::Layout { id: def.id.clone(), source })?;
             if layout.size_without_page_zero() != def.size {
                 return Err(DefsError::Size {
                     id: def.id.clone(),

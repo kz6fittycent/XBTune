@@ -72,7 +72,7 @@ impl Pty {
                     Err(_) => return,
                 };
                 decoder.push(&buf[..n]);
-                while let Some(d) = decoder.next() {
+                while let Some(d) = decoder.next_frame() {
                     let Decoded::Frame(frame) = d else { continue };
                     let emissions = sim.lock().expect("sim lock").respond(&frame);
                     for e in emissions {

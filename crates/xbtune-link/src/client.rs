@@ -85,7 +85,7 @@ impl EcmClient {
                         _ => Outcome::Corrupt,
                     };
                     self.stats.record_attempt(outcome, None, retry);
-                    warn!(attempt, attempts, ?request, error = %e, "ECM request failed");
+                    debug!(attempt, attempts, ?request, error = %e, "attempt failed");
                     let transient = e.is_transient();
                     let io = matches!(e, TransactionError::Io(_));
                     last = Some(e);
@@ -97,6 +97,7 @@ impl EcmClient {
             }
         }
         let last = last.expect("at least one attempt");
+        warn!(?request, error = %last, "ECM request failed");
         if attempts > 1 && last.is_transient() {
             Err(TransactionError::Exhausted { attempts, last: Box::new(last) })
         } else {
@@ -113,7 +114,7 @@ impl EcmClient {
 
         let deadline = Instant::now() + self.policy.timeout;
         loop {
-            while let Some(d) = self.decoder.next() {
+            while let Some(d) = self.decoder.next_frame() {
                 match d {
                     Decoded::Frame(pdu) => {
                         trace!(rx = %hex(pdu.as_bytes()));

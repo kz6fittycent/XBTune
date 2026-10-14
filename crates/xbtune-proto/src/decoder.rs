@@ -58,7 +58,7 @@ impl FrameDecoder {
 
     /// Try to take the next frame out of the buffer. Returns `None` when more
     /// bytes are needed.
-    pub fn next(&mut self) -> Option<Decoded> {
+    pub fn next_frame(&mut self) -> Option<Decoded> {
         loop {
             // Skip to the next SOH.
             match self.buf.iter().position(|&b| b == SOH) {
@@ -112,7 +112,7 @@ mod tests {
     use crate::pdu::{EcmAddress, Request};
 
     fn frames(d: &mut FrameDecoder) -> Vec<Decoded> {
-        std::iter::from_fn(|| d.next()).collect()
+        std::iter::from_fn(|| d.next_frame()).collect()
     }
 
     fn version_reply() -> Vec<u8> {
@@ -137,7 +137,7 @@ mod tests {
         let bytes = version_reply();
         for (i, b) in bytes.iter().enumerate() {
             d.push(&[*b]);
-            let got = d.next();
+            let got = d.next_frame();
             if i + 1 < bytes.len() {
                 assert_eq!(got, None, "early frame at byte {i}");
             } else {
@@ -153,10 +153,7 @@ mod tests {
         d.push(&version_reply());
         d.push(&[0x01, 0x01, 0x02]);
         d.push(&version_reply());
-        let got: Vec<_> = frames(&mut d)
-            .into_iter()
-            .filter(|f| matches!(f, Decoded::Frame(_)))
-            .collect();
+        let got: Vec<_> = frames(&mut d).into_iter().filter(|f| matches!(f, Decoded::Frame(_))).collect();
         assert_eq!(got.len(), 2);
         assert!(d.discarded() >= 8);
     }
@@ -206,6 +203,6 @@ mod tests {
         d.clear();
         assert_eq!(d.pending(), 0);
         d.push(&version_reply());
-        assert!(matches!(d.next(), Some(Decoded::Frame(_))));
+        assert!(matches!(d.next_frame(), Some(Decoded::Frame(_))));
     }
 }

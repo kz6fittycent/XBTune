@@ -23,9 +23,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use xbtune_defs::{Catalog, EcmDef};
 use xbtune_proto::decoder::Decoded;
 use xbtune_proto::eeprom::{Layout, PAGE_ZERO_END};
-use xbtune_proto::pdu::{
-    ACK, CMD_GET, CMD_RTDATA, CMD_SET, CMD_VERSION, CONTROL_PAGE, HOST_ID,
-};
+use xbtune_proto::pdu::{ACK, CMD_GET, CMD_RTDATA, CMD_SET, CMD_VERSION, CONTROL_PAGE, HOST_ID};
 use xbtune_proto::{EcmAddress, FrameDecoder, Function, Pdu};
 
 /// Status byte the simulator sends for requests it refuses. ASSUMED: the
@@ -145,7 +143,15 @@ impl Simulator {
             Pdu::new(cfg.address.id(), HOST_ID, &payload).into_bytes()
         };
         let rng = cfg.seed.max(1);
-        Self { cfg, image: full, runtime, state: 0, script: VecDeque::new(), rng, journal: Journal::default() }
+        Self {
+            cfg,
+            image: full,
+            runtime,
+            state: 0,
+            script: VecDeque::new(),
+            rng,
+            journal: Journal::default(),
+        }
     }
 
     /// The default BUEIB simulator with EcmDroid's test image.
@@ -335,7 +341,7 @@ pub async fn serve<T: AsyncRead + AsyncWrite + Unpin>(sim: SharedSim, mut io: T)
             return Ok(());
         }
         decoder.push(&buf[..n]);
-        while let Some(d) = decoder.next() {
+        while let Some(d) = decoder.next_frame() {
             let Decoded::Frame(frame) = d else { continue };
             let emissions = sim.lock().expect("sim lock").respond(&frame);
             for e in emissions {

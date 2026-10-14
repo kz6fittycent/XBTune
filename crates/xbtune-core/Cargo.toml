@@ -1,5 +1,6 @@
 [package]
 name = "xbtune-core"
+description = "Session state, storage locations, snap environment (later: EEPROM model, diffs, logging, auto-tune)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,6 +8,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+directories.workspace = true
 
 [lints]
 workspace = true
