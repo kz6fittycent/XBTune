@@ -18,6 +18,7 @@ xbtune-link.workspace = true
 xbtune-proto.workspace = true
 
 [dev-dependencies]
+serde.workspace = true
 tokio.workspace = true
 xbtune-sim.workspace = true
 

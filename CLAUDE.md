@@ -5,44 +5,48 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 
 ## Status
 
-- **Phase 1 (foundation): built and waiting for the owner's hardware test.**
-  Don't start phase 2 until the owner says so.
-- Snap verified on this PC (2026-10-14, rev x2, git b5fa645), strict confinement,
-  with bluez, raw-usb and removable-media connected:
-  - `doctor`, `info --sim`, and the "interface not connected" hints: OK.
-  - `scan` (BlueZ over D-Bus): OK.
-  - RFCOMM socket: reaches the radio, no seccomp/AppArmor denials. Works with
-    the real BuellTooth (see hardware results above).
-  - USB serial: not tested (no adapter here). The AppArmor profile grants
-    `/dev/tty{USB,ACM}[0-9]* rwk`, which covers serialport's flock.
-  - The pty simulator can't be used *inside* the snap: AppArmor refuses
-    file_lock on /dev/pts/*, and serialport always flocks. Use the pty sim
-    from `cargo run` instead.
-  - Harmless AppArmor noise: tokio reading cgroup `cpu.max`.
+- **Phase 1: done.** On-bike pass over BuellTooth 2026-10-14. The owner has
+  no USB cable, so the USB path is untested on hardware (signed off without it).
+- **Phase 2 (definitions + read): built 2026-10-14, waiting for the owner's
+  hardware test and golden data.** Don't start phase 3 until the owner says so.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
-  `BUEIB310 12-11-03`. Confirmed on hardware 2026-10-14.
+  `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the
   garage). Build the snap here, then hand the user the `.snap` file to install
   on the laptop with `sudo snap install --dangerous`. Interfaces must be
   connected on the laptop too. Can't run commands on the laptop: give the
   user exact commands and ask for the output.
-- Hardware results (2026-10-14, laptop, snap git b5fa645):
-  - BuellTooth `00:11:22:33:44:55`, RFCOMM channel 1: `info` OK. BUEIB,
-    107-byte runtime frame, idle, 23/23 requests OK, 0 retries,
-    RTT avg 65 ms (min 50, max 147).
-  - USB serial: not yet tested.
+- Phase 1 hardware result (laptop, snap git b5fa645): `info` OK, 23/23
+  requests, 0 retries, RTT avg 65 ms (min 50, max 147).
+- Snap confinement checks on this PC: see "Snap notes" below.
 - Repo is private, with no remote. Don't add a remote or push without asking.
   Don't publish to the store.
+
+### Phase 2 contents
+
+- `data/ecmdroid.toml`: full definitions for in-scope categories (4,679 EEPROM
+  variables, 1,244 runtime, 92 bit sets, 831 names).
+- `xbtune-defs`: model + decoding; checks on load; issues per ID
+  (`xbtune-cli defs <ID>`, table in `docs/SUPPORTED_ECMS.md`).
+- `xbtune-core`: `Image`, `.xbt` (`docs/FILE_FORMATS.md`), `.xpr`, `EepromRead`
+  (resume + verify-by-double-read).
+- CLI: `dump`, `show`, `diff`, `convert`, `defs`.
+- Golden tests: EcmDroid's own test assertions (`crates/xbtune-defs/tests/`);
+  owner's bike (`crates/xbtune-core/tests/owner_golden.rs`) skipped until
+  `tests/fixtures/owner/` holds `xbtune.xbt`, `ecmdroid.xpr` and
+  `ecmdroid_values.toml`.
+- `docs/PARITY.md`: checklist from the public ECMSpy guides, with **NEW**
+  items that weren't in KICKOFF §5.
 
 ## Layout
 
 ```
 crates/xbtune-proto  PDU framing, checksum, decoder, EEPROM page model, transaction rules (no I/O)
 crates/xbtune-link   serial + RFCOMM transports (BoxIo), EcmClient (retries/stats), BlueZ scan
-crates/xbtune-defs   ECM catalog loaded from data/ecmdroid.toml + data/ecm_models.toml
-crates/xbtune-core   env: snap detection, $SNAP_USER_COMMON paths, plug checks
+crates/xbtune-defs   catalog + definitions (EEPROM/runtime vars, bit sets) from data/ecmdroid.toml; decoding
+crates/xbtune-core   env (snap, paths), image (.xbt/.xpr), read (full EEPROM read), time
 crates/xbtune-sim    simulated ECM + fault injection; in-process and pty; bin xbtune-sim
-crates/xbtune-cli    xbtune-cli: info, ports, scan, ecms, doctor
+crates/xbtune-cli    xbtune-cli: info, ports, scan, ecms, doctor, dump, show, diff, convert, defs
 crates/xbtune-app    placeholder (egui app is phase 3)
 data/                ecmdroid.toml (ED-DB derived, RESTRICTED), ecm_models.toml (ours)
 tools/               extract_ecmdroid_db.py
@@ -89,19 +93,36 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 - Snap apps: `xbtune.cli`, `xbtune.sim`. In phase 3 the GUI becomes `xbtune`,
   with the gnome extension.
 - Publishing workflows are gated by the repo variable `XBTUNE_STORE_PUBLISH`.
+- Tables/maps: layout is XBTune's reading of the db columns (EcmDroid only
+  shows raw bytes). Maps = rows of `cols` values + `skip` pad bytes; `Table` =
+  interleaved (input, output) pairs, input scaled by axisscale/axistranslate.
+  Pair-table input scaling is UNCONFIRMED; `show` says so.
+- Not ported: EcmDroid `Variable.getHigh()` double scaling. Duplicate db rows
+  that disagree are dropped, not guessed (BUEOD `KVS_RPM_Revs`).
+- `dump` verifies by default: a chunk counts only when two consecutive reads
+  agree (the XOR frame checksum misses some errors). Backups must use it.
 - Approved extra deps (2026-10-14): clap, thiserror, anyhow, tracing,
   tracing-subscriber, libc, futures. Ask before adding any others.
 
 ## Next steps
 
-1. Owner runs the phase 1 hardware checklist (below) over BuellTooth and USB,
-   from the installed snap. Record the results here.
-2. Ask for a btsnoop capture of EcmDroid connecting and reading the version.
-   Confirm the version/runtime request frames, any echo, and the RFCOMM
-   channel.
-3. Phase 2 (only after the owner says go): extend the extractor to variables,
-   tables and bits; full EEPROM read/save/open; `xbtune-cli dump`; golden
-   test against the owner's dump; `docs/PARITY.md` from public ECMSpy material.
+1. Owner runs the phase 2 checklist below on the bike and sends: the `.xbt`
+   dump, an EcmDroid `.xpr` save of the same ECM, and a few Setup-screen
+   values. Put them in `tests/fixtures/owner/` and run the golden tests.
+2. Ask for a btsnoop capture of EcmDroid reading the EEPROM to confirm the
+   GET frames and page 0 reads byte for byte.
+3. Phase 3 (only after the owner says go): runtime polling, CLI logging,
+   first egui app.
+
+## Phase 2 hardware checklist (read-only)
+
+Ignition ON, engine OFF, kill switch RUN.
+1. `xbtune.cli dump --bt 00:11:22:33:44:55 --xpr ~/BUEIB_xbtune.xpr -o ~/xbtune.xbt`
+   (expect about 10-20 s, "Verified: yes", 0 re-reads).
+2. `xbtune.cli show ~/xbtune.xbt`, then `... show ~/xbtune.xbt Tab_Fuel_Front Tab_Spark_Front`.
+3. EcmDroid: fetch the EEPROM, save it, copy the `.xpr` to the laptop.
+4. `xbtune.cli diff ~/xbtune.xbt ~/<EcmDroid file>.xpr` -> "Identical".
+5. Send the three files plus a few EcmDroid Setup values (rev limits, fan temps).
 
 ## Phase 1 hardware checklist (read-only)
 

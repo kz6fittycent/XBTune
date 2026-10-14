@@ -24,6 +24,24 @@ what the bike really has.
 | BUE2D | DDFI-3 | XB or 1125, 2008+ | BUE2D | 3756 / 3796 | 0–15 | 135 | EcmDroid test image available |
 | BUE3D | DDFI-3 | XB or 1125, 2008+ | BUE3D | 3884 / 3924 | 0–16 | 135 | |
 
+### Definition data per ID (from `xbtune-cli defs <ID>`)
+
+| ECM ID | EEPROM variables | Runtime variables | Data issues |
+|---|---|---|---|
+| BUECB | 214 | 67 | 1 unnamed variable |
+| BUEGB | 233 | 70 | 2 unnamed |
+| BUEIB / BUEIC | 241 | 70 | 3 unnamed (`KSparkCtrl`, `Pad2`, `Pad3`); no layout problems |
+| BUEOD | 411 | 115 | `KVS_RPM_Revs` left out (conflicting rows); 1 unnamed |
+| BUEWD | 519 | 115 | 2 |
+| BUEYD | 533 | 115 | 3, incl. `Tab_Idle_Spark` layout doesn't fit (raw bytes only) |
+| BUEZD | 539 | 112 | 2 |
+| BUE1D | 537 | 111 | 2, incl. `Tab_Idle_Spark` layout doesn't fit (raw bytes only) |
+| BUE2D | 544 | 111 | 1 |
+| BUE3D | 662 | 111 | 19 unnamed (many look 1125-specific) |
+
+"Unnamed" means the variable has no `names` row; EcmDroid hides these.
+XBTune keeps them, labelled with the variable name.
+
 ## Recognised, not yet supported
 
 Race ECMs use address 0x55 at 19200 baud (`--race`). They share street
