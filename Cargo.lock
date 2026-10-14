@@ -1305,6 +1305,15 @@ name = "xbtune-core"
 version = "0.1.0"
 dependencies = [
  "directories",
+ "serde",
+ "thiserror",
+ "tokio",
+ "toml",
+ "tracing",
+ "xbtune-defs",
+ "xbtune-link",
+ "xbtune-proto",
+ "xbtune-sim",
 ]
 
 [[package]]

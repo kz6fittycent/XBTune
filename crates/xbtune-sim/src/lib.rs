@@ -52,6 +52,12 @@ pub enum Fault {
     Delay(Duration),
     /// Refuse with this status byte.
     Nak(u8),
+    /// Change the first data byte and fix up the checksum: a frame that
+    /// passes every check but carries wrong data.
+    SilentFlip,
+    /// Like `SilentFlip`, but with a different wrong value every time, so
+    /// repeated reads never agree.
+    SilentFlipVarying,
 }
 
 /// Random faults, as probabilities per reply (0.0..=1.0).
@@ -121,8 +127,9 @@ pub struct Simulator {
     image: Vec<u8>,
     runtime: Vec<u8>,
     state: u8,
-    script: VecDeque<Fault>,
+    script: VecDeque<Option<Fault>>,
     rng: u64,
+    flips: u8,
     pub journal: Journal,
 }
 
@@ -150,6 +157,7 @@ impl Simulator {
             state: 0,
             script: VecDeque::new(),
             rng,
+            flips: 0,
             journal: Journal::default(),
         }
     }
@@ -172,8 +180,9 @@ impl Simulator {
     }
 
     /// Queue faults for the next replies, one per reply, before random ones.
-    pub fn script(&mut self, faults: impl IntoIterator<Item = Fault>) {
-        self.script.extend(faults);
+    /// `None` lets a reply through untouched.
+    pub fn script<F: Into<Option<Fault>>>(&mut self, faults: impl IntoIterator<Item = F>) {
+        self.script.extend(faults.into_iter().map(Into::into));
     }
 
     /// Set the busy/idle state byte.
@@ -264,7 +273,7 @@ impl Simulator {
 
     fn next_fault(&mut self) -> Option<Fault> {
         if let Some(f) = self.script.pop_front() {
-            return Some(f);
+            return f;
         }
         let r = self.cfg.rates.clone();
         if self.roll(r.drop) {
@@ -308,6 +317,21 @@ impl Simulator {
             }
             Some(Fault::Delay(d)) => {
                 out.push(Emission::Sleep(d));
+                out.push(Emission::Write(reply));
+            }
+            Some(f @ (Fault::SilentFlip | Fault::SilentFlipVarying)) => {
+                // Data starts after the 6-byte header and the status byte.
+                let n = reply.len();
+                if n > 9 {
+                    let mask = if f == Fault::SilentFlip {
+                        0x01
+                    } else {
+                        self.flips = self.flips.wrapping_add(1).max(1);
+                        self.flips
+                    };
+                    reply[7] ^= mask;
+                    reply[n - 1] = xbtune_proto::pdu::checksum(&reply);
+                }
                 out.push(Emission::Write(reply));
             }
         }
