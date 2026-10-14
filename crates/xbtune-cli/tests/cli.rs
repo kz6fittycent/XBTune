@@ -117,3 +117,51 @@ fn defs_reports_issues() {
     assert!(ok);
     assert!(out.contains("EEPROM variables: "), "{out}");
 }
+
+#[test]
+fn live_prints_frames() {
+    let (ok, out) = cli(&["live", "--sim", "--count", "2", "--channels", "RPM,CLT,pw1"]);
+    assert!(ok, "{out}");
+    assert_eq!(out.matches("t=").count(), 2, "{out}");
+    assert!(out.contains("Engine Speed") && out.contains("Engine Temperature"), "{out}");
+    assert!(out.contains(" ms"), "{out}");
+    let (ok, out) = cli(&["live", "--sim", "--channels", "nope"]);
+    assert!(!ok);
+    assert!(out.contains("no channel 'nope'"), "{out}");
+}
+
+#[test]
+fn log_writes_csv_through_dropouts() {
+    let csv = tmp("live.csv");
+    let (ok, out) = cli(&[
+        "log",
+        "--sim",
+        "--sim-drop",
+        "0.2",
+        "--sim-latency-ms",
+        "5",
+        "--attempts",
+        "1",
+        "--timeout-ms",
+        "50",
+        "--duration",
+        "2",
+        "--note",
+        "test ride",
+        "-o",
+        csv.to_str().unwrap(),
+    ]);
+    assert!(ok, "{out}");
+    assert!(out.contains("Rows:"), "{out}");
+    let text = std::fs::read_to_string(&csv).unwrap();
+    assert!(text.starts_with("# XBTune live log\n"), "{text}");
+    assert!(text.contains("# ecm_id: BUEIB\n") && text.contains("# note: test ride\n"));
+    let rows: Vec<&str> = text.lines().filter(|l| !l.starts_with('#')).collect();
+    assert!(rows[0].starts_with("time_s,") && rows[0].ends_with(",frame"), "{}", rows[0]);
+    assert!(rows.len() > 20, "{} rows", rows.len());
+    let n = rows[0].split(',').count();
+    assert!(rows.iter().all(|r| r.split(',').count() == n));
+    // Time only goes forward.
+    let t: Vec<f64> = rows[1..].iter().map(|r| r.split(',').next().unwrap().parse().unwrap()).collect();
+    assert!(t.windows(2).all(|w| w[0] < w[1]));
+}

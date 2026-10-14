@@ -3,6 +3,7 @@
 //! the link, reads and saves the EEPROM, and decodes images. Nothing here
 //! writes to the ECM.
 
+mod live;
 mod render;
 
 use std::io::Write as _;
@@ -69,6 +70,10 @@ enum Cmd {
         #[arg(long)]
         id: Option<String>,
     },
+    /// Show live data from the ECM (read-only).
+    Live(live::LiveArgs),
+    /// Record live data to a CSV log (read-only).
+    Log(live::LogArgs),
     /// Show what XBTune knows about an ECM ID's definition, and data issues.
     Defs {
         /// ECM ID, e.g. BUEIB.
@@ -154,6 +159,24 @@ struct Connection {
     /// Testing: make the simulator drop this fraction of replies.
     #[arg(long, hide = true, default_value_t = 0.0)]
     sim_drop: f64,
+    /// Testing: delay every simulator reply, in milliseconds (live and log
+    /// default to 60, about what BuellTooth does).
+    #[arg(long, hide = true)]
+    sim_latency_ms: Option<u64>,
+}
+
+impl Connection {
+    fn address(&self) -> EcmAddress {
+        if self.race { EcmAddress::Race } else { EcmAddress::Stock }
+    }
+
+    fn policy(&self) -> RetryPolicy {
+        RetryPolicy {
+            timeout: Duration::from_millis(self.timeout_ms),
+            max_attempts: self.attempts.max(1),
+            ..RetryPolicy::default()
+        }
+    }
 }
 
 #[derive(Args)]
@@ -208,6 +231,8 @@ async fn run(cmd: Cmd) -> Result<()> {
         Cmd::Diff { a, b, id } => diff(&a, &b, id.as_deref()),
         Cmd::Convert { input, output, id } => convert(&input, &output, id.as_deref()),
         Cmd::Defs { id, list } => defs(&id, list),
+        Cmd::Live(a) => live::live(a).await,
+        Cmd::Log(a) => live::log(a).await,
     }
 }
 
@@ -221,8 +246,14 @@ impl Endpoint {
     fn from_args(c: &Connection) -> Result<Self> {
         let address = if c.race { EcmAddress::Race } else { EcmAddress::Stock };
         Ok(if c.sim {
-            let mut sim = xbtune_sim::Simulator::bueib();
-            sim.set_rates(xbtune_sim::FaultRates { drop: c.sim_drop, ..Default::default() });
+            let mut sim = xbtune_sim::Simulator::bueib_running();
+            let latency = c.sim_latency_ms.unwrap_or(0);
+            sim.set_rates(xbtune_sim::FaultRates {
+                drop: c.sim_drop,
+                delay: if latency > 0 { 1.0 } else { 0.0 },
+                delay_by: Duration::from_millis(latency),
+                ..Default::default()
+            });
             Endpoint::Sim(xbtune_sim::shared(sim))
         } else if let Some(path) = &c.serial {
             Endpoint::Real(Target::Serial { path: path.clone(), baud: c.baud.unwrap_or(address.baud()) })
@@ -245,18 +276,24 @@ impl Endpoint {
         }
     }
 
-    async fn open(&self, c: &Connection) -> Result<EcmClient> {
-        let address = if c.race { EcmAddress::Race } else { EcmAddress::Stock };
-        let policy = RetryPolicy {
-            timeout: Duration::from_millis(c.timeout_ms),
-            max_attempts: c.attempts.max(1),
-            ..RetryPolicy::default()
-        };
-        let io = match self {
+    async fn open_io(&self) -> Result<xbtune_link::BoxIo> {
+        Ok(match self {
             Endpoint::Sim(sim) => xbtune_sim::in_process(sim.clone()),
             Endpoint::Real(target) => xbtune_link::open(target).await.map_err(|e| open_error(target, e))?,
-        };
-        Ok(EcmClient::new(io, address).with_policy(policy))
+        })
+    }
+
+    async fn open(&self, c: &Connection) -> Result<EcmClient> {
+        Ok(EcmClient::new(self.open_io().await?, c.address()).with_policy(c.policy()))
+    }
+
+    /// The endpoint as a reopenable transport for a live session.
+    fn opener(self) -> xbtune_core::session::Opener {
+        let ep = std::sync::Arc::new(self);
+        std::sync::Arc::new(move || {
+            let ep = ep.clone();
+            Box::pin(async move { ep.open_io().await.map_err(|e| format!("{e:#}")) })
+        })
     }
 }
 

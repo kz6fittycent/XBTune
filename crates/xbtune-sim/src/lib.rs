@@ -13,11 +13,12 @@
 //! Behaviour that is *not* confirmed against a real ECM, and must not be
 //! relied on outside tests, is marked "ASSUMED" (see docs/PROVENANCE.md).
 
+pub mod engine;
 pub mod pty;
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use xbtune_defs::{Catalog, EcmDef};
@@ -130,6 +131,9 @@ pub struct Simulator {
     script: VecDeque<Option<Fault>>,
     rng: u64,
     flips: u8,
+    /// Made-up live data: the engine, when it started, and a fixed time
+    /// for tests.
+    engine: Option<(engine::Engine, Instant, Option<f64>)>,
     pub journal: Journal,
 }
 
@@ -158,6 +162,7 @@ impl Simulator {
             script: VecDeque::new(),
             rng,
             flips: 0,
+            engine: None,
             journal: Journal::default(),
         }
     }
@@ -165,6 +170,27 @@ impl Simulator {
     /// The default BUEIB simulator with EcmDroid's test image.
     pub fn bueib() -> Self {
         Self::new(SimConfig::bueib(), BUEIB_EEPROM)
+    }
+
+    /// [`Simulator::bueib`] with the made-up engine running.
+    pub fn bueib_running() -> Self {
+        let c = Catalog::builtin().expect("built-in definitions load");
+        let def = c.definition(c.lookup("BUEIB").expect("BUEIB defined")).expect("BUEIB definition").clone();
+        Self::bueib().with_engine(def)
+    }
+
+    /// Serve moving runtime data from the made-up engine in [`engine`],
+    /// using `def`'s offsets (the captured frame stays the template).
+    pub fn with_engine(mut self, def: Arc<xbtune_defs::Definition>) -> Self {
+        self.engine = Some((engine::Engine::new(def), Instant::now(), None));
+        self
+    }
+
+    /// Freeze the engine at `t` seconds (tests), or let it run (`None`).
+    pub fn set_engine_time(&mut self, t: Option<f64>) {
+        if let Some(e) = &mut self.engine {
+            e.2 = t;
+        }
     }
 
     pub fn config(&self) -> &SimConfig {
@@ -216,7 +242,12 @@ impl Simulator {
                 let v = self.cfg.version.clone();
                 self.reply(ACK, v.as_bytes())
             }
-            [CMD_RTDATA] => self.runtime.clone(),
+            [CMD_RTDATA] => match &self.engine {
+                Some((e, start, fixed)) => {
+                    e.frame(&self.runtime, fixed.unwrap_or_else(|| start.elapsed().as_secs_f64()))
+                }
+                None => self.runtime.clone(),
+            },
             [CMD_GET, 0, CONTROL_PAGE, 1] => {
                 let s = self.state;
                 self.reply(ACK, &[s])

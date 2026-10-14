@@ -135,6 +135,17 @@ known-good source:**
 | Pages read in page-number order (page 0 first) | ED `FetchTask.java`, `EEPROM.get()` |
 | `.xbt` format, CRC-32, verify-by-double-read | XB, see `docs/FILE_FORMATS.md` |
 
+## Live data and logs
+
+| Detail | Source |
+|---|---|
+| Runtime frame request, whole frame decoded with frame-relative offsets | ED `ECM.getRuntimeData()`, `Variable.refreshValue()` (see Protocol and Definitions) |
+| Channel list = runtime variables with a names entry, neither row secret | ED `VariableProvider` (as for `xbtune-defs`) |
+| Channel names (`RPM`, `pw1`, `CLT`, ...) | ED-DB `names.origname`, as EcmDroid's log columns |
+| Polling back to back, reconnect with backoff, stop on a frame-length mismatch | XB |
+| CSV log format | XB, see `docs/FILE_FORMATS.md` |
+| Unit abbreviations `ms`, `s`, `°F` | XB (EcmDroid's `Units.getSymbol()` covers °, %, V only) |
+
 ## Fixtures (`tests/fixtures`)
 
 | File | Source |
@@ -159,4 +170,7 @@ Nothing outside tests may rely on them.
 - Refused requests are answered with status 0x15. Real error codes are
   unknown.
 - Runtime frames for ECMs other than BUEIB are zeros with an ACK.
+- The "running engine" (`xbtune-sim/src/engine.rs`) is a made-up 30 s ride
+  written through the definition's offsets and scaling. Its values are
+  plausible only; they are not reference data for anything.
 - Missing page 0 bytes in an image are served as zeros.

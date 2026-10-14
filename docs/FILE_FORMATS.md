@@ -54,3 +54,36 @@ XBTune reads `.xpr` with the ECM ID from `--id`, else the file name prefix,
 else the length (only if every matching ID shares one definition). It
 writes `xsize` bytes when page 0 is real, otherwise only `size`, so padding
 is never mistaken for page 0 data.
+
+## `.csv`: XBTune live log (`xbtune-log 1`)
+
+Written by `xbtune-cli log` and the app. A block of `#` lines, one column
+row, then one row per runtime frame:
+
+```text
+# XBTune live log
+# format: xbtune-log 1
+# app: xbtune 0.1.0
+# ecm_id: BUEIB
+# version: BUEIB310 12-11-03
+# target: Bluetooth 00:11:22:33:44:55 channel 1
+# started: 2026-10-14T21:00:00Z
+# note: first ride            (only if given; newlines become spaces)
+# channel: RPM | Engine Speed | RPM
+# channel: pw1 | Fuel Pulsewidth Front | ms
+...
+time_s,SysConfig,MilliSec,Seconds,RPM,spark1,...,frame
+0.185,123,0.35,0,1110,16.17,...,0110003D02065...
+```
+
+- `time_s`: seconds since the session started polling (not since the log
+  started), three decimals. Rows are in time order; gaps mean dropouts.
+- One column per channel of the definition, in frame order, named by
+  EcmDroid channel name (`# channel:` lines give label and units).
+  Scalars are in engineering units with the channel's decimals (4 if the
+  definition gives none); bitfields are the byte as a decimal number.
+  An empty cell means the frame was too short for that channel.
+- `frame`: the whole runtime reply frame as uppercase hex, so a log can be
+  decoded again later with corrected definitions.
+- Columns are separated by `,`; names containing `,` or `"` are quoted.
+- The file is flushed about once a second and when logging stops.
