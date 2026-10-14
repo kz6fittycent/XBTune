@@ -369,7 +369,7 @@ fn shape(kind: EeKind, r: &EeRow, width: usize, size: usize, zero: usize) -> Sha
     if kind == EeKind::String {
         return Shape::Text;
     }
-    if r.size % width != 0 {
+    if !r.size.is_multiple_of(width) {
         return Shape::Invalid(format!("size {} is not a multiple of element width {width}", r.size));
     }
     let n = r.size / width;
