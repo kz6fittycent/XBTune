@@ -146,6 +146,14 @@ known-good source:**
 | CSV log format | XB, see `docs/FILE_FORMATS.md` |
 | Unit abbreviations `ms`, `s`, `°F` | XB (EcmDroid's `Units.getSymbol()` covers °, %, V only) |
 
+## App assets (`crates/xbtune-app/assets`)
+
+| File | Source |
+|---|---|
+| `fonts/Inter-Regular.ttf`, `fonts/Inter-SemiBold.ttf`, `fonts/Inter-OFL.txt` | Inter 4.1, official release `Inter-4.1.zip` from github.com/rsms/inter (sha256 `9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e`), files `extras/ttf/*` and `LICENSE.txt`. SIL Open Font License 1.1. |
+
+Gauge ranges in the app (`gauge.rs`) are XBTune display choices, not ECM data.
+
 ## Fixtures (`tests/fixtures`)
 
 | File | Source |

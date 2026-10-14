@@ -303,21 +303,7 @@ async fn connect(c: &Connection) -> Result<(EcmClient, String)> {
 }
 
 fn open_error(target: &Target, e: OpenError) -> anyhow::Error {
-    let plug = match target {
-        Target::Serial { .. } => "raw-usb",
-        Target::Rfcomm { .. } => "bluez",
-    };
-    if e.is_permission_denied() {
-        anyhow!("{e}\n\n{}", env::permission_hint(plug))
-    } else if let Target::Rfcomm { address, .. } = target {
-        anyhow!(
-            "{e}\n\nIs the adapter powered (ignition on) and paired? To pair:\n    \
-             bluetoothctl pair {address}   (BuellTooth PIN is usually 1234)\n    \
-             bluetoothctl trust {address}"
-        )
-    } else {
-        anyhow!(e)
-    }
+    anyhow!(xbtune_core::session::open_error_text(target, &e))
 }
 
 async fn info(a: InfoArgs) -> Result<()> {

@@ -1,6 +1,9 @@
 # cargo-deny policy. Allowed licenses are fixed by docs/KICKOFF.md section 2.
 [graph]
 all-features = true
+# XBTune is Linux-only (KICKOFF section 3); dependencies that exist only for
+# other platforms (e.g. clipboard-win) are never built or shipped.
+targets = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
 
 [advisories]
 version = 2

@@ -1,12 +1,31 @@
 [package]
 name = "xbtune-app"
+description = "XBTune desktop app (egui)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[[bin]]
+name = "xbtune"
+path = "src/main.rs"
+
 [dependencies]
+anyhow.workspace = true
+eframe.workspace = true
+egui.workspace = true
+egui_plot.workspace = true
+serde.workspace = true
+tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+xbtune-core.workspace = true
+xbtune-defs.workspace = true
+xbtune-link.workspace = true
+xbtune-proto.workspace = true
+xbtune-sim.workspace = true
 
 [lints]
 workspace = true

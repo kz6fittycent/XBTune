@@ -22,7 +22,7 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tracing::{debug, info};
 use xbtune_defs::{Catalog, Definition, EcmDef};
-use xbtune_link::{BoxIo, EcmClient};
+use xbtune_link::{BoxIo, EcmClient, OpenError, Target};
 use xbtune_proto::{EcmAddress, LinkStats, RetryPolicy, TransactionError};
 
 use crate::live::{CsvLogger, LogMeta, RateMeter, Sample, channels};
@@ -32,6 +32,34 @@ pub type Opener = Arc<dyn Fn() -> Pin<Box<dyn Future<Output = Result<BoxIo, Stri
 
 /// Called after every event is queued (e.g. to wake the UI).
 pub type Notify = Arc<dyn Fn() + Send + Sync>;
+
+/// An [`Opener`] for a real transport. Errors carry advice (snap
+/// connection, dialout group, pairing).
+pub fn target_opener(target: Target) -> Opener {
+    Arc::new(move || {
+        let target = target.clone();
+        Box::pin(async move { xbtune_link::open(&target).await.map_err(|e| open_error_text(&target, &e)) })
+    })
+}
+
+/// A failure to open `target`, with what to do about it.
+pub fn open_error_text(target: &Target, e: &OpenError) -> String {
+    let plug = match target {
+        Target::Serial { .. } => "raw-usb",
+        Target::Rfcomm { .. } => "bluez",
+    };
+    if e.is_permission_denied() {
+        format!("{e}\n\n{}", crate::env::permission_hint(plug))
+    } else if let Target::Rfcomm { address, .. } = target {
+        format!(
+            "{e}\n\nIs the adapter powered (ignition on) and paired? To pair:\n    \
+             bluetoothctl pair {address}   (BuellTooth PIN is usually 1234)\n    \
+             bluetoothctl trust {address}"
+        )
+    } else {
+        e.to_string()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct SessionConfig {

@@ -20,6 +20,11 @@ anyhow = "1"
 bluer = { version = "0.17", features = ["bluetoothd", "rfcomm"] }
 clap = { version = "4", features = ["derive"] }
 directories = "6"
+# GUI. egui's bundled fonts are off (their licenses fail cargo-deny); the app
+# ships Inter (OFL-1.1) itself.
+eframe = { version = "0.36", default-features = false, features = ["accesskit", "glow", "wayland", "x11"] }
+egui = { version = "0.36", default-features = false }
+egui_plot = "0.37"
 futures = "0.3"
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
