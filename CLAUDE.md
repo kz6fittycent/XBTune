@@ -14,8 +14,15 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   "Identical (1210 bytes compared)". Fuel/spark maps decode sensibly.
   Owner's dumps and 26 Setup-screen values are in `tests/fixtures/owner/`;
   all golden tests pass.
-- **Phase 3 (live data + logging + first app): built 2026-10-14, waiting for
-  the owner's hardware test.** Don't start phase 4 until the owner says so.
+- **Phase 3 (live data + logging + first app): built 2026-10-14; on-bike
+  2026-10-14 "working quite well"** (snap a1bd3e7, engine running, logs in
+  `tests/fixtures/owner/*.csv`, re-decoded by `owner_logs_decode_as_logged`).
+  Good poll = ~146 ms (107 bytes at 9600 baud = 111 ms), so max ~6.8 Hz.
+  With the engine running ~1 in 10 replies never arrived (owner suspects
+  the BuellTooth); with the old 1 s timeout each loss cost 1.3 s -> 3.7 Hz.
+  Live timeout is now 400 ms and failures are logged as `# event:` lines;
+  next owner log should show the new rate and the failure pattern.
+  Don't start phase 4 until the owner says so.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the
@@ -137,6 +144,11 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 - Flags0-6 bit meanings are NOT in ecmdroid.db (all names empty), so idle /
   closed loop / WOT flags are shown raw. Need a real source before naming
   them (KICKOFF §5 lists them).
+- Live polling uses `session::LIVE_TIMEOUT` (400 ms); EEPROM reads keep
+  1 s. Owner logs: lost replies don't arrive late (intervals are ~0.15 s or
+  ~1.3/2.5 s, almost nothing between), so a short timeout loses nothing.
+- Sim demo (`live`/`log --sim`, app Demo) models BuellTooth: 35 ms latency +
+  9600-baud wire time (`SimConfig::wire_baud`), ~143 ms per runtime poll.
 - Gauge ranges are XBTune display presets (`xbtune-app/src/gauge.rs`); the
   db's runtime low/high are raw-type limits (Bat 0-2000 V).
 - Publishing workflows are gated by the repo variable `XBTUNE_STORE_PUBLISH`.
@@ -168,8 +180,8 @@ Bike on its stand, somewhere ventilated. Snap: build here, install on the
 laptop with `sudo snap install --dangerous xbtune_*.snap`; check
 `snap connections xbtune` (bluez, raw-usb, removable-media connected).
 1. Ignition ON, engine OFF: `xbtune.cli live --bt 00:11:22:33:44:55`.
-   Expect RPM 0, sensible engine/air temp, battery ~12-13 V, ~12-16 Hz,
-   0% errors. Compare a few values with EcmDroid's live screen.
+   Expect RPM 0, sensible engine/air temp, battery ~12-13 V, ~6-7 Hz
+   (the K-line limit), few errors. Compare a few values with EcmDroid's live screen.
 2. Start the engine: RPM ~1000-1100 at idle, engine temp rising, O2 moving
    once warm. `xbtune.cli log --bt ... --duration 60 -o ~/idle.csv`.
 3. GUI: open XBTune from the app menu. Connect -> Paired devices ->

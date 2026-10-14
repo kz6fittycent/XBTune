@@ -150,9 +150,10 @@ struct Connection {
     /// Override the serial baud rate.
     #[arg(long)]
     baud: Option<u32>,
-    /// Reply timeout per attempt, in milliseconds.
-    #[arg(long, default_value_t = 1000)]
-    timeout_ms: u64,
+    /// Reply timeout per attempt, in milliseconds (default 1000; 400 for
+    /// live and log).
+    #[arg(long)]
+    timeout_ms: Option<u64>,
     /// Attempts per request (1 = no retries).
     #[arg(long, default_value_t = 3)]
     attempts: u32,
@@ -160,9 +161,12 @@ struct Connection {
     #[arg(long, hide = true, default_value_t = 0.0)]
     sim_drop: f64,
     /// Testing: delay every simulator reply, in milliseconds (live and log
-    /// default to 60, about what BuellTooth does).
+    /// default to 35, plus 9600-baud wire time).
     #[arg(long, hide = true)]
     sim_latency_ms: Option<u64>,
+    /// Testing: simulated K-line baud rate (0 = instant).
+    #[arg(long, hide = true)]
+    sim_baud: Option<u32>,
 }
 
 impl Connection {
@@ -171,8 +175,13 @@ impl Connection {
     }
 
     fn policy(&self) -> RetryPolicy {
+        self.policy_with(RetryPolicy::default().timeout)
+    }
+
+    /// The policy, with `timeout` unless --timeout-ms was given.
+    fn policy_with(&self, timeout: Duration) -> RetryPolicy {
         RetryPolicy {
-            timeout: Duration::from_millis(self.timeout_ms),
+            timeout: self.timeout_ms.map(Duration::from_millis).unwrap_or(timeout),
             max_attempts: self.attempts.max(1),
             ..RetryPolicy::default()
         }
@@ -254,6 +263,7 @@ impl Endpoint {
                 delay_by: Duration::from_millis(latency),
                 ..Default::default()
             });
+            sim.set_wire_baud(c.sim_baud.filter(|b| *b > 0));
             Endpoint::Sim(xbtune_sim::shared(sim))
         } else if let Some(path) = &c.serial {
             Endpoint::Real(Target::Serial { path: path.clone(), baud: c.baud.unwrap_or(address.baud()) })

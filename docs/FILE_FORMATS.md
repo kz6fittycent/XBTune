@@ -86,4 +86,7 @@ time_s,SysConfig,MilliSec,Seconds,RPM,spark1,...,frame
 - `frame`: the whole runtime reply frame as uppercase hex, so a log can be
   decoded again later with corrected definitions.
 - Columns are separated by `,`; names containing `,` or `"` are quoted.
+- `# event: t=<s> <text>` lines may appear between rows: failed attempts
+  ("1 failed attempt(s) (timeout 1)"), requests that gave up, reconnects.
+  `t` uses the same clock as `time_s`. Readers skip every `#` line.
 - The file is flushed about once a second and when logging stops.

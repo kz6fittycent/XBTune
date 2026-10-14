@@ -64,11 +64,14 @@ fn start(
     interval_ms: u64,
     max_reconnects: Option<u32>,
 ) -> Result<(session::Session, String)> {
-    conn.sim_latency_ms.get_or_insert(60);
+    // The demo ECM behaves like a BuellTooth: ~35 ms latency plus the
+    // K-line's 9600-baud wire time.
+    conn.sim_latency_ms.get_or_insert(35);
+    conn.sim_baud.get_or_insert(9600);
     let ep = Endpoint::from_args(conn)?;
     let label = ep.label();
     let mut cfg = SessionConfig::new(label.clone(), conn.address());
-    cfg.policy = conn.policy();
+    cfg.policy = conn.policy_with(session::LIVE_TIMEOUT);
     cfg.min_interval = Duration::from_millis(interval_ms);
     cfg.max_reconnects = max_reconnects;
     let s = session::start(cfg, ep.opener(), Arc::new(Catalog::builtin()?), None);

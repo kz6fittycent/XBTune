@@ -61,6 +61,12 @@ pub fn open_error_text(target: &Target, e: &OpenError) -> String {
     }
 }
 
+/// Reply timeout for live polling. A runtime reply takes ~146 ms on a
+/// BuellTooth (111 ms of it is 107 bytes at 9600 baud), and the owner's logs
+/// show lost replies never arrive late, so waiting the read default of 1 s
+/// only stretches every dropout. EEPROM reads keep the 1 s default.
+pub const LIVE_TIMEOUT: Duration = Duration::from_millis(400);
+
 #[derive(Debug, Clone)]
 pub struct SessionConfig {
     /// Human-readable target, for logs and the UI.
@@ -84,7 +90,7 @@ impl SessionConfig {
         Self {
             target: target.into(),
             address,
-            policy: RetryPolicy::default(),
+            policy: RetryPolicy { timeout: LIVE_TIMEOUT, ..RetryPolicy::default() },
             min_interval: Duration::ZERO,
             reconnect_delay: Duration::from_secs(2),
             max_reconnects: None,
@@ -256,6 +262,7 @@ impl Worker {
             self.reconnects += 1;
             let max = self.cfg.reconnect_delay;
             let delay = (max / 8).saturating_mul(1 << (failed_in_a_row - 1).min(3)).min(max);
+            self.log_event(&format!("reconnecting in {} ms: {reason}", delay.as_millis()));
             self.out.send(Event::State(LinkState::Reconnecting { reason, delay }));
             if let Ok(stop) = tokio::time::timeout(delay, self.wait_for_stop()).await {
                 return stop;
@@ -321,7 +328,12 @@ impl Worker {
                 self.handle(c);
             }
             let asked = Instant::now();
-            match client.runtime_data().await {
+            let before = client.stats().clone();
+            let result = client.runtime_data().await;
+            if let Some(what) = failed_attempts(&before, client.stats()) {
+                self.log_event(&what);
+            }
+            match result {
                 Ok(pdu) => {
                     fails = 0;
                     *failed_in_a_row = 0;
@@ -345,6 +357,7 @@ impl Worker {
                 Err(e) => {
                     fails += 1;
                     debug!(error = %e, fails, "runtime request failed");
+                    self.log_event(&format!("request gave up: {e}"));
                     if matches!(e, TransactionError::Io(_)) || fails >= self.cfg.fails_before_reconnect {
                         return End::Retry(e.to_string());
                     }
@@ -410,12 +423,38 @@ impl Worker {
         }
     }
 
+    /// Note a link event in the log as a `# event:` line.
+    fn log_event(&mut self, what: &str) {
+        let t = self.started.elapsed().as_secs_f64();
+        let Some(log) = &mut self.log else { return };
+        if let Err(e) = log.writer.event(t, what) {
+            self.stop_log(Some(e.to_string()));
+        }
+    }
+
     fn stop_log(&mut self, error: Option<String>) {
         let Some(mut log) = self.log.take() else { return };
         let flushed = log.writer.flush().err().map(|e| e.to_string());
         let rows = log.writer.rows();
         self.out.send(Event::LogStopped { path: log.path, rows, error: error.or(flushed) });
     }
+}
+
+/// Failed attempts between two stats snapshots, e.g. "2 failed attempts
+/// (timeout 2)", or `None` if every attempt succeeded.
+fn failed_attempts(before: &LinkStats, after: &LinkStats) -> Option<String> {
+    let kinds = [
+        ("timeout", after.timeouts - before.timeouts),
+        ("corrupt", after.corrupt - before.corrupt),
+        ("nak", after.naks - before.naks),
+        ("io", after.io_errors - before.io_errors),
+    ];
+    let total: u64 = kinds.iter().map(|k| k.1).sum();
+    if total == 0 {
+        return None;
+    }
+    let detail: Vec<String> = kinds.iter().filter(|k| k.1 > 0).map(|(n, c)| format!("{n} {c}")).collect();
+    Some(format!("{total} failed attempt(s) ({})", detail.join(", ")))
 }
 
 #[cfg(test)]

@@ -90,6 +90,9 @@ pub struct SimConfig {
     pub echo: bool,
     pub rates: FaultRates,
     pub seed: u64,
+    /// Model the K-line: each reply takes 10 bits per byte at this rate to
+    /// arrive (a real 107-byte runtime frame is ~111 ms at 9600 baud).
+    pub wire_baud: Option<u32>,
 }
 
 impl SimConfig {
@@ -103,6 +106,7 @@ impl SimConfig {
             echo: false,
             rates: FaultRates::default(),
             seed: 0x5EED_B0E1,
+            wire_baud: None,
         }
     }
 
@@ -201,6 +205,11 @@ impl Simulator {
         &self.image
     }
 
+    /// Model wire time at this baud rate (`None`: replies are instant).
+    pub fn set_wire_baud(&mut self, baud: Option<u32>) {
+        self.cfg.wire_baud = baud;
+    }
+
     pub fn set_rates(&mut self, rates: FaultRates) {
         self.cfg.rates = rates;
     }
@@ -233,6 +242,18 @@ impl Simulator {
         }
         let reply = self.answer(frame.payload());
         self.apply(fault, reply, &mut out);
+        if let Some(baud) = self.cfg.wire_baud.filter(|b| *b > 0) {
+            out = out
+                .into_iter()
+                .flat_map(|e| match e {
+                    Emission::Write(b) => {
+                        let wire = Duration::from_micros(b.len() as u64 * 10 * 1_000_000 / baud as u64);
+                        vec![Emission::Sleep(wire), Emission::Write(b)]
+                    }
+                    other => vec![other],
+                })
+                .collect();
+        }
         out
     }
 

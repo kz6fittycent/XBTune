@@ -7,6 +7,7 @@ is the owner's own calibration.
 |---|---|
 | `BUEIB_xbtune.xpr` (or `xbtune.xbt`) | `xbtune.cli dump --bt <ADDR> --xpr BUEIB_xbtune.xpr` (verified read) |
 | `BUEIB_20261014-162837.xpr` (or `ecmdroid.xpr`) | EcmDroid: EEPROM → Fetch, then Save, from the same ECM, same day |
+| `idle.csv`, `BUEIB_20261014-231006.csv` | Live logs from the bike, engine running (`xbtune.cli log` and the app's Record), snap git a1bd3e7 |
 | `ecmdroid_values.toml` | Values read off EcmDroid's Setup screens (see the test for the format) |
 
 `crates/xbtune-core/tests/owner_golden.rs` checks that both images are

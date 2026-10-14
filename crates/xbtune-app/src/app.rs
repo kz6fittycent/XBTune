@@ -188,12 +188,13 @@ impl XbApp {
         let (opener, label): (session::Opener, String) = match &target {
             SavedTarget::Demo => {
                 let mut sim = xbtune_sim::Simulator::bueib_running();
-                // About BuellTooth's round trip, so the demo feels real.
+                // Like a BuellTooth: ~35 ms latency plus 9600-baud wire time.
                 sim.set_rates(xbtune_sim::FaultRates {
                     delay: 1.0,
-                    delay_by: Duration::from_millis(60),
+                    delay_by: Duration::from_millis(35),
                     ..Default::default()
                 });
+                sim.set_wire_baud(Some(9600));
                 let sim = xbtune_sim::shared(sim);
                 let opener: session::Opener = Arc::new(move || {
                     let sim = sim.clone();

@@ -123,3 +123,55 @@ fn owner_maps_decode_as_on_the_bike() {
     assert_eq!(spark[3], [0.0, 45.0, 45.0, 45.0, 41.5, 37.5, 24.0, 12.0, 7.5, 5.0]);
     assert_eq!(spark[9], [0.0, 42.5, 37.25, 37.5, 35.0, 27.0, 21.5, 7.0, 5.0, 5.0]);
 }
+
+/// Every live log from the bike (`*.csv`): each stored frame is a valid
+/// 107-byte BUEIB runtime frame, and decoding it with today's definitions
+/// gives exactly the values that were logged.
+#[test]
+fn owner_logs_decode_as_logged() {
+    use xbtune_defs::RtKind;
+    use xbtune_proto::Pdu;
+    let Ok(dir) = std::fs::read_dir(fixture("")) else { return };
+    let mut logs: Vec<PathBuf> = dir
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|x| x == "csv"))
+        .collect();
+    logs.sort();
+    if logs.is_empty() {
+        eprintln!("SKIPPED: no owner logs");
+        return;
+    }
+    let c = Catalog::builtin().unwrap();
+    let ecm = c.lookup("BUEIB").unwrap();
+    let def = c.definition(ecm).unwrap();
+    for path in logs {
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("# ecm_id: BUEIB"), "{}", path.display());
+        let mut lines = text.lines().filter(|l| !l.starts_with('#'));
+        let header: Vec<&str> = lines.next().unwrap().split(',').collect();
+        assert_eq!(header.first(), Some(&"time_s"));
+        assert_eq!(header.last(), Some(&"frame"));
+        let mut rows = 0;
+        for line in lines {
+            let cells: Vec<&str> = line.split(',').collect();
+            assert_eq!(cells.len(), header.len(), "{}: {line}", path.display());
+            let hex = cells.last().unwrap();
+            let frame: Vec<u8> =
+                (0..hex.len()).step_by(2).map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap()).collect();
+            assert_eq!(frame.len(), ecm.runtime_len);
+            Pdu::parse(&frame)
+                .unwrap_or_else(|e| panic!("{}: bad frame at t={}: {e}", path.display(), cells[0]));
+            for (name, logged) in header[1..header.len() - 1].iter().zip(&cells[1..]) {
+                let var = def.runtime.get(*name).unwrap_or_else(|| panic!("no channel {name}"));
+                let x = var.value(&frame).unwrap();
+                let want = match var.kind {
+                    RtKind::Bitfield => format!("{}", x as u8),
+                    RtKind::Scalar => format_number(x, var.names.decimals.or(Some(4))),
+                };
+                assert_eq!(&want, logged, "{}: {name} at t={}", path.display(), cells[0]);
+            }
+            rows += 1;
+        }
+        assert!(rows > 100, "{}: {rows} rows", path.display());
+    }
+}

@@ -187,6 +187,11 @@ impl<W: Write> CsvLogger<W> {
         Ok(())
     }
 
+    /// A `# event: t=<s> <what>` line (link trouble, reconnects).
+    pub fn event(&mut self, t: f64, what: &str) -> io::Result<()> {
+        writeln!(self.out, "# event: t={t:.3} {}", what.replace(['\n', '\r'], " "))
+    }
+
     pub fn rows(&self) -> u64 {
         self.rows
     }
@@ -244,12 +249,14 @@ mod tests {
         };
         let mut log = CsvLogger::new(Vec::new(), &meta, vars.clone()).unwrap();
         log.write(&Sample { t: 0.5, wall: std::time::UNIX_EPOCH, frame: frame.clone() }).unwrap();
+        log.event(0.75, "1 failed attempt(s) (timeout 1)\nx").unwrap();
         let text = String::from_utf8(log.into_inner()).unwrap();
         let lines: Vec<&str> = text.lines().collect();
         assert!(lines.contains(&"# note: a, b c"));
         assert!(lines.contains(&"# channel: RPM | Engine Speed | RPM"));
         let header = lines.iter().find(|l| l.starts_with("time_s,")).unwrap();
-        let row = lines.last().unwrap();
+        assert_eq!(lines.last(), Some(&"# event: t=0.750 1 failed attempt(s) (timeout 1) x"));
+        let row = lines.iter().rev().find(|l| !l.starts_with('#')).unwrap();
         let cols: Vec<&str> = header.split(',').collect();
         let vals: Vec<&str> = row.split(',').collect();
         assert_eq!(cols.len(), vals.len());

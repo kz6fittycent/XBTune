@@ -140,6 +140,8 @@ fn log_writes_csv_through_dropouts() {
         "0.2",
         "--sim-latency-ms",
         "5",
+        "--sim-baud",
+        "0",
         "--attempts",
         "1",
         "--timeout-ms",
@@ -155,6 +157,8 @@ fn log_writes_csv_through_dropouts() {
     assert!(out.contains("Rows:"), "{out}");
     let text = std::fs::read_to_string(&csv).unwrap();
     assert!(text.starts_with("# XBTune live log\n"), "{text}");
+    // Lost replies are noted in the log.
+    assert!(text.lines().any(|l| l.starts_with("# event: t=") && l.contains("timeout")), "{text}");
     assert!(text.contains("# ecm_id: BUEIB\n") && text.contains("# note: test ride\n"));
     let rows: Vec<&str> = text.lines().filter(|l| !l.starts_with('#')).collect();
     assert!(rows[0].starts_with("time_s,") && rows[0].ends_with(",frame"), "{}", rows[0]);
