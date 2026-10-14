@@ -7,8 +7,13 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 
 - **Phase 1: done.** On-bike pass over BuellTooth 2026-10-14. The owner has
   no USB cable, so the USB path is untested on hardware (signed off without it).
-- **Phase 2 (definitions + read): built 2026-10-14, waiting for the owner's
-  hardware test and golden data.** Don't start phase 3 until the owner says so.
+- **Phase 2 (definitions + read): built 2026-10-14; on-bike pass 2026-10-14**
+  (laptop, snap git 23ea31c): full dump in 10.5 s, verified, 0 re-reads,
+  161/161 requests, 0 retries, RTT avg 65 ms; CRC-32 3b54974e;
+  `diff` against EcmDroid's own save (`BUEIB_20261014-162837.xpr`) =
+  "Identical (1210 bytes compared)". Fuel/spark maps decode sensibly.
+  Still waiting for the files + Setup values for the golden test.
+  Don't start phase 3 until the owner says so.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the
