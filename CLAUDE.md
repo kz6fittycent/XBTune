@@ -95,6 +95,7 @@ cargo run -p xbtune-cli -- info --sim
 cargo run -p xbtune-sim -- --drop 0.1 --fragment 0.3   # prints /dev/pts/N
 cargo run -p xbtune-cli -- info --serial /dev/pts/N
 snapcraft pack && sudo snap install --dangerous xbtune_*.snap   # LXD works again since the Docker fix
+XBTUNE_SCREENSHOT=~/snap/xbtune/common/s.ppm XBTUNE_VIEW=charts xbtune   # GUI check inside the snap
 ```
 
 Regenerating the data file needs EcmDroid's db (it is not in the repo):
@@ -121,6 +122,14 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
   if BuellTooth isn't on channel 1, add SDP via a BlueZ Profile.
 - Snap stores everything under `$SNAP_USER_COMMON` (`xbtune_core::env::Dirs`).
 - Snap apps: `xbtune` (GUI, gnome extension), `xbtune.cli`, `xbtune.sim`.
+- Snap build does NOT use the rust plugin: the gnome extension's
+  LD_LIBRARY_PATH (SDK libc) breaks host rustup/cargo, and snapd 2.76 in the
+  build instance won't run the rustup snap as root. Parts are `nil` with
+  scripts that unset LD_LIBRARY_PATH/PKG_CONFIG_PATH; Ubuntu's rustup deb
+  installs stable (`rust-deps`). Verified in the snap 2026-10-14: GUI demo
+  renders (fonts, GL), CLI live/log, BT absent -> "Host is down".
+  Harmless denials: a11y bus (accesskit/zbus), /dev/char/195:0 (NVIDIA),
+  cgroup cpu.max (Rust std thread count).
 - GUI deps (listed in KICKOFF §4): eframe/egui 0.36 (default features off:
   glow, wayland, x11, accesskit), egui_plot 0.37. egui's bundled fonts are
   off (UFL/OFL in a crate fail cargo-deny); Inter 4.1 is bundled instead.
