@@ -1,0 +1,6 @@
+/target/
+*.snap
+/parts/
+/stage/
+/prime/
+/.craft/

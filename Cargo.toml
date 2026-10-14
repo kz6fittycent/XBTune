@@ -1,0 +1,37 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+rust-version = "1.85"
+publish = false
+
+[workspace.dependencies]
+xbtune-proto = { path = "crates/xbtune-proto" }
+xbtune-link = { path = "crates/xbtune-link" }
+xbtune-defs = { path = "crates/xbtune-defs" }
+xbtune-core = { path = "crates/xbtune-core" }
+xbtune-sim = { path = "crates/xbtune-sim" }
+
+anyhow = "1"
+bluer = { version = "0.17", features = ["bluetoothd", "rfcomm"] }
+clap = { version = "4", features = ["derive"] }
+directories = "6"
+futures = "0.3"
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serialport = { version = "4", default-features = false, features = ["libudev"] }
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "time", "sync", "fs"] }
+toml = "0.9"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
