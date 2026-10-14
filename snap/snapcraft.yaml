@@ -65,11 +65,12 @@ parts:
       - crates/xbtune-app
       - crates/xbtune-cli
       - crates/xbtune-sim
-    # The gnome extension replaces the part's build environment, so the
-    # rust plugin's implicit rustup snap must be named here.
-    build-snaps:
-      - rustup
+    # snapd 2.76 in the build instance refuses to run snap apps as root
+    # ("cannot track application process"), so the rust plugin's rustup snap
+    # is unusable. Ubuntu's rustup deb (/usr/bin, ahead of /snap/bin) is used
+    # instead and installs the stable toolchain.
     build-packages:
+      - rustup
       - pkg-config
       - libdbus-1-dev
       - libudev-dev
