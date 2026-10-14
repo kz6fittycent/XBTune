@@ -1,0 +1,35 @@
+# Values read off EcmDroid's Setup screens for the owner's BUEIB,
+# 2026-10-14. Comments are EcmDroid's screen labels as the owner wrote them;
+# keys are the variable names they map to. Units are dropped.
+[values]
+# Fixed RPM limits
+KRPM_Hard_Hi = "7500"        # Hard_Limit_Trigger
+KRPM_Soft_Hi = "7400"        # Soft_Limit_Trigger
+KRPM_Soft_Lo = "7350"        # Soft_Limit_Reset
+KRPM_Hard_Lo = "7450"        # Hard_Limit_Reset
+KRPM_Kill_Hi = "7600"        # Kill_Limit_Trigger
+KRPM_Kill_Lo = "7550"        # Kill_Limit_Reset
+# Fan, key off
+KKey_Off_Fan_Time = "5"      # Max_Duration (minutes)
+KKey_Off_Min_Bat = "10.0"    # Min_Batt_Voltage
+KKey_Off_Fan_On = "175"      # On_Temp
+KKey_Off_Fan_Off = "155"     # Off_Temp
+KKey_Off_Delay = "10"        # 100%_Runtime (seconds)
+KKey_Off_Fan_DC = "40"       # Run_Duty_Cycle
+# Fan, key on
+KTemp_Fan_On = "220"         # On_Temp
+KTemp_Fan_Off = "180"        # Off_Temp
+# Temperature limits
+KTemp_Soft_Hi = "280"        # Soft_Limit_Trigger
+KTemp_Soft_Lo = "275"        # Soft_Limit_Reset
+KTemp_Hard_Hi = "295"        # Hard_Limit_Trigger
+KTemp_Hard_Lo = "285"        # Hard_Limit_Reset
+KTemp_Kill_Hi = "305"        # Kill_Limit_Trigger
+KTemp_Kill_Lo = "154"        # Kill_Limit_Reset
+KTemp_CEL_Flash_Hi = "280"   # Engine_Light_Flashing_On
+KTemp_CEL_Flash_Lo = "275"   # Engine_Light_Flashing_Off
+# Conditions for temperature limits
+KTemp_RPM_Soft = "3500"      # Soft_Limit_Min_RPM
+KTemp_RPM_Hard = "4500"      # Hard_Limit_Min_RPM
+KTemp_Abs_Hi = "305"         # Ignore_RPM_Trigger
+KTemp_Abs_Lo = "304"         # Ignore_RPM_Reset
