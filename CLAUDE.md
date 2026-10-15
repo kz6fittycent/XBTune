@@ -94,7 +94,9 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   `UNANSWERED_LIMIT` (3) silent version requests with the hint as an
   error message (it retried forever with the hint hidden); NAKs and
   garbled replies don't count as silence (`TransactionError::is_silence`).
-  Owner to retest the ECM type on the bike.
+  Owner retest 2026-10-15 (snap 0b5d69c): Factory race on the BUEIB
+  stopped with the red message; Stock connected. Works on hardware (so
+  the BUEIB does NOT answer on 0x55, as EcmDroid implies).
 - **Tube-frame DDFI ECMs: built 2026-10-15** (owner moved them up from
   phase 9: "add the tuber features too for this phase"). Data regenerated
   from ecmdroid.db at the pinned commit (fresh clone; extractor reproduced
