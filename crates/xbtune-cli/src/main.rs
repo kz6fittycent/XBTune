@@ -207,6 +207,11 @@ impl Connection {
         if self.race { EcmAddress::Race } else { EcmAddress::Stock }
     }
 
+    /// Appended to "no answer" errors: the other ECM type stays silent.
+    fn no_answer_hint(&self) -> &'static str {
+        xbtune_core::session::wrong_type_hint(self.address())
+    }
+
     fn policy(&self) -> RetryPolicy {
         self.policy_with(RetryPolicy::default().timeout)
     }
@@ -309,7 +314,12 @@ impl Endpoint {
     fn from_args(c: &Connection) -> Result<Self> {
         let address = if c.race { EcmAddress::Race } else { EcmAddress::Stock };
         Ok(if c.sim {
-            let mut sim = xbtune_sim::Simulator::bueib_running();
+            // --race: a factory race B2RIB, which only answers on 0x55.
+            let mut sim = if c.race {
+                xbtune_sim::Simulator::b2rib_running()
+            } else {
+                xbtune_sim::Simulator::bueib_running()
+            };
             let latency = c.sim_latency_ms.unwrap_or(0);
             sim.set_rates(xbtune_sim::FaultRates {
                 drop: c.sim_drop,
@@ -375,9 +385,13 @@ async fn info(a: InfoArgs) -> Result<()> {
     println!("Link:        {label}");
     println!("ECM address: {:#04x}", client.ecm().id());
 
-    let version = client.version().await.context(
-        "no answer to the version request. Is the ignition on and the adapter on the diagnostic connector?",
-    )?;
+    let version = client.version().await.map_err(|e| {
+        anyhow!(
+            "no answer to the version request ({e}). Is the ignition on and the adapter on the diagnostic \
+             connector? {}",
+            a.conn.no_answer_hint()
+        )
+    })?;
     println!("Version:     {version}");
 
     let catalog = Catalog::builtin()?;
@@ -416,7 +430,14 @@ async fn info(a: InfoArgs) -> Result<()> {
         Ok(s) => println!("State:       busy ({s:#04x})"),
         Err(e) => println!("State:       could not read ({e})"),
     }
-    println!("Writes:      disabled (XBTune phase 1 is read-only)");
+    println!(
+        "Writes:      {}",
+        match xbtune_core::diag::write_permit(a.conn.sim) {
+            Ok(_) if a.conn.sim => "allowed (simulated ECM)",
+            Ok(_) => "unlocked (app: Settings -> Safety locks)",
+            Err(_) => "locked (app: Settings -> Safety locks)",
+        }
+    );
 
     if a.pings > 0 {
         let mut failed = 0;
@@ -586,7 +607,9 @@ async fn dump(a: DumpArgs) -> Result<()> {
                 tries += 1;
                 eprintln!("  no answer to the version request ({e}); trying again");
             }
-            Err(e) => return Err(anyhow!(e).context("no answer to the version request")),
+            Err(e) => {
+                bail!("no answer to the version request ({e}). {}", a.conn.no_answer_hint());
+            }
         }
     };
     let Some(ecm) = catalog.lookup(&version).cloned() else {

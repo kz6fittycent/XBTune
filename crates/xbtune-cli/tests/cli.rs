@@ -34,7 +34,17 @@ fn info_against_sim() {
     assert!(out.contains("Version:     BUEIB310 12-11-03"), "{out}");
     assert!(out.contains("ECM ID:      BUEIB (DDFI-2)"), "{out}");
     assert!(out.contains("Runtime:     107-byte frame (matches definition)"), "{out}");
-    assert!(out.contains("Writes:      disabled"), "{out}");
+    assert!(out.contains("Writes:      allowed (simulated ECM)"), "{out}");
+}
+
+#[test]
+fn factory_race_ecm_with_race() {
+    let (ok, out) = cli(&["info", "--sim", "--race"]);
+    assert!(ok, "{out}");
+    assert!(out.contains("ECM address: 0x55"), "{out}");
+    assert!(out.contains("ECM ID:      B2RIB (DDFI-2)"), "{out}");
+    assert!(out.contains("Definition:  BUEIB"), "{out}");
+    assert!(!out.contains("Note:"), "{out}");
 }
 
 #[test]

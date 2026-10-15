@@ -67,6 +67,18 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   (`relay/bug-report/`) is NOT deployed yet: the owner does the Cloudflare/
   token steps in its README. Until then sends fail and reports queue in
   `<data>/app-log/pending/`.
+- **Factory race ECMs: built 2026-10-15** (owner asked after seeing
+  EcmDroid's race support). EcmDroid has no commits after our pin
+  `2f17d29f`; its race support is `3c189be` (protocol choice, address
+  0x55, "wrong Protocol?") + `2f17d29` (USB 19200; engraved = factory
+  race, printed = P&A race = stock). XBTune: `SavedTarget` has `race`
+  (serde default false; `Demo { race }`), Connect view "ECM type" radio,
+  serial opens at `EcmAddress::baud()`, `session::wrong_type_hint` on
+  version timeouts (session + CLI), `Simulator::b2rib_running()` (race
+  demo; CLI `--sim --race`; pty `xbtune-sim --ecm B2RIB`). Tests: session
+  read/live/burn on the race sim, CLI info. Hook `XBTUNE_SHOT_RACE=1`.
+  Untested on a real race ECM (none available). BT adapters must be set
+  to 19200 for factory race; XBTune can't change a BuellTooth's baud.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the
@@ -405,7 +417,7 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
      assuming DDFI-2 behaviour; simulator + image tests; writes only after
      sim tests (§6.7) and stay unverified on hardware until someone has one.
    - No artwork/logo (owner's call; the Pegasus logo is a Buell trademark).
-     Race ECMs stay recognised-but-hidden.
+     Race ECMs: supported since 2026-10-15 (owner's request; see Status).
 
 ## Next steps
 

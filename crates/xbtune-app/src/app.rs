@@ -209,8 +209,10 @@ impl XbApp {
         }
         if app.shot.is_some() {
             let view = std::env::var("XBTUNE_VIEW").unwrap_or_default();
+            let race = std::env::var_os("XBTUNE_SHOT_RACE").is_some();
+            app.connect.race = race;
             if view != "connect" && std::env::var_os("XBTUNE_SHOT_LOGS").is_none() {
-                app.start(SavedTarget::Demo);
+                app.start(SavedTarget::Demo { race });
             }
             app.view = match view.as_str() {
                 "data" => View::Data,
@@ -346,15 +348,19 @@ impl XbApp {
         crate::logs_view::stop_playback(self);
         self.stop();
         let (opener, label): (session::Opener, String) = match &target {
-            SavedTarget::Demo => {
-                let mut sim = xbtune_sim::Simulator::bueib_running();
-                // Like a BuellTooth: ~35 ms latency plus 9600-baud wire time.
+            SavedTarget::Demo { race } => {
+                let mut sim = if *race {
+                    xbtune_sim::Simulator::b2rib_running()
+                } else {
+                    xbtune_sim::Simulator::bueib_running()
+                };
+                // Like a BuellTooth: ~35 ms latency plus K-line wire time.
                 sim.set_rates(xbtune_sim::FaultRates {
                     delay: 1.0,
                     delay_by: Duration::from_millis(35),
                     ..Default::default()
                 });
-                sim.set_wire_baud(Some(9600));
+                sim.set_wire_baud(Some(target_address(&target).baud()));
                 let sim = xbtune_sim::shared(sim);
                 self.demo_sim = Some(sim.clone());
                 let opener: session::Opener = Arc::new(move || {
@@ -370,18 +376,19 @@ impl XbApp {
                 }
                 Err(e) => return self.say(e, true),
             },
-            SavedTarget::Serial { path } => {
-                let t = Target::Serial { path: path.clone(), baud: EcmAddress::Stock.baud() };
+            SavedTarget::Serial { path, .. } => {
+                // Factory race ECMs talk at 19200 (EcmDroid 2f17d29).
+                let t = Target::Serial { path: path.clone(), baud: target_address(&target).baud() };
                 (session::target_opener(t.clone()), t.to_string())
             }
         };
         tracing::info!("connecting to {label}");
-        let mut cfg = SessionConfig::new(label, EcmAddress::Stock);
-        cfg.permit = xbtune_core::diag::permit(target == SavedTarget::Demo).ok();
+        let mut cfg = SessionConfig::new(label, target_address(&target));
+        cfg.permit = xbtune_core::diag::permit(target.is_demo()).ok();
         self.permitted = cfg.permit.is_some();
-        cfg.write_permit = xbtune_core::diag::write_permit(target == SavedTarget::Demo).ok();
+        cfg.write_permit = xbtune_core::diag::write_permit(target.is_demo()).ok();
         self.write_permitted = cfg.write_permit.is_some();
-        if target != SavedTarget::Demo {
+        if !target.is_demo() {
             self.demo_sim = None;
         }
         let ctx = self.egui_ctx.clone();
@@ -517,7 +524,7 @@ impl XbApp {
                 Err(e) => return self.say(format!("Couldn't save the safety locks: {e}"), true),
             }
         }
-        let demo = self.link.target == Some(SavedTarget::Demo);
+        let demo = self.link.target.as_ref().is_some_and(SavedTarget::is_demo);
         let permit = xbtune_core::diag::permit(demo).ok();
         let write_permit = xbtune_core::diag::write_permit(demo).ok();
         self.permitted = permit.is_some();
@@ -534,7 +541,7 @@ impl XbApp {
     }
 
     pub fn is_demo(&self) -> bool {
-        self.demo_sim.is_some() && self.link.target == Some(SavedTarget::Demo)
+        self.demo_sim.is_some() && self.link.target.as_ref().is_some_and(SavedTarget::is_demo)
     }
 
     pub fn demo_engine_running(&self) -> bool {
@@ -962,4 +969,10 @@ impl eframe::App for XbApp {
         self.stop();
         self.save_settings();
     }
+}
+
+/// The ECM address for a saved target: stock (0x42, 9600 baud) or factory
+/// race (0x55, 19200 baud).
+fn target_address(t: &SavedTarget) -> EcmAddress {
+    if t.race() { EcmAddress::Race } else { EcmAddress::Stock }
 }

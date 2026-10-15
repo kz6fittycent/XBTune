@@ -20,10 +20,13 @@ pub struct ConnectUi {
     pub ports: Vec<PortInfo>,
     manual_address: String,
     manual_channel: u8,
+    /// Connect as a factory race ECM (address 0x55, 19200 baud).
+    pub race: bool,
 }
 
 impl ConnectUi {
     pub fn new(last: Option<SavedTarget>) -> Self {
+        let race = last.as_ref().is_some_and(SavedTarget::race);
         let (manual_address, manual_channel) = match last {
             Some(SavedTarget::Bluetooth { address, channel, .. }) => (address, channel),
             _ => (String::new(), bluetooth::DEFAULT_CHANNEL),
@@ -35,6 +38,7 @@ impl ConnectUi {
             ports: serial::list_ports(),
             manual_address,
             manual_channel,
+            race,
         }
     }
 
@@ -140,6 +144,10 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             ui.add_space(8.0);
         }
 
+        ecm_type(app, ui, &p);
+        ui.add_space(8.0);
+        let race = app.connect.race;
+
         // Bluetooth
         theme::card(ui).show(ui, |ui| {
             ui.set_width(ui.available_width());
@@ -192,6 +200,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                             address: d.address.to_string(),
                             channel: bluetooth::DEFAULT_CHANNEL,
                             name: d.name.clone(),
+                            race,
                         });
                     }
                     ui.end_row();
@@ -213,6 +222,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                             address: app.connect.manual_address.trim().to_uppercase(),
                             channel: app.connect.manual_channel,
                             name: None,
+                            race,
                         });
                     }
                 });
@@ -251,7 +261,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     ui.label(RichText::new(&port.path).strong());
                     ui.label(RichText::new(&port.description).color(p.muted));
                     if ui.button("Connect").clicked() {
-                        chosen = Some(SavedTarget::Serial { path: port.path.clone() });
+                        chosen = Some(SavedTarget::Serial { path: port.path.clone(), race });
                     }
                 });
             }
@@ -268,17 +278,45 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     ui.label(RichText::new("Demo").font(theme::strong_font(16.0)));
                     ui.label(
                         RichText::new(
-                            "A simulated BUEIB with made-up engine data, for trying XBTune without the bike.",
+                            if race {
+                                "A simulated factory race B2RIB with made-up engine data, for trying XBTune without the bike."
+                            } else {
+                                "A simulated BUEIB with made-up engine data, for trying XBTune without the bike."
+                            },
                         )
                         .color(p.muted),
                     );
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button("Start demo").clicked() {
-                        app.start(SavedTarget::Demo);
+                        app.start(SavedTarget::Demo { race });
                     }
                 });
             });
         });
+    });
+}
+
+/// Stock or factory race: EcmDroid's protocol choice (3c189be). A factory
+/// race ECM answers only on address 0x55 at 19200 baud, so it has to be
+/// chosen before connecting; P&A race ECMs talk like stock ones.
+fn ecm_type(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
+    theme::card(ui).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("ECM type").font(theme::strong_font(16.0)));
+            ui.add_space(12.0);
+            ui.radio_value(&mut app.connect.race, false, "Stock (or P&A race)");
+            ui.radio_value(&mut app.connect.race, true, "Factory race");
+        });
+        let text = if app.connect.race {
+            "Factory race ECMs have RACE USE ONLY engraved on the case. They talk at 19200 baud: \
+             a USB cable is set up for you, but a Bluetooth adapter has to be configured for \
+             19200 baud first (a BuellTooth is normally 9600)."
+        } else {
+            "Almost every ECM. P&A race ECMs (RACE USE ONLY printed on the case) count as stock here; \
+             only an engraved marking means factory race."
+        };
+        ui.label(RichText::new(text).small().color(p.muted));
     });
 }

@@ -51,9 +51,12 @@ test expectations), marked in the tests.
 | Busy state | GET page 0x20, offset 0, len 1; 0 = idle | ED `PDU.GET_CSTATE`, `ECM.getCurrentState()` |
 | Max bytes per GET/SET | 16 | ED `ECM.readEEPromPage()`, `writeEEPromPage()` |
 | Page 0 reads | one byte at a time at offset `0xFF - pagelen + i + 1` | ED `ECM.readEEPromPage()` |
-| Page 0 writes | only selected variables (`LFuel1`, `KBaro`) | ED `ECM.writeEEPromPage()`. Not implemented yet. |
+| Page 0 writes | only selected variables (`LFuel1`, `KBaro`) | ED `ECM.writeEEPromPage()`. Used by burns (phase 6). |
 | Image layout | pages 1..N back to back from 0, page 0 at the end (`xsize - len`) | ED `EEPROM.get()`, `TestEEPROM.testVersion` |
 | Serial settings | 9600 8N1, no flow control (race: 19200) | ED `ECM.java` class comment, `MainActivity.java` |
+| Race protocol choice | "Stock / P&A" vs "Factory Race" picked before connecting; race = address 0x55; no valid reply -> "wrong Protocol?" | ED commit `3c189be` (`ECM.Protocol`, `PDU.setProtocol()`, `ECM.sendPDU()`) |
+| Race over USB | port opened at 19200 for Factory Race | ED commit `2f17d29` (`MainActivity.java`) |
+| Factory vs P&A race | engraved vs printed RACE USE ONLY; Bluetooth adapter at 19200 for factory race | ED `README.md`, commit `2f17d29` |
 | Reply timeout | 1000 ms | ED `ECM.DEFAULT_TIMEOUT` |
 | SPP UUID | 00001101-0000-1000-8000-00805F9B34FB | ED `ECM.java`; Bluetooth SIG |
 | GET reply length must equal the request | | ED `ECM.readEEPromPage()` |

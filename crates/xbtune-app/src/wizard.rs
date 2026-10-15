@@ -241,7 +241,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             app.view = View::Connect;
             app.wizard.step = None;
         }
-        Some(Action::StartDemo) => app.start(SavedTarget::Demo),
+        Some(Action::StartDemo) => app.start(SavedTarget::Demo { race: false }),
         Some(Action::OpenReport) => {
             app.wizard.step = None;
             app.report.open();

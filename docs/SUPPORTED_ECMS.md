@@ -42,10 +42,24 @@ what the bike really has.
 "Unnamed" means the variable has no `names` row; EcmDroid hides these.
 XBTune keeps them, labelled with the variable name.
 
-## Recognised, not yet supported
+## Race ECMs (supported, untested on hardware)
 
-Race ECMs use address 0x55 at 19200 baud (`--race`). They share street
-definitions, but are not a target until there is hardware to test on.
+Factory race ECMs answer only on address 0x55 at 19200 baud. Choose
+**ECM type -> Factory race** on the app's Connect screen (CLI: `--race`)
+before connecting; the wrong choice looks like a silent ECM, and XBTune
+says so. This follows EcmDroid's "Stock / P&A" vs "Factory Race" protocol
+choice (commit `3c189be`) and its USB baud fix (`2f17d29`).
+
+- **Factory race:** RACE USE ONLY *engraved* on the case.
+- **P&A race:** RACE USE ONLY *printed* on the case. These talk like stock
+  ECMs: choose "Stock".
+- **USB cable:** XBTune opens the port at 19200 for factory race.
+- **Bluetooth:** the adapter's own serial side must be set to 19200 baud,
+  8N1, no handshake. A BuellTooth is normally 9600; XBTune can't change it.
+
+They use the street definitions below. Reading, live data, logging,
+diagnostics and burns are tested against the simulator (a B2RIB) only.
+No one has tried a real race ECM yet; reports welcome.
 
 | ECM ID | Family | Bikes | Definition |
 |---|---|---|---|
@@ -53,6 +67,9 @@ definitions, but are not a target until there is hardware to test on.
 | B3R1D | DDFI-3 | XB or 1125 2008+, EBR race | BUE1D |
 | B3R2D | DDFI-3 | XB or 1125 2008+, EBR race | BUE2D |
 | B3R3D | DDFI-3 | XB or 1125 2008+, EBR race | BUE3D |
+
+Whether the EBR race IDs (B3R*D) use the race address or the stock one
+isn't recorded anywhere we can cite: try "Factory race" first, then "Stock".
 
 ## Out of scope
 

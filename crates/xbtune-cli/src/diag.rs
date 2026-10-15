@@ -72,7 +72,10 @@ async fn connect(conn: &Connection) -> Result<Connected> {
     }
     eprintln!("Connecting: {}", ep.label());
     let mut client = ep.open(conn).await?;
-    let version = client.version().await.context("no answer to the version request")?;
+    let version = client
+        .version()
+        .await
+        .map_err(|e| anyhow!("no answer to the version request ({e}). {}", conn.no_answer_hint()))?;
     let catalog = Catalog::builtin()?;
     let ecm = catalog.lookup(&version).cloned().ok_or_else(|| anyhow!("unknown ECM '{version}'"))?;
     let def = catalog.definition(&ecm).cloned().ok_or_else(|| anyhow!("{}: no definition", ecm.id))?;

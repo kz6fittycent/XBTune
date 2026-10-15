@@ -75,6 +75,21 @@ pub fn open_error_text(target: &Target, e: &OpenError) -> String {
 /// only stretches every dropout. EEPROM reads keep the 1 s default.
 pub const LIVE_TIMEOUT: Duration = Duration::from_millis(400);
 
+/// EcmDroid's "wrong Protocol?" hint (`ECM.java`, 3c189be): a factory race
+/// ECM answers only on address 0x55, every other ECM only on 0x42, so the
+/// wrong choice looks like a silent ECM.
+pub fn wrong_type_hint(address: EcmAddress) -> &'static str {
+    match address {
+        EcmAddress::Stock => {
+            "If this is a factory race ECM (RACE USE ONLY engraved on the case), choose \"Factory race\" (CLI: --race)."
+        }
+        EcmAddress::Race => {
+            "Factory race was chosen: if this is a stock or P&A race ECM (RACE USE ONLY printed, not engraved), \
+             choose \"Stock\" (CLI: no --race). Over Bluetooth, a factory race ECM needs the adapter set to 19200 baud."
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SessionConfig {
     /// Human-readable target, for logs and the UI.
@@ -415,7 +430,12 @@ impl Worker {
     async fn connected(&mut self, mut client: EcmClient, failed_in_a_row: &mut u32) -> End {
         let version = match client.version().await {
             Ok(v) => v,
-            Err(e) => return End::Retry(format!("no answer to the version request: {e}")),
+            Err(e) => {
+                return End::Retry(format!(
+                    "no answer to the version request: {e}. {}",
+                    wrong_type_hint(self.cfg.address)
+                ));
+            }
         };
         let Some(ecm) = self.catalog.lookup(&version).cloned() else {
             return End::Stop(Some(format!(
@@ -1073,6 +1093,49 @@ mod tests {
             Some(Event::BurnPrepared { backup, path, .. }) => ((**backup).clone(), path.clone()),
             other => panic!("{other:?}"),
         }
+    }
+
+    /// Factory race ECMs (EcmDroid 3c189be): the stock address gets no
+    /// answer and a hint; the race address reads, polls and burns.
+    #[tokio::test]
+    async fn factory_race_ecm_needs_the_race_address() {
+        let mut sim = Simulator::b2rib_running();
+        sim.set_engine_running(false);
+        let sim = shared(sim);
+        let catalog = Arc::new(Catalog::builtin().unwrap());
+        let mut cfg = SessionConfig::new("sim", EcmAddress::Stock);
+        fast(&mut cfg);
+        let mut s = start(cfg, sim_opener(sim.clone()), catalog.clone(), None);
+        let ev = collect_until(&mut s, |e| matches!(e, Event::State(LinkState::Reconnecting { .. }))).await;
+        let Some(Event::State(LinkState::Reconnecting { reason, .. })) = ev.last() else { panic!("{ev:?}") };
+        assert!(reason.contains("Factory race") && reason.contains("--race"), "{reason}");
+        s.send(Command::Stop);
+        s.task.await.unwrap();
+
+        let store = std::env::temp_dir().join(format!("xbtune-race-{}", std::process::id()));
+        let mut cfg = SessionConfig::new("sim", EcmAddress::Race);
+        fast(&mut cfg);
+        cfg.read_timeout = Duration::from_millis(200);
+        cfg.store = Some(store.clone());
+        cfg.write_permit = Some(crate::diag::test_write_permit());
+        let mut s = start(cfg, sim_opener(sim.clone()), catalog.clone(), None);
+        let ev = collect_until(&mut s, |e| matches!(e, Event::Identified(_))).await;
+        let Some(Event::Identified(id)) = ev.last() else { panic!("{ev:?}") };
+        assert_eq!(id.ecm.id, "B2RIB");
+        assert_eq!(id.ecm.definition, "BUEIB");
+        let ev = collect_until(&mut s, |e| matches!(e, Event::Sample(_))).await;
+        assert!(matches!(ev.last(), Some(Event::Sample(_))));
+        let (backup, _) = prepared(&mut s).await;
+        assert_eq!(backup.ecm_id, "B2RIB");
+        let mut t = crate::tune::Tune::new(backup, &catalog).unwrap();
+        t.set("rev", &[("KRPM_Hard_Hi".into(), 0, 7000.0)]).unwrap();
+        s.send(Command::Burn { target: Box::new(t.image.clone()), note: String::new() });
+        let ev = collect_until(&mut s, |e| matches!(e, Event::BurnDone(_))).await;
+        let Some(Event::BurnDone(Ok(sum))) = ev.last() else { panic!("{:?}", ev.last()) };
+        assert_eq!(sum.report.writes, 1);
+        assert_eq!(sim.lock().unwrap().image(), &t.image.bytes[..]);
+        s.send(Command::Stop);
+        let _ = std::fs::remove_dir_all(&store);
     }
 
     #[tokio::test]

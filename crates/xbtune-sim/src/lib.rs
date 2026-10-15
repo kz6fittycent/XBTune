@@ -144,6 +144,13 @@ impl SimConfig {
         let catalog = Catalog::builtin().expect("built-in definitions load");
         Self::for_ecm(catalog.lookup("BUEIB").expect("BUEIB defined"), "310 12-11-03")
     }
+
+    /// A factory race B2RIB: the BUEIB definition, but address 0x55. The
+    /// version suffix is made up (no real B2RIB has been seen yet).
+    pub fn b2rib() -> Self {
+        let catalog = Catalog::builtin().expect("built-in definitions load");
+        Self::for_ecm(catalog.lookup("B2RIB").expect("B2RIB defined"), "310 01-01-05")
+    }
 }
 
 /// What the simulated ECM has done, for test assertions.
@@ -220,6 +227,14 @@ impl Simulator {
         let c = Catalog::builtin().expect("built-in definitions load");
         let def = c.definition(c.lookup("BUEIB").expect("BUEIB defined")).expect("BUEIB definition").clone();
         Self::bueib().with_engine(def)
+    }
+
+    /// A simulated factory race ECM (B2RIB, address 0x55) with the made-up
+    /// engine running. Same EEPROM image as [`Simulator::bueib`].
+    pub fn b2rib_running() -> Self {
+        let c = Catalog::builtin().expect("built-in definitions load");
+        let def = c.definition(c.lookup("B2RIB").expect("B2RIB defined")).expect("B2RIB definition").clone();
+        Self::new(SimConfig::b2rib(), BUEIB_EEPROM).with_engine(def)
     }
 
     /// Serve moving runtime data from the made-up engine in [`engine`],

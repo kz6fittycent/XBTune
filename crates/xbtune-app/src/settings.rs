@@ -8,7 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::theme::ThemePref;
 
-/// Where the ECM was last reached.
+/// Where the ECM was last reached. `race`: a factory race ECM (address
+/// 0x55, 19200 baud; EcmDroid's "Factory Race" protocol). Settings saved
+/// before it existed read as stock.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum SavedTarget {
@@ -16,24 +18,42 @@ pub enum SavedTarget {
         address: String,
         channel: u8,
         name: Option<String>,
+        #[serde(default)]
+        race: bool,
     },
     Serial {
         path: String,
+        #[serde(default)]
+        race: bool,
     },
-    /// The built-in simulated ECM.
-    Demo,
+    /// The built-in simulated ECM (a BUEIB, or a B2RIB when `race`).
+    Demo {
+        #[serde(default)]
+        race: bool,
+    },
 }
 
 impl SavedTarget {
     pub fn label(&self) -> String {
-        match self {
+        let base = match self {
             Self::Bluetooth { address, name, .. } => match name {
                 Some(n) => format!("{n} ({address})"),
                 None => address.clone(),
             },
-            Self::Serial { path } => path.clone(),
-            Self::Demo => "Demo (simulated ECM)".into(),
+            Self::Serial { path, .. } => path.clone(),
+            Self::Demo { .. } => "Demo (simulated ECM)".into(),
+        };
+        if self.race() { format!("{base}, factory race ECM") } else { base }
+    }
+
+    pub fn race(&self) -> bool {
+        match self {
+            Self::Bluetooth { race, .. } | Self::Serial { race, .. } | Self::Demo { race } => *race,
         }
+    }
+
+    pub fn is_demo(&self) -> bool {
+        matches!(self, Self::Demo { .. })
     }
 }
 
@@ -119,6 +139,7 @@ mod tests {
                 address: "00:11:22:AA:BB:CC".into(),
                 channel: 1,
                 name: None,
+                race: true,
             }),
             theme: ThemePref::Dark,
             ..Default::default()
@@ -133,5 +154,32 @@ mod tests {
         assert_eq!(back.theme, ThemePref::Light);
         assert_eq!(back.gauges, Settings::default().gauges);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn targets_saved_before_race_read_as_stock() {
+        for (text, want) in [
+            (
+                "[last]\nkind = \"bluetooth\"\naddress = \"00:11:22:AA:BB:CC\"\nchannel = 1\n",
+                SavedTarget::Bluetooth {
+                    address: "00:11:22:AA:BB:CC".into(),
+                    channel: 1,
+                    name: None,
+                    race: false,
+                },
+            ),
+            (
+                "[last]\nkind = \"serial\"\npath = \"/dev/ttyUSB0\"\n",
+                SavedTarget::Serial { path: "/dev/ttyUSB0".into(), race: false },
+            ),
+            ("[last]\nkind = \"demo\"\n", SavedTarget::Demo { race: false }),
+        ] {
+            let s: Settings = toml::from_str(text).unwrap();
+            assert_eq!(s.last, Some(want), "{text}");
+        }
+        let race = Settings { last: Some(SavedTarget::Demo { race: true }), ..Default::default() };
+        let back: Settings = toml::from_str(&toml::to_string_pretty(&race).unwrap()).unwrap();
+        assert_eq!(back.last, race.last);
+        assert!(back.last.unwrap().label().contains("factory race"));
     }
 }
