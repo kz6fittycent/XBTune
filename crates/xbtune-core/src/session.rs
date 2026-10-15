@@ -87,6 +87,8 @@ pub struct SessionConfig {
     pub fails_before_reconnect: u32,
     /// Allows [`Command::Function`]; `None` refuses them.
     pub permit: Option<crate::diag::Permit>,
+    /// Reply timeout during an EEPROM read (the read default, 1 s).
+    pub read_timeout: Duration,
     pub function_timing: crate::diag::FunctionTiming,
 }
 
@@ -101,6 +103,7 @@ impl SessionConfig {
             max_reconnects: None,
             fails_before_reconnect: 2,
             permit: None,
+            read_timeout: RetryPolicy::default().timeout,
             function_timing: crate::diag::FunctionTiming::default(),
         }
     }
@@ -115,6 +118,10 @@ pub enum Command {
     StopLog,
     /// Run an active test, clear codes or reset the TPS (between polls).
     Function(xbtune_proto::Function),
+    /// Read the whole EEPROM (verified, resumed after reconnects), then go
+    /// back to polling. Read-only.
+    ReadEeprom,
+    CancelRead,
     Stop,
 }
 
@@ -170,6 +177,11 @@ pub enum Event {
         function: xbtune_proto::Function,
         result: Result<crate::diag::Outcome, String>,
     },
+    /// EEPROM read progress.
+    ReadProgress(crate::read::Progress),
+    /// The EEPROM was read and verified.
+    EepromRead(Box<crate::image::Image>),
+    ReadFailed(String),
     /// Something worth showing that doesn't stop the session.
     Warning(String),
 }
@@ -200,6 +212,7 @@ pub fn start(cfg: SessionConfig, opener: Opener, catalog: Arc<Catalog>, notify: 
             out,
             commands: crx,
             identity: None,
+            read: None,
             log: None,
             started: Instant::now(),
             reconnects: 0,
@@ -240,6 +253,8 @@ struct Worker {
     out: Out,
     commands: mpsc::UnboundedReceiver<Command>,
     identity: Option<Identity>,
+    /// An EEPROM read in progress; survives reconnects.
+    read: Option<crate::read::EepromRead>,
     log: Option<Log>,
     started: Instant,
     reconnects: u32,
@@ -310,6 +325,12 @@ impl Worker {
                 function,
                 result: Err("not connected to the ECM right now".into()),
             }),
+            Command::ReadEeprom => self.start_read(),
+            Command::CancelRead => {
+                if self.read.take().is_some() {
+                    self.out.send(Event::ReadFailed("cancelled".into()));
+                }
+            }
             Command::Stop => {}
         }
     }
@@ -353,6 +374,9 @@ impl Worker {
                     Command::Function(f) => self.function(&mut client, f).await,
                     c => self.handle(c),
                 }
+            }
+            if let Some(end) = self.continue_read(&mut client).await {
+                return end;
             }
             let asked = Instant::now();
             let before = client.stats().clone();
@@ -402,6 +426,59 @@ impl Worker {
             let spent = asked.elapsed();
             if spent < self.cfg.min_interval {
                 tokio::time::sleep(self.cfg.min_interval - spent).await;
+            }
+        }
+    }
+
+    fn start_read(&mut self) {
+        let Some(id) = &self.identity else {
+            self.out.send(Event::ReadFailed("the ECM hasn't been identified yet".into()));
+            return;
+        };
+        match id.ecm.layout() {
+            Ok(layout) => self.read = Some(crate::read::EepromRead::new(&layout, true)),
+            Err(e) => self.out.send(Event::ReadFailed(e.to_string())),
+        }
+    }
+
+    /// Run a pending EEPROM read to the end. `Some` ends the connection
+    /// (link trouble: reconnect and resume).
+    async fn continue_read(&mut self, client: &mut EcmClient) -> Option<End> {
+        let mut read = self.read.take()?;
+        // EEPROM reads use the full timeout, not the live-data one.
+        let live_policy = client.policy();
+        client.set_policy(RetryPolicy { timeout: self.cfg.read_timeout, ..live_policy });
+        let out = &self.out;
+        let result = read.run(client, |p| out.send(Event::ReadProgress(p))).await;
+        client.set_policy(live_policy);
+        match result {
+            Ok(()) => {
+                let id = self.identity.as_ref().expect("identified before reading");
+                let bytes = read.bytes().expect("complete");
+                match crate::image::Image::from_raw(&id.ecm, &bytes) {
+                    Ok(mut img) => {
+                        img.page_zero = read.has_page_zero();
+                        img.ecm_version = Some(id.version.clone());
+                        img.meta.created = crate::time::rfc3339(SystemTime::now());
+                        img.meta.source = format!(
+                            "read from ECM over {}, every chunk read twice and matched ({} re-read)",
+                            self.cfg.target,
+                            read.mismatches()
+                        );
+                        self.log_event("EEPROM read complete");
+                        self.out.send(Event::EepromRead(Box::new(img)));
+                    }
+                    Err(e) => self.out.send(Event::ReadFailed(e.to_string())),
+                }
+                None
+            }
+            Err(crate::read::ReadError::Link(e)) => {
+                self.read = Some(read);
+                Some(End::Retry(format!("EEPROM read interrupted ({e}); will resume")))
+            }
+            Err(e) => {
+                self.out.send(Event::ReadFailed(e.to_string()));
+                None
             }
         }
     }
@@ -674,6 +751,33 @@ mod tests {
         let Some(Event::FunctionDone { result: Err(e), .. }) = ev.last() else { panic!("{ev:?}") };
         assert!(e.contains("locked"), "{e}");
         assert!(sim.lock().unwrap().journal.functions.is_empty());
+        s.send(Command::Stop);
+    }
+
+    #[tokio::test]
+    async fn eeprom_read_through_dropouts_matches_the_image() {
+        let mut sim = Simulator::bueib_running();
+        sim.set_rates(FaultRates { drop: 0.15, ..Default::default() });
+        let image = sim.image().to_vec();
+        let sim = shared(sim);
+        let mut cfg = SessionConfig::new("sim", EcmAddress::Stock);
+        fast(&mut cfg);
+        cfg.policy.timeout = Duration::from_millis(40);
+        cfg.policy.settle = Duration::from_millis(5);
+        cfg.policy.max_attempts = 1;
+        cfg.read_timeout = Duration::from_millis(40);
+        cfg.fails_before_reconnect = 1;
+        let mut s = start(cfg, sim_opener(sim), Arc::new(Catalog::builtin().unwrap()), None);
+        collect_until(&mut s, |e| matches!(e, Event::Identified(_))).await;
+        s.send(Command::ReadEeprom);
+        let ev = collect_until(&mut s, |e| matches!(e, Event::EepromRead(_) | Event::ReadFailed(_))).await;
+        let Some(Event::EepromRead(img)) = ev.last() else { panic!("{:?}", ev.last()) };
+        assert_eq!(img.bytes, image);
+        assert!(img.page_zero);
+        assert!(ev.iter().any(|e| matches!(e, Event::ReadProgress(_))));
+        // Polling resumes.
+        let ev = collect_until(&mut s, |e| matches!(e, Event::Sample(_))).await;
+        assert!(matches!(ev.last(), Some(Event::Sample(_))));
         s.send(Command::Stop);
     }
 }

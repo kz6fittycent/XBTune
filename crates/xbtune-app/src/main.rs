@@ -9,9 +9,11 @@ mod connect;
 mod dashboard;
 mod diagnostics;
 mod gauge;
+mod grid;
 mod settings;
 mod table;
 mod theme;
+mod tune_view;
 
 fn main() -> eframe::Result {
     tracing_subscriber::fmt()

@@ -43,6 +43,18 @@ from offset 0 in page-number order, then page 0 at the end.
 Files are written to a temporary name and renamed, so a crash never leaves a
 half-written image.
 
+### Edit metadata
+
+Saving an edited tune adds two optional `[meta]` keys (older files without
+them still load):
+
+- `modified`: when it was last edited in XBTune (RFC 3339 UTC).
+- `parent_crc32`: CRC-32 of the image it was opened from, so an edited tune
+  can be traced back to the original read.
+
+An image read from the ECM (`source` starts with "read from ECM") and never
+edited is a backup: the app saves edits to it under a new name.
+
 ## `.xpr`: EcmDroid raw image
 
 Just the bytes, no header. EcmDroid writes the whole buffer (`xsize`, page 0

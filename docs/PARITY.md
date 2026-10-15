@@ -17,7 +17,7 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 | Pick port / adapter, ECM type detected from version | ✅ `info`, `scan`, `ports` | 1 |
 | Unknown ECM type → clear error, point to supported list | ✅ read-only, writes refused | 1 |
 | Fetch EEPROM on connect, with progress | 🟡 `dump` (CLI); app in 5 | 2/5 |
-| Online / offline modes (edit an in-memory copy offline) | ⬜ | 5 |
+| Online / offline modes (edit an in-memory copy offline) | ✅ Tune view edits files only; Read from ECM loads a verified copy | 5 |
 | Trouble codes work even without a definition for the ECM | ⬜ needs the code bytes' offsets from somewhere; not in EcmDroid | later |
 | Status-bar error indicator when a code is set | ✅ red "Code NN" in the app header | 4 |
 | Supported-ECM list, per-ECM runtime/EEPROM info pages | 🟡 `ecms`, `defs`, `docs/SUPPORTED_ECMS.md` | 2 |
@@ -55,15 +55,15 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 |---|---|---|
 | Fetch, load, save EEPROM | ✅ `dump`, `.xbt`, `.xpr` | 2 |
 | Hex/cell view with offset, byte, 16-bit LE value, variable name | 🟡 `show --list`, `diff` | 2/5 |
-| Static maps (fuel, spark; idle setpoint on DDFI-3) | 🟡 view (`show`); edit in 5 | 5 |
+| Static maps (fuel, spark; idle setpoint on DDFI-3) | ✅ grid with heatmap, axes, 3D, set/add/×/%/smooth/interpolate, copy/paste, undo/redo; live point (approx.) | 5 |
 | **NEW** Dynamic maps from logs: EGO, AFV, lambda, hits, weight | ⬜ | 7 |
-| **NEW** Load/save individual maps to files | ⬜ | 5 |
-| **NEW** Linked front/rear editing: unlocked, same difference, same value, same % | ⬜ | 5 |
-| Scalars and flags (system, limits, corrections, O2 setup pages) | 🟡 view; edit in 5 | 5 |
+| **NEW** Load/save individual maps to files | 🟡 copy/paste as TSV (spreadsheets), `copy-table` / "copy from other image" | 5 |
+| **NEW** Linked front/rear editing: unlocked, same difference, same value, same % | ✅ "Link front/rear" applies the same operation to the twin map | 5 |
+| Scalars and flags (system, limits, corrections, O2 setup pages) | ✅ every value, table and flag byte in the definition; `set` in the CLI | 5 |
 | Burn full image or only changed cells; each write read back and compared | ⬜ changed pages only, always verified | 6 |
 | Quick Burn of a single cell on Set (experimental there) | ❌ every burn goes through the §6 path | 6 |
 | **NEW** Calibration string (8 chars) set before burn/save | ⬜ (`Cal_ID` exists on DDFI-3 IDs) | 5/6 |
-| Compare edited copy against the fetched original | 🟡 `diff` | 2/5 |
+| Compare edited copy against the fetched original | ✅ edited cells outlined; compare with any image (side by side or difference heatmap), `diff` | 5 |
 | **NEW** Warn that DDFI-3 ECMs can lose changes if keep-alive power is faulty | ⬜ burn screen text | 6 |
 
 ## Tuning

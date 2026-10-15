@@ -205,3 +205,47 @@ fn active_tests_are_guarded() {
     assert!(!out.status.success());
     assert!(String::from_utf8_lossy(&out.stderr).contains("cancelled"));
 }
+
+#[test]
+fn set_and_copy_table_edit_files_only() {
+    let base = tmp("base.xbt");
+    let (ok, out) = cli(&["dump", "--sim", "-o", base.to_str().unwrap()]);
+    assert!(ok, "{out}");
+    let edited = tmp("edited.xbt");
+    let (ok, out) = cli(&[
+        "set",
+        base.to_str().unwrap(),
+        "KRPM_Hard_Hi=7000",
+        "Tab_Fuel_Front[11,0]=99",
+        "-o",
+        edited.to_str().unwrap(),
+    ]);
+    assert!(ok, "{out}");
+    assert!(out.contains("KRPM_Hard_Hi[0]: 6800 -> 7000"), "{out}");
+    assert!(out.contains("2 element(s) changed"), "{out}");
+    let (ok, out) = cli(&["show", edited.to_str().unwrap(), "KRPM_Hard_Hi"]);
+    assert!(ok && out.contains("7000"), "{out}");
+    let (ok, out) = cli(&["diff", base.to_str().unwrap(), edited.to_str().unwrap()]);
+    assert!(ok, "{out}");
+    assert!(out.contains("KRPM_Hard_Hi") && out.contains("Tab_Fuel_Front"), "{out}");
+    // Refuses to overwrite the input without --in-place, and bad cells.
+    let (ok, out) = cli(&["set", base.to_str().unwrap(), "KRPM_Hard_Hi=7000", "-o", base.to_str().unwrap()]);
+    assert!(!ok && out.contains("--in-place"), "{out}");
+    let (ok, out) =
+        cli(&["set", base.to_str().unwrap(), "Tab_Fuel_Front[12,0]=1", "-o", tmp("x.xbt").to_str().unwrap()]);
+    assert!(!ok && out.contains("outside"), "{out}");
+    // Copy the map back from the original: only the rev limit differs then.
+    let back = tmp("back.xbt");
+    let (ok, out) = cli(&[
+        "copy-table",
+        base.to_str().unwrap(),
+        edited.to_str().unwrap(),
+        "Tab_Fuel_Front",
+        "-o",
+        back.to_str().unwrap(),
+    ]);
+    assert!(ok, "{out}");
+    let (ok, out) = cli(&["diff", base.to_str().unwrap(), back.to_str().unwrap()]);
+    assert!(ok, "{out}");
+    assert!(out.contains("KRPM_Hard_Hi") && !out.contains("Tab_Fuel_Front"), "{out}");
+}

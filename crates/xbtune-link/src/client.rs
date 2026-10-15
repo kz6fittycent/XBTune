@@ -50,6 +50,10 @@ impl EcmClient {
         self
     }
 
+    pub fn set_policy(&mut self, policy: RetryPolicy) {
+        self.policy = policy;
+    }
+
     pub fn policy(&self) -> RetryPolicy {
         self.policy
     }

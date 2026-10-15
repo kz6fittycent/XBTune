@@ -33,6 +33,7 @@ pub enum View {
     Data,
     Charts,
     Diagnostics,
+    Tune,
 }
 
 /// What the UI knows about the link.
@@ -97,6 +98,10 @@ pub struct XbApp {
     pub messages: Vec<Message>,
     pub chart_paused: Option<f64>,
     pub diag: crate::diagnostics::DiagUi,
+    /// The tune being edited, and an image to compare it with.
+    pub tune: Option<xbtune_core::tune::Tune>,
+    pub compare: Option<(PathBuf, xbtune_core::image::Image)>,
+    pub tune_ui: crate::tune_view::TuneUi,
     /// The demo ECM, to start and stop its engine.
     demo_sim: Option<xbtune_sim::SharedSim>,
     /// ECM commands allowed for the current session.
@@ -161,11 +166,26 @@ impl XbApp {
             messages: Vec::new(),
             chart_paused: None,
             diag: Default::default(),
+            tune: None,
+            compare: None,
+            tune_ui: Default::default(),
             demo_sim: None,
             permitted: false,
             egui_ctx: cc.egui_ctx.clone(),
             shot,
         };
+        if let Some(p) =
+            std::env::var_os("XBTUNE_TUNE").map(PathBuf::from).or_else(|| app.settings.last_tune.clone())
+            && p.exists()
+        {
+            crate::tune_view::open(&mut app, &p, false);
+            app.tune_ui.status = None;
+        }
+        if app.shot.is_some()
+            && let Ok(script) = std::env::var("XBTUNE_SHOT_TUNE")
+        {
+            crate::tune_view::scripted(&mut app, &script);
+        }
         if app.shot.is_some() {
             let view = std::env::var("XBTUNE_VIEW").unwrap_or_default();
             if view != "connect" {
@@ -176,6 +196,7 @@ impl XbApp {
                 "charts" => View::Charts,
                 "connect" => View::Connect,
                 "diag" => View::Diagnostics,
+                "tune" => View::Tune,
                 _ => View::Dashboard,
             };
         }
@@ -257,6 +278,51 @@ impl XbApp {
             *st = LinkState::Stopped { reason: None };
         }
         self.link.log = None;
+    }
+
+    /// A verified read from the ECM: save it as a backup, then open it (or,
+    /// with unsaved edits open, offer it for comparison).
+    fn got_eeprom(&mut self, img: xbtune_core::image::Image) {
+        let path = crate::tune_view::images_dir().join(format!(
+            "{}_{}.xbt",
+            img.ecm_id,
+            xbtune_core::time::file_stamp(SystemTime::now())
+        ));
+        if let Err(e) = img.save(&path, &self.catalog) {
+            self.say(format!("Read OK, but saving the backup failed: {e}"), true);
+            return;
+        }
+        if self.tune.as_ref().is_some_and(|t| t.is_modified()) {
+            self.compare = Some((path.clone(), img));
+            self.say(
+                format!(
+                    "EEPROM saved to {}. Your unsaved edits stay open; it's loaded for comparison.",
+                    path.display()
+                ),
+                false,
+            );
+        } else {
+            crate::tune_view::open(self, &path, false);
+            self.say(format!("EEPROM read, verified and saved to {}", path.display()), false);
+        }
+        self.view = View::Tune;
+    }
+
+    /// Unsaved edits at exit go to a recovery file.
+    fn save_recovery(&mut self) {
+        let Some(t) = &mut self.tune else { return };
+        if !t.is_modified() {
+            return;
+        }
+        let path = crate::tune_view::images_dir().join(format!(
+            "recovered_{}_{}.xbt",
+            t.ecm.id,
+            xbtune_core::time::file_stamp(SystemTime::now())
+        ));
+        let catalog = self.catalog.clone();
+        if let Err(e) = t.save(&path, &catalog) {
+            tracing::warn!(error = %e, "could not save recovery file");
+        }
     }
 
     pub fn session_permitted(&self) -> bool {
@@ -343,6 +409,15 @@ impl XbApp {
                 Event::FunctionDone { function, result } => {
                     self.diag.running = None;
                     self.diag.last = Some((function, result));
+                }
+                Event::ReadProgress(p) => self.tune_ui.read_progress = Some((p.done, p.total)),
+                Event::ReadFailed(e) => {
+                    self.tune_ui.read_progress = None;
+                    self.say(format!("EEPROM read failed: {e}"), true);
+                }
+                Event::EepromRead(img) => {
+                    self.tune_ui.read_progress = None;
+                    self.got_eeprom(*img);
                 }
                 Event::Warning(w) => self.say(w, true),
             }
@@ -454,6 +529,7 @@ impl XbApp {
             (View::Data, "Live data"),
             (View::Charts, "Charts"),
             (View::Diagnostics, "Diagnostics"),
+            (View::Tune, "Tune"),
         ] {
             let selected = self.view == v;
             let text = RichText::new(label).size(15.0);
@@ -588,11 +664,13 @@ impl eframe::App for XbApp {
                     View::Data => crate::table::show(self, ui),
                     View::Charts => crate::charts::show(self, ui),
                     View::Diagnostics => crate::diagnostics::show(self, ui),
+                    View::Tune => crate::tune_view::show(self, ui),
                 }
             });
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.save_recovery();
         self.stop();
         self.save_settings();
     }

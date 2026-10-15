@@ -28,7 +28,9 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   `test tachometer` (done after 4.4 s) and `test fan` (5.4 s) ran fine.
   EcmDroid also shows stored 15 (codes cross-checked). `codes --clear`
   on the bike cleared it. TPS reset deliberately not run (owner's choice).
-  Phase 4 done. Don't start phase 5 until the owner says so.
+  Phase 4 done.
+- **Phase 5 (offline map editing): built 2026-10-14, waiting for the
+  owner's test.** Don't start phase 6 (burn) until the owner says so.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the
@@ -41,6 +43,26 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 - Snap confinement checks on this PC: see "Snap notes" below.
 - Repo is private, with no remote. Don't add a remote or push without asking.
   Don't publish to the store.
+
+### Phase 5 contents
+
+- `xbtune-core::tune`: `Tune` (image + definition), `set` (encode, clamp,
+  byte patches), undo/redo, `copy_from`, `modified_vars`, `save` (stamps
+  `meta.modified`, `meta.parent_crc32`), `apply_op` (Set/Add/Multiply/
+  Percent/Smooth/InterpolateRows/Cols), `Clip` (TSV), `partner`.
+- Session `Command::ReadEeprom`/`CancelRead` -> `ReadProgress`/`EepromRead`/
+  `ReadFailed`; verified, resumes after reconnect; `read_timeout` 1 s.
+- App Tune view (`tune_view.rs`, `grid.rs`): open/save/save-as via an
+  in-app file browser (no file-dialog crate), Read from ECM (auto-saved
+  backup in images dir, never overwritten), variable list (edited = accent,
+  differs from compare = ≠), map grid (heatmap, axes, drag/shift/ctrl
+  select, row/col headers), ops toolbar, Copy/Paste (system clipboard TSV),
+  link front/rear, 3D surface (mesh; drag to rotate), compare (other /
+  difference), scalars (step = scale), flag bytes as checkboxes, Ctrl+Z/Y/S/
+  C/V, arrows; unsaved edits -> recovery file on exit; last tune reopens.
+- CLI: `set FILE NAME=V NAME[r,c]=V -o OUT`, `copy-table FROM INTO VARS -o
+  OUT` (both refuse to overwrite the input without --in-place).
+- Hook: `XBTUNE_TUNE=path XBTUNE_SHOT_TUNE="var=..;select=r,c:r,c;op=pct:5;3d;compare=PATH;mode=diff"`.
 
 ### Phase 4 contents
 
@@ -193,10 +215,24 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 
 ## Next steps
 
-1. Owner runs the phase 4 checklist (read-only part first).
+1. Owner runs the phase 5 checklist below.
 2. Optional: btsnoop capture of EcmDroid reading the EEPROM / live data, to
    confirm frames byte for byte.
-3. Phase 5 (only after the owner says go): offline map editing.
+3. Phase 6 (only after the owner says go): burn (KICKOFF §6), sim first.
+
+## Phase 5 checklist (no ECM writes; editing files only)
+
+1. App -> Connect to the bike -> Tune -> "Read from ECM": progress bar,
+   then it opens and is saved as a backup in the images folder.
+2. Fuel Map Front: select cells (drag, shift-click, click row/column
+   headers), try +, %, Smooth, Interp; Undo/Redo; 3D view; engine idling
+   -> the "live point" circle should sit near idle RPM / low load.
+3. Change a value (e.g. a rev limit) and a flag; Save -> asks for a new
+   name (the ECM read is protected). Compare with the original -> ≠ marks
+   and Difference view.
+4. CLI: `xbtune.cli set ~/xbtune.xbt KRPM_Hard_Hi=7450 -o ~/test.xbt`,
+   then `xbtune.cli diff ~/xbtune.xbt ~/test.xbt`.
+5. Nothing here writes to the ECM; burning is phase 6.
 
 ## Phase 4 hardware checklist
 

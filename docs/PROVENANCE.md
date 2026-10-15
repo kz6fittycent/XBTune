@@ -158,6 +158,15 @@ known-good source:**
 | No AFV reset (EcmDroid only writes `LFuel1`/`KBaro` in page 0 during a burn) | ED `ECM.PAGE_ZERO_VARS_TO_WRITE` |
 | Engine-stopped check (RPM 0), busy check, never re-send, lost reply resolved by busy state, hardware permit, safety notices | XB |
 
+## Tune editing (`crates/xbtune-core/src/tune.rs`, app Tune view)
+
+| Detail | Source |
+|---|---|
+| Encoding `raw = round((value - translate) / scale)`, LE, clamped to the element width | XB: the inverse of ED `Variable.refreshValue()` |
+| Pairs: even elements use axis scale/translate | XB (same unconfirmed reading as decoding) |
+| Grid ops, clipboard, undo/redo as byte patches, front/rear partner by name | XB |
+| Live point on maps: axes named "...RPM..." follow the `RPM` channel, "...Load..." the `Load` channel | XB reading, UNCONFIRMED (shown as "approx.") |
+
 ## App assets (`crates/xbtune-app/assets`)
 
 | File | Source |

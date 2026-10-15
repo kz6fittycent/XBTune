@@ -1,0 +1,357 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//! The map grid (heatmap, selection, change markers) and the 3D surface,
+//! drawn with the egui painter.
+
+use std::collections::BTreeSet;
+
+use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, pos2, vec2};
+use xbtune_defs::format_number;
+
+use crate::theme::Palette;
+
+/// Selected cells, plus where a range selection started.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Selection {
+    pub cells: BTreeSet<(usize, usize)>,
+    pub anchor: Option<(usize, usize)>,
+    drag_from: Option<(usize, usize)>,
+}
+
+impl Selection {
+    pub fn clear(&mut self) {
+        *self = Self::default();
+    }
+
+    pub fn rect(&mut self, a: (usize, usize), b: (usize, usize)) {
+        self.cells.clear();
+        for r in a.0.min(b.0)..=a.0.max(b.0) {
+            for c in a.1.min(b.1)..=a.1.max(b.1) {
+                self.cells.insert((r, c));
+            }
+        }
+    }
+
+    pub fn list(&self) -> Vec<(usize, usize)> {
+        self.cells.iter().copied().collect()
+    }
+
+    /// Move a single-cell selection with the arrow keys.
+    pub fn step(&mut self, dr: i64, dc: i64, rows: usize, cols: usize) {
+        let (r, c) = self.anchor.unwrap_or((0, 0));
+        let r = (r as i64 + dr).clamp(0, rows as i64 - 1) as usize;
+        let c = (c as i64 + dc).clamp(0, cols as i64 - 1) as usize;
+        self.cells.clear();
+        self.cells.insert((r, c));
+        self.anchor = Some((r, c));
+    }
+}
+
+/// What the cells show.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CellMode {
+    Values,
+    /// The comparison image's values.
+    Other,
+    /// This minus the comparison image.
+    Difference,
+}
+
+pub struct GridSpec<'a> {
+    pub values: &'a [Vec<f64>],
+    /// As last saved, to mark edited cells.
+    pub saved: Option<&'a [Vec<f64>]>,
+    /// Comparison image.
+    pub other: Option<&'a [Vec<f64>]>,
+    pub mode: CellMode,
+    pub row_labels: Vec<String>,
+    pub col_labels: Vec<String>,
+    pub decimals: Option<u32>,
+    /// Live operating point (fractional row, col), if known.
+    pub live: Option<(f32, f32)>,
+}
+
+/// Heatmap colour for `t` in 0..=1 (blue, cyan, green, yellow, red).
+pub fn heat(t: f32) -> Color32 {
+    const STOPS: [(f32, [u8; 3]); 5] = [
+        (0.0, [0x2c, 0x7b, 0xb6]),
+        (0.25, [0x00, 0xa6, 0xca]),
+        (0.5, [0x7c, 0xcf, 0x8a]),
+        (0.75, [0xf9, 0xd0, 0x57]),
+        (1.0, [0xd7, 0x19, 0x1c]),
+    ];
+    let t = if t.is_finite() { t.clamp(0.0, 1.0) } else { 0.5 };
+    let i = STOPS.windows(2).position(|w| t <= w[1].0).unwrap_or(STOPS.len() - 2);
+    let (a, b) = (STOPS[i], STOPS[i + 1]);
+    let f = (t - a.0) / (b.0 - a.0);
+    let mix = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * f).round() as u8;
+    Color32::from_rgb(mix(a.1[0], b.1[0]), mix(a.1[1], b.1[1]), mix(a.1[2], b.1[2]))
+}
+
+/// Colour for a difference: blue below zero, red above, grey at zero.
+pub fn diff_colour(d: f64, max_abs: f64) -> Color32 {
+    if d == 0.0 || max_abs == 0.0 {
+        return Color32::from_gray(90);
+    }
+    let t = (d.abs() / max_abs).clamp(0.15, 1.0) as f32;
+    let base = if d > 0.0 { [0xd7, 0x30, 0x27] } else { [0x45, 0x75, 0xb4] };
+    let g = 90.0;
+    let mix = |x: u8| (g + (x as f32 - g) * t) as u8;
+    Color32::from_rgb(mix(base[0]), mix(base[1]), mix(base[2]))
+}
+
+fn text_on(c: Color32) -> Color32 {
+    let l = 0.299 * c.r() as f32 + 0.587 * c.g() as f32 + 0.114 * c.b() as f32;
+    if l > 150.0 { Color32::from_gray(20) } else { Color32::WHITE }
+}
+
+fn range(grid: &[Vec<f64>]) -> (f64, f64) {
+    let all = grid.iter().flatten().filter(|v| v.is_finite());
+    let lo = all.clone().fold(f64::INFINITY, |a, b| a.min(*b));
+    let hi = all.fold(f64::NEG_INFINITY, |a, b| a.max(*b));
+    (lo, hi)
+}
+
+/// Draw the grid and update `sel` from the mouse. Returns true if the
+/// selection changed.
+pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> bool {
+    let p = Palette::for_visuals(ui.visuals());
+    let rows = spec.values.len();
+    let cols = spec.values.first().map_or(0, |r| r.len());
+    if rows == 0 || cols == 0 {
+        return false;
+    }
+    let header_w = 64.0;
+    let header_h = 26.0;
+    let avail = ui.available_width() - header_w - 4.0;
+    let cell_w = (avail / cols as f32).clamp(46.0, 84.0);
+    let cell_h = 26.0;
+    let size = vec2(header_w + cell_w * cols as f32, header_h + cell_h * rows as f32);
+    let (rect, response) = ui.allocate_exact_size(size, Sense::click_and_drag());
+    let painter = ui.painter_at(rect);
+    let origin = rect.min + vec2(header_w, header_h);
+    let cell_rect = |r: usize, c: usize| {
+        Rect::from_min_size(origin + vec2(c as f32 * cell_w, r as f32 * cell_h), vec2(cell_w, cell_h))
+    };
+
+    let shown: Vec<Vec<f64>> = match (spec.mode, spec.other) {
+        (CellMode::Other, Some(o)) => o.to_vec(),
+        (CellMode::Difference, Some(o)) => {
+            spec.values.iter().zip(o).map(|(a, b)| a.iter().zip(b).map(|(x, y)| x - y).collect()).collect()
+        }
+        _ => spec.values.to_vec(),
+    };
+    let (lo, hi) = range(&shown);
+    let max_abs = lo.abs().max(hi.abs());
+    let font = FontId::proportional(12.5);
+
+    for r in 0..rows {
+        for c in 0..cols {
+            let v = shown[r][c];
+            let fill = if spec.mode == CellMode::Difference {
+                diff_colour(v, max_abs)
+            } else {
+                heat(if hi > lo { ((v - lo) / (hi - lo)) as f32 } else { 0.5 })
+            };
+            let cr = cell_rect(r, c);
+            painter.rect_filled(cr.shrink(0.5), 2.0, fill);
+            let text = if spec.mode == CellMode::Difference && v == 0.0 {
+                String::new()
+            } else if spec.mode == CellMode::Difference && v > 0.0 {
+                format!("+{}", format_number(v, spec.decimals))
+            } else {
+                format_number(v, spec.decimals)
+            };
+            painter.text(cr.center(), Align2::CENTER_CENTER, text, font.clone(), text_on(fill));
+            let edited = spec.saved.is_some_and(|s| s[r][c] != spec.values[r][c]);
+            let differs =
+                spec.mode == CellMode::Values && spec.other.is_some_and(|o| o[r][c] != spec.values[r][c]);
+            if edited {
+                painter.rect_stroke(
+                    cr.shrink(2.0),
+                    2.0,
+                    Stroke::new(2.0, Color32::WHITE),
+                    StrokeKind::Inside,
+                );
+            } else if differs {
+                painter.circle_filled(cr.right_top() + vec2(-5.0, 5.0), 2.5, Color32::WHITE);
+            }
+        }
+    }
+    // Selection outline.
+    for &(r, c) in &sel.cells {
+        if r < rows && c < cols {
+            painter.rect_stroke(cell_rect(r, c), 0.0, Stroke::new(2.0, p.accent), StrokeKind::Inside);
+        }
+    }
+    // Live operating point.
+    if let Some((lr, lc)) = spec.live {
+        let at = origin + vec2((lc + 0.5) * cell_w, (lr + 0.5) * cell_h);
+        painter.circle(at, 7.0, Color32::from_black_alpha(80), Stroke::new(2.5, Color32::WHITE));
+    }
+    // Headers.
+    let hfont = FontId::proportional(11.5);
+    for (c, l) in spec.col_labels.iter().enumerate().take(cols) {
+        let cr = Rect::from_min_size(pos2(origin.x + c as f32 * cell_w, rect.min.y), vec2(cell_w, header_h));
+        painter.text(cr.center(), Align2::CENTER_CENTER, l, hfont.clone(), p.muted);
+    }
+    for (r, l) in spec.row_labels.iter().enumerate().take(rows) {
+        let cr =
+            Rect::from_min_size(pos2(rect.min.x, origin.y + r as f32 * cell_h), vec2(header_w - 6.0, cell_h));
+        painter.text(cr.right_center(), Align2::RIGHT_CENTER, l, hfont.clone(), p.muted);
+    }
+
+    // Mouse.
+    let before = sel.clone();
+    let hit = |pos: Pos2| -> Option<(Option<usize>, Option<usize>)> {
+        let d = pos - origin;
+        let r = (d.y >= 0.0).then(|| (d.y / cell_h) as usize).filter(|r| *r < rows);
+        let c = (d.x >= 0.0).then(|| (d.x / cell_w) as usize).filter(|c| *c < cols);
+        let in_rows = d.y < rows as f32 * cell_h;
+        let in_cols = d.x < cols as f32 * cell_w;
+        (in_rows && in_cols).then_some((if d.y < 0.0 { None } else { r }, if d.x < 0.0 { None } else { c }))
+    };
+    let mods = ui.input(|i| i.modifiers);
+    if response.drag_started() || response.clicked() {
+        if let Some(pos) = response.interact_pointer_pos()
+            && let Some(h) = hit(pos)
+        {
+            match h {
+                (Some(r), Some(c)) if mods.shift => {
+                    let a = sel.anchor.unwrap_or((r, c));
+                    sel.rect(a, (r, c));
+                }
+                (Some(r), Some(c)) if mods.command => {
+                    if !sel.cells.remove(&(r, c)) {
+                        sel.cells.insert((r, c));
+                    }
+                    sel.anchor = Some((r, c));
+                }
+                (Some(r), Some(c)) => {
+                    sel.cells.clear();
+                    sel.cells.insert((r, c));
+                    sel.anchor = Some((r, c));
+                    sel.drag_from = Some((r, c));
+                }
+                (None, Some(c)) => {
+                    sel.rect((0, c), (rows - 1, c));
+                    sel.anchor = Some((0, c));
+                }
+                (Some(r), None) => {
+                    sel.rect((r, 0), (r, cols - 1));
+                    sel.anchor = Some((r, 0));
+                }
+                (None, None) => {
+                    sel.rect((0, 0), (rows - 1, cols - 1));
+                    sel.anchor = Some((0, 0));
+                }
+            }
+        }
+    } else if response.dragged()
+        && let (Some(from), Some(pos)) = (sel.drag_from, response.interact_pointer_pos())
+        && let Some((Some(r), Some(c))) = hit(pos)
+    {
+        sel.rect(from, (r, c));
+    }
+    if response.drag_stopped() {
+        sel.drag_from = None;
+    }
+    *sel != before
+}
+
+/// A rotatable 3D surface of the grid. `view` is (yaw, pitch) in radians,
+/// changed by dragging.
+pub fn surface(ui: &mut Ui, values: &[Vec<f64>], sel: &Selection, view: &mut (f32, f32), height: f32) {
+    let rows = values.len();
+    let cols = values.first().map_or(0, |r| r.len());
+    if rows < 2 || cols < 2 {
+        return;
+    }
+    let p = Palette::for_visuals(ui.visuals());
+    let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::drag());
+    if response.dragged() {
+        let d = response.drag_delta();
+        view.0 += d.x * 0.01;
+        view.1 = (view.1 + d.y * 0.01).clamp(0.1, 1.4);
+    }
+    let painter = ui.painter_at(rect);
+    painter.rect_filled(rect, 8.0, ui.visuals().extreme_bg_color);
+    let (lo, hi) = range(values);
+    let span = if hi > lo { hi - lo } else { 1.0 };
+    let (yaw, pitch) = *view;
+    let scale = rect.width().min(rect.height() * 1.6) * 0.36;
+    let center = rect.center() + vec2(0.0, rect.height() * 0.12);
+    // World: x across columns, z across rows (both -1..1), y up 0..0.8.
+    let project = |r: usize, c: usize| -> (Pos2, f32) {
+        let x = c as f32 / (cols - 1) as f32 * 2.0 - 1.0;
+        let z = r as f32 / (rows - 1) as f32 * 2.0 - 1.0;
+        let y = ((values[r][c] - lo) / span) as f32 * 0.8;
+        let (xs, zs) = (x * yaw.cos() - z * yaw.sin(), x * yaw.sin() + z * yaw.cos());
+        let ys = y * pitch.cos() - zs * pitch.sin();
+        let depth = y * pitch.sin() + zs * pitch.cos();
+        (pos2(center.x + xs * scale, center.y - ys * scale), depth)
+    };
+    let mut quads: Vec<(f32, [Pos2; 4], Color32, bool)> = Vec::new();
+    for r in 0..rows - 1 {
+        for c in 0..cols - 1 {
+            let pts = [project(r, c), project(r, c + 1), project(r + 1, c + 1), project(r + 1, c)];
+            let depth = pts.iter().map(|p| p.1).sum::<f32>() / 4.0;
+            let avg = (values[r][c] + values[r][c + 1] + values[r + 1][c] + values[r + 1][c + 1]) / 4.0;
+            let selected =
+                [(r, c), (r, c + 1), (r + 1, c), (r + 1, c + 1)].iter().any(|x| sel.cells.contains(x));
+            quads.push((
+                depth,
+                [pts[0].0, pts[1].0, pts[2].0, pts[3].0],
+                heat(((avg - lo) / span) as f32),
+                selected,
+            ));
+        }
+    }
+    // Far to near.
+    quads.sort_by(|a, b| b.0.total_cmp(&a.0));
+    // Each quad is filled as two plain mesh triangles (no edge feathering,
+    // which turns near-degenerate triangles into spikes), then outlined.
+    for (_, pts, fill, selected) in quads {
+        let mut mesh = egui::Mesh::default();
+        for pt in pts {
+            mesh.colored_vertex(pt, fill);
+        }
+        mesh.add_triangle(0, 1, 2);
+        mesh.add_triangle(0, 2, 3);
+        painter.add(Shape::mesh(mesh));
+        let stroke = if selected {
+            Stroke::new(1.5, p.accent)
+        } else {
+            Stroke::new(0.6, Color32::from_black_alpha(120))
+        };
+        // Separate segments: a joined outline of a collapsed quad spikes.
+        for i in 0..4 {
+            painter.line_segment([pts[i], pts[(i + 1) % 4]], stroke);
+        }
+    }
+    painter.text(
+        rect.left_bottom() + vec2(10.0, -8.0),
+        Align2::LEFT_BOTTOM,
+        "Drag to rotate",
+        FontId::proportional(11.0),
+        p.muted,
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn heat_endpoints_and_selection() {
+        assert_eq!(heat(0.0), Color32::from_rgb(0x2c, 0x7b, 0xb6));
+        assert_eq!(heat(1.0), Color32::from_rgb(0xd7, 0x19, 0x1c));
+        assert_eq!(heat(f32::NAN), heat(0.5));
+        assert_eq!(diff_colour(0.0, 5.0), Color32::from_gray(90));
+        let mut s = Selection::default();
+        s.rect((2, 3), (0, 1));
+        assert_eq!(s.cells.len(), 9);
+        s.anchor = Some((0, 0));
+        s.step(-1, 5, 4, 4);
+        assert_eq!(s.list(), vec![(0, 3)]);
+    }
+}

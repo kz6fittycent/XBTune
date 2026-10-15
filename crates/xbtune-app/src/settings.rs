@@ -50,6 +50,8 @@ pub struct Settings {
     pub chart_channels: Vec<String>,
     /// Seconds of history shown in charts.
     pub chart_seconds: f64,
+    /// Tune file to reopen at start.
+    pub last_tune: Option<std::path::PathBuf>,
 }
 
 impl Default for Settings {
@@ -63,6 +65,7 @@ impl Default for Settings {
                 .to_vec(),
             chart_channels: ["RPM", "TPD", "CLT", "O2"].map(String::from).to_vec(),
             chart_seconds: 60.0,
+            last_tune: None,
         }
     }
 }

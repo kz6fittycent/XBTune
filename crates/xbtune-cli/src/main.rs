@@ -6,6 +6,7 @@
 //! owner unlocks them. Nothing writes the EEPROM.
 
 mod diag;
+mod edit;
 mod live;
 mod render;
 
@@ -83,6 +84,10 @@ enum Cmd {
     TpsReset(diag::TpsArgs),
     /// Record live data to a CSV log (read-only).
     Log(live::LogArgs),
+    /// Change values or map cells in an image file (offline; never the ECM).
+    Set(edit::SetArgs),
+    /// Copy variables (maps, tables, values) from one image into another (offline).
+    CopyTable(edit::CopyArgs),
     /// Show what XBTune knows about an ECM ID's definition, and data issues.
     Defs {
         /// ECM ID, e.g. BUEIB.
@@ -256,6 +261,8 @@ async fn run(cmd: Cmd) -> Result<()> {
         Cmd::Convert { input, output, id } => convert(&input, &output, id.as_deref()),
         Cmd::Defs { id, list } => defs(&id, list),
         Cmd::Live(a) => live::live(a).await,
+        Cmd::Set(a) => edit::set(a),
+        Cmd::CopyTable(a) => edit::copy_table(a),
         Cmd::Codes(a) => diag::codes(a).await,
         Cmd::Test(a) => diag::test(a).await,
         Cmd::TpsReset(a) => diag::tps_reset(a).await,
