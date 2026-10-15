@@ -93,8 +93,10 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   desktop): connected twice, wrong code closed the session as intended.
   R1 PASSED. Owner expected remote AFV reset/tests already (that's R4);
   owner: keep the R2-R5 order and continue.
-- **Remote R2-R5: built 2026-10-15** (sim-tested with two app instances;
-  NOT yet tried by the owner). App logic `remote_sync.rs`, UI
+- **Remote R2-R5: built 2026-10-15; owner test PASSED 2026-10-15** (snap
+  62bd467, laptop = owner on the bike, desktop = tuner): "worked
+  perfectly ... zero issues"; a remote AFV reset on the real ECM took.
+  Owner likes the granular per-session permissions. PHASE 8 DONE. App logic `remote_sync.rs`, UI
   `remote_view.rs`; session passes app messages through
   (`Command::Send`/`Event::Message`; msg.rs has all R2-R5 types, binary
   as base64). R2: host forwards raw runtime frames every 250 ms +
@@ -472,7 +474,7 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 
 KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 "Polish + release" becomes phase 9:
-7. Log viewer + auto-tune (built 2026-10-15; owner testing).
+7. Log viewer + auto-tune (built 2026-10-15; owner tested: auto-tune works).
 8. **Remote tuning** (owner's idea, 2026-10-15; owner said go
    2026-10-15). `docs/REMOTE.md` APPROVED 2026-10-15 (code `47-381926`
    = room + 6 digits; review-each default; tuner may save a copy; separate
