@@ -30,10 +30,10 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 | Log to file, new timestamped file each time | ✅ CSV (`log`, app Record), raw frames kept | 3 |
 | **NEW** Binary log format (compact) and EcmDroid binary log import | ⬜ | 3/7 |
 | **NEW** MegaLogViewer `.msl` text log export | ⬜ | 3/7 |
-| Log playback in real time, driving the live views | ⬜ | 7 |
-| **NEW** Narrowband O2 statistics (% rich/lean/error, average rich/lean V) | ⬜ | 7 |
-| **NEW** Log anomaly flags (temperature jumps > 3.5 °C, gaps > 2 s, battery 11/16 V) | ⬜ | 7 |
-| **NEW** Wideband O2 input (Innovate LC-1, PLX; up to two sensors) logged with ECM data | ⬜ needs a dependency + serial; ask first | 7 |
+| Log playback in real time, driving the live views | ✅ Logs view: play/pause, 1-10×, scrub; drives Dashboard, Live data, Charts and the map live point | 7 |
+| **NEW** Narrowband O2 statistics (% rich/lean/error, average rich/lean V) | ✅ Logs view, `logstats` (split at `KO2_Midpoint`) | 7 |
+| **NEW** Log anomaly flags (temperature jumps > 3.5 °C, gaps > 2 s, battery 11/16 V) | ✅ Logs view (click to jump), `logstats` | 7 |
+| **NEW** Wideband O2 input (Innovate LC-1, PLX; up to two sensors) logged with ECM data | ⬜ later: owner runs the stock narrowband for now (2026-10-15) | 7+ |
 | **NEW** DDFI-3 analog wideband input configuration (0–5 V → AFR) | ⬜ definitions | 5 |
 
 ## Diagnostics
@@ -56,7 +56,7 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 | Fetch, load, save EEPROM | ✅ `dump`, `.xbt`, `.xpr` | 2 |
 | Hex/cell view with offset, byte, 16-bit LE value, variable name | 🟡 `show --list`, `diff` | 2/5 |
 | Static maps (fuel, spark; idle setpoint on DDFI-3) | ✅ grid with heatmap, axes, 3D, set/add/×/%/smooth/interpolate, copy/paste, undo/redo; live point (approx.) | 5 |
-| **NEW** Dynamic maps from logs: EGO, AFV, lambda, hits, weight | ⬜ | 7 |
+| **NEW** Dynamic maps from logs: EGO, AFV, lambda, hits, weight | 🟡 fuel-map overlays: samples per cell (weight) and average EGO; lambda needs a wideband | 7 |
 | **NEW** Load/save individual maps to files | 🟡 copy/paste as TSV (spreadsheets), `copy-table` / "copy from other image" | 5 |
 | **NEW** Linked front/rear editing: unlocked, same difference, same value, same % | ✅ "Link front/rear" applies the same operation to the twin map | 5 |
 | Scalars and flags (system, limits, corrections, O2 setup pages) | ✅ every value, table and flag byte in the definition; `set` in the CLI | 5 |
@@ -70,9 +70,9 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 
 | Feature | XBTune | Phase |
 |---|---|---|
-| EGO correction averaged per cell, hit counts (>100 significant) | ⬜ auto-tune proposes values | 7 |
-| **NEW** Lambda (wideband) averaged per cell; front/rear separately | ⬜ | 7 |
-| **NEW** Helper: multiply maps by the current AFV, then reset AFV | ⬜ | 7 |
+| EGO correction averaged per cell, hit counts (>100 significant) | ✅ bilinear-weighted per cell; auto-tune (app + `autotune`) proposes values for review | 7 |
+| **NEW** Lambda (wideband) averaged per cell; front/rear separately | ⬜ needs a wideband | 7+ |
+| **NEW** Helper: multiply maps by the current AFV, then reset AFV | ⬜ (auto-tune advises the AFV reset after burning its corrections) | 7 |
 | **NEW** Guided workflows ("Process Finder": six processes by sensor setup) | ⬜ docs + UI hints | 8 |
 | Closed-loop / open-loop learn toggles, closed-loop boundaries | 🟡 scalars; edit in 5 | 5 |
 | **NEW** Front cylinder correction table | 🟡 if in the definition | 5 |

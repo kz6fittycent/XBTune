@@ -4,7 +4,7 @@ Diagnostics, logging and tuning for the DDFI-2 and DDFI-3 ECMs on 2003–2009
 Buell XB9 and XB12 motorcycles, for Linux. Bluetooth (BuellTooth and other
 SPP adapters) is the main link. USB serial cables work too.
 
-**Status: phase 6.** XBTune identifies the ECM, reads and saves the
+**Status: phase 7.** XBTune identifies the ECM, reads and saves the
 EEPROM, shows and logs live data, reads trouble codes and edits tunes offline, from the command
 line or the desktop app (`xbtune`). Active tests, clearing codes and TPS
 reset, and writing tunes to the ECM (burn: backup, review, write only what
@@ -25,6 +25,8 @@ xbtune.cli log --bt ADDR -o ride.csv    # log live data to CSV
 xbtune.cli codes --bt ADDR              # current and stored trouble codes
 xbtune.cli set tune.xbt KRPM_Hard_Hi=7450 -o new.xbt   # offline edit
 xbtune.cli burn --bt ADDR new.xbt --vars KRPM_Hard_Hi   # write (locked until unlocked)
+xbtune.cli logstats ride.csv            # log summary, O2 statistics, anomalies
+xbtune.cli autotune --tune tune.xbt ride.csv -o tuned.xbt   # EGO auto-tune (file only)
 xbtune                                  # the desktop app
 ```
 

@@ -59,6 +59,9 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   pairing behaves sensibly. Engine-running link with the 400 ms timeout:
   5.6 Hz, 4% errors (was 3.7 Hz). Don't start phase 6 (burn) until the
   owner says so.
+- **Phase 7 (log viewer + auto-tune): built 2026-10-15** (owner's go; stock
+  narrowband). Sim/owner-log tested; NOT yet tried by the owner. See
+  "Phase 7 contents" and "Phase 7 checklist".
 - **Getting started + bug reports: built 2026-10-15** (owner asked; network
   feature OK'd by the owner per KICKOFF §9). Not yet on the laptop. The relay
   (`relay/bug-report/`) is NOT deployed yet: the owner does the Cloudflare/
@@ -80,6 +83,35 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   (origin, added 2026-10-15; owner OK'd pushing). Keep it private.
   Don't publish to the store. The snap name `xbtune` is registered (owner,
   2026-10-14); registration only, nothing uploaded.
+
+### Phase 7 contents
+
+- `xbtune-core::logfile`: reads `xbtune-log 1` CSVs back (time_s + raw
+  frame re-decoded with the current definition; events kept).
+- `xbtune-core::autotune`: `channel_for_axis` (RPM/Load), `frac_index`,
+  `cell_weights` (bilinear), `analyze` (filters: CLT >= 80 C, closed loop =
+  EGO changed in the last 3 samples, |dRPM/dt| <= 800/s, |dTPD/dt| <= 10/s,
+  no Accel/Decel/WOT correction, dt <= 1 s; weighted EGO per cell),
+  `propose` (new = old x EGO/100, min hits 30, cap +-10%, map rounding),
+  `apply` (one undo step), `fuel_maps`.
+- Evidence from the owner's logs (tests pin it): veCurr1 == fuel map
+  interpolated at (RPM, Load) for 70% of samples within 0.15 (median 0.03);
+  EGO holds at AFV in open loop (64 s at warm-up), moves every frame in
+  closed loop; EGO starts from AFV, so it includes AFV -> advise AFV reset
+  after burning corrections. One O2 sensor (rear); ECM's EGO applies to
+  both cylinders -> both maps corrected by default (Front/Rear ticks).
+- `xbtune-core::logstats`: O2 rich/lean/error % (split at KO2_Midpoint),
+  avg rich/lean V; anomalies (gap > 2 s, CLT jump > 3.5 C, battery 11-16 V).
+- CLI: `logstats LOG...`, `autotune --tune T LOG... [-o|--in-place]
+  [--maps --min-hits --max-change --min-clt]` (saves only with -o).
+- App: Logs view (`logs_view.rs`): open logs, stats, anomalies, charts
+  with playhead, playback (only when not connected) driving Dashboard/Live
+  data/Charts/map live point. Tune view: fuel-map overlays (samples per
+  cell, average EGO) and Auto-tune dialog (`autotune_view.rs`).
+- Not done (later / needs owner input): wideband input + lambda maps,
+  "multiply maps by AFV then reset" helper, binary/.msl log formats.
+- Hooks: `XBTUNE_SHOT_LOGS=a.csv:b.csv XBTUNE_SHOT_PLAY=<s>
+  XBTUNE_SHOT_OVERLAY=hits|ego XBTUNE_SHOT_AUTOTUNE=1`.
 
 ### Getting started + bug reports
 
@@ -330,7 +362,7 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 
 KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 "Polish + release" becomes phase 9:
-7. Log viewer + auto-tune (next; start only on the owner's go).
+7. Log viewer + auto-tune (built 2026-10-15; owner testing).
 8. **Remote tuning** (owner's idea, 2026-10-15). Decisions made:
    - Bike owner = host (has the bike); tuner = guest. Host shows a 6-digit
      code, reads it to the tuner, who types it in: PAKE (SPAKE2), then an
@@ -369,8 +401,28 @@ snap: xbtune_0.1.0+git8a55efa_amd64.snap). Resume here.
    below). Suggested first real burn: a harmless, reversible change.
 2. Optional: btsnoop capture of EcmDroid reading the EEPROM / live data, to
    confirm frames byte for byte.
-3. Phase 7 (only after the owner says go): log viewer + auto-tune. Then
-   phase 8 remote tuning (see "Phase plan"), then phase 9 polish + release.
+3. Phase 7 built 2026-10-15: owner tests it (Phase 7 checklist). Then
+   phase 8 remote tuning (see "Phase plan"; write docs/REMOTE.md first),
+   only on the owner's go; then phase 9 polish + release.
+
+## Phase 7 checklist (no ECM writes)
+
+1. Warm the engine fully, then Record a log of steady riding: hold
+   different steady throttle/RPM points for 10+ s each (closed-loop cells
+   are cruise/light load). Or idle in the garage for a first look.
+2. Logs -> Open log... -> the CSV: check duration/Hz, O2 rich/lean %, any
+   anomalies; click a chart to move the playhead; Play, then Dashboard /
+   Charts / Tune (live point moves over the fuel map).
+3. Tune -> Read from ECM (or open a fresh backup) -> Fuel Map Front ->
+   Logs: "Samples per cell", then "Average EGO" (blue < 100: ECM removed
+   fuel; red > 100: added).
+4. Auto-tune... -> Analyse -> review cells (untick any), Apply -> Undo
+   works; Save as a new file. Nothing is written to the ECM.
+5. CLI: `xbtune.cli logstats <log>`; `xbtune.cli autotune --tune <xbt>
+   <log> -o ~/tuned.xbt`; `xbtune.cli diff <xbt> ~/tuned.xbt` (fuel cells only).
+6. Optional, separately and only if happy: burn the corrected cells
+   (normal Burn review), then Resets -> AFV reset, ride, log again: EGO in
+   those cells should sit nearer 100%.
 
 ## Phase 6 checklist
 
