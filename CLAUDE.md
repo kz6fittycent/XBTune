@@ -255,6 +255,10 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 
 ## Next steps
 
+Paused 2026-10-14 at the owner's request (HEAD 8a55efa, tree clean; laptop
+snap: xbtune_0.1.0+git8a55efa_amd64.snap). Resume here.
+
+
 1. Owner reviews the phase 6 sim results (demo burn in the app), then
    decides whether to unlock writes and do the first real burn (checklist
    below). Suggested first real burn: a harmless, reversible change.
