@@ -91,8 +91,11 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   `XBTUNE_CRASH_TEST=panic|thread|segv|abort`, `XBTUNE_REPORT_URL=...`.
 - Snap: `network` plug on the GUI app.
 - 2026-10-15 owner feedback round: wizard plug status showed "?" because
-  Inter has no ✔/✘ (now ✓/✗ + words; `theme::tests` checks every non-ASCII
-  UI character against the font's cmap). Owner's BT MAC removed from hint
+  Inter has no ✔/✘. ✓/✗ still showed "?" on the owner's laptop, so the
+  status is now a drawn dot (green/red/grey) + a word, no symbol at all
+  (`XBTUNE_SHOT_PLUGS=1` fakes states for UI checks). `theme::tests` checks
+  every non-ASCII UI character against the font's cmap. Side bar shows
+  `$SNAP_VERSION` (git hash) so the owner can tell which build runs. Owner's BT MAC removed from hint
   text/docs/tests (hint is "XX:XX:XX:XX:XX:XX"). New views: Resets (TPS +
   AFV, live TPD/TPS V/AFV) and Settings (safety locks -> `diag::set_unlocks`
   + `Command::SetPermits` to the live session; startup; theme).

@@ -88,13 +88,22 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                         ui.label("The snap also needs permission to use them:");
                         for s in &app.plugs {
                             ui.horizontal(|ui| {
-                                // ✓/✗: Inter has these, not the heavy ✔/✘.
-                                let (mark, color) = match s.connected {
-                                    Some(true) => ("✓ allowed", p.good),
-                                    Some(false) => ("✗ not allowed", p.bad),
+                                // A drawn dot, not a symbol: nothing depends on the font.
+                                let (word, color) = match s.connected {
+                                    Some(true) => ("allowed", p.good),
+                                    Some(false) => ("not allowed", p.bad),
                                     None => ("unknown", p.muted),
                                 };
-                                ui.add_sized([110.0, 18.0], egui::Label::new(RichText::new(mark).color(color)));
+                                let (r, painter) = ui.allocate_painter(egui::vec2(12.0, 12.0), egui::Sense::hover());
+                                painter.circle_filled(r.rect.center(), 5.5, color);
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(90.0, 18.0),
+                                    egui::Layout::left_to_right(egui::Align::Center),
+                                    |ui| {
+                                        ui.set_min_width(90.0);
+                                        ui.label(RichText::new(word).color(color));
+                                    },
+                                );
                                 ui.label(s.purpose);
                             });
                             if s.connected == Some(false) {

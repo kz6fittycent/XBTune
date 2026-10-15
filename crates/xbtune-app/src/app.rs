@@ -227,6 +227,15 @@ impl XbApp {
             app.wizard.open();
         }
         if app.shot.is_some() {
+            // XBTUNE_SHOT_PLUGS=1: made-up snap permission states (outside a
+            // snap there are none to show).
+            if std::env::var_os("XBTUNE_SHOT_PLUGS").is_some() {
+                app.plugs = xbtune_core::env::MANUAL_PLUGS
+                    .iter()
+                    .zip([Some(true), Some(false), None])
+                    .map(|(&(plug, purpose), connected)| PlugState { plug, purpose, connected })
+                    .collect();
+            }
             // XBTUNE_SHOT_UNLOCK=commands|writes: the unlock confirmation.
             if let Ok(which) = std::env::var("XBTUNE_SHOT_UNLOCK") {
                 app.settings_ui.ask(&which);
@@ -661,7 +670,7 @@ impl XbApp {
         }
         ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
             ui.add_space(6.0);
-            ui.label(RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).small().weak());
+            ui.label(RichText::new(format!("v{}", crate::report::version())).small().weak());
             ui.label(RichText::new("EEPROM writes only via Burn").small().weak());
             ui.add_space(6.0);
             let w = ui.available_width();
