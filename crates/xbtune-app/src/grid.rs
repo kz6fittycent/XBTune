@@ -54,6 +54,10 @@ pub enum CellMode {
     Other,
     /// This minus the comparison image.
     Difference,
+    /// Logged sample weight per cell.
+    LogHits,
+    /// Average EGO correction per cell (%).
+    LogEgo,
 }
 
 pub struct GridSpec<'a> {
@@ -68,6 +72,10 @@ pub struct GridSpec<'a> {
     pub decimals: Option<u32>,
     /// Live operating point (fractional row, col), if known.
     pub live: Option<(f32, f32)>,
+    /// Per-cell log statistics, for the LogHits/LogEgo modes.
+    pub log: Option<&'a [Vec<xbtune_core::autotune::CellStat>]>,
+    /// Cells with fewer hits are drawn faded in the log modes.
+    pub min_hits: f64,
 }
 
 /// Heatmap colour for `t` in 0..=1 (blue, cyan, green, yellow, red).
@@ -133,6 +141,10 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> bool {
         Rect::from_min_size(origin + vec2(c as f32 * cell_w, r as f32 * cell_h), vec2(cell_w, cell_h))
     };
 
+    let log_mode = matches!(spec.mode, CellMode::LogHits | CellMode::LogEgo) && spec.log.is_some();
+    if log_mode && let Some(log) = spec.log {
+        draw_log(&painter, spec, log, rows, cols, &cell_rect);
+    }
     let shown: Vec<Vec<f64>> = match (spec.mode, spec.other) {
         (CellMode::Other, Some(o)) => o.to_vec(),
         (CellMode::Difference, Some(o)) => {
@@ -146,6 +158,9 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> bool {
 
     for r in 0..rows {
         for c in 0..cols {
+            if log_mode {
+                break;
+            }
             let v = shown[r][c];
             let fill = if spec.mode == CellMode::Difference {
                 diff_colour(v, max_abs)
@@ -256,6 +271,44 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> bool {
         sel.drag_from = None;
     }
     *sel != before
+}
+
+/// The log overlay: hits as a heatmap, or average EGO coloured by how far
+/// it is from 100% (red: the ECM added fuel, blue: it took fuel away).
+/// Cells below `min_hits` are faded; cells without data are blank.
+fn draw_log(
+    painter: &egui::Painter,
+    spec: &GridSpec,
+    log: &[Vec<xbtune_core::autotune::CellStat>],
+    rows: usize,
+    cols: usize,
+    cell_rect: &dyn Fn(usize, usize) -> Rect,
+) {
+    let font = FontId::proportional(12.5);
+    let max_hits = log.iter().flatten().map(|s| s.hits).fold(0.0, f64::max);
+    let max_dev =
+        log.iter().flatten().filter(|s| s.hits > 0.0).map(|s| (s.ego - 100.0).abs()).fold(0.0, f64::max);
+    for (r, row) in log.iter().enumerate().take(rows) {
+        for (c, &s) in row.iter().enumerate().take(cols) {
+            let cr = cell_rect(r, c);
+            if s.hits <= 0.0 {
+                painter.rect_filled(cr.shrink(0.5), 2.0, Color32::from_gray(60));
+                continue;
+            }
+            let (fill, text) = match spec.mode {
+                CellMode::LogHits => (
+                    heat(if max_hits > 0.0 { (s.hits.ln_1p() / max_hits.ln_1p()) as f32 } else { 0.0 }),
+                    format!("{:.0}", s.hits),
+                ),
+                _ => (diff_colour(s.ego - 100.0, max_dev.max(2.0)), format!("{:.1}", s.ego)),
+            };
+            let enough = s.hits >= spec.min_hits;
+            let fill = if enough { fill } else { fill.gamma_multiply(0.45) };
+            painter.rect_filled(cr.shrink(0.5), 2.0, fill);
+            let tc = if enough { text_on(fill) } else { text_on(fill).gamma_multiply(0.6) };
+            painter.text(cr.center(), Align2::CENTER_CENTER, text, font.clone(), tc);
+        }
+    }
 }
 
 /// A rotatable 3D surface of the grid. `view` is (yaw, pitch) in radians,

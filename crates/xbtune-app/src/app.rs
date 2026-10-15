@@ -35,6 +35,7 @@ pub enum View {
     Diagnostics,
     Resets,
     Tune,
+    Logs,
     Settings,
 }
 
@@ -68,7 +69,7 @@ pub struct History {
 }
 
 impl History {
-    fn push(&mut self, s: Sample) {
+    pub fn push(&mut self, s: Sample) {
         while self.samples.front().is_some_and(|f| s.t - f.t > HISTORY.as_secs_f64()) {
             self.samples.pop_front();
         }
@@ -107,6 +108,8 @@ pub struct XbApp {
     pub burn: crate::burn_view::BurnUi,
     pub wizard: crate::wizard::WizardUi,
     pub settings_ui: crate::settings_view::SettingsUi,
+    pub logs: crate::logs_view::LogsUi,
+    pub autotune: crate::autotune_view::AutotuneUi,
     pub report: crate::report_view::ReportUi,
     /// Variables to write again on a retry.
     pub pending_chosen: std::collections::BTreeSet<String>,
@@ -182,6 +185,8 @@ impl XbApp {
             burn: Default::default(),
             wizard: Default::default(),
             settings_ui: Default::default(),
+            logs: Default::default(),
+            autotune: Default::default(),
             report: Default::default(),
             pending_chosen: Default::default(),
             write_permitted: false,
@@ -204,7 +209,7 @@ impl XbApp {
         }
         if app.shot.is_some() {
             let view = std::env::var("XBTUNE_VIEW").unwrap_or_default();
-            if view != "connect" {
+            if view != "connect" && std::env::var_os("XBTUNE_SHOT_LOGS").is_none() {
                 app.start(SavedTarget::Demo);
             }
             app.view = match view.as_str() {
@@ -214,6 +219,7 @@ impl XbApp {
                 "diag" => View::Diagnostics,
                 "resets" => View::Resets,
                 "settings" => View::Settings,
+                "logs" => View::Logs,
                 "tune" => View::Tune,
                 _ => View::Dashboard,
             };
@@ -246,6 +252,32 @@ impl XbApp {
                     .zip([Some(true), Some(false), None])
                     .map(|(&(plug, purpose), connected)| PlugState { plug, purpose, connected })
                     .collect();
+            }
+            // XBTUNE_SHOT_LOGS=a.csv:b.csv opens logs; XBTUNE_SHOT_PLAY=<s>
+            // plays the first one from <s> seconds in (paused there);
+            // XBTUNE_SHOT_OVERLAY=hits|ego; XBTUNE_SHOT_AUTOTUNE=1 opens the
+            // auto-tune dialog, analysed.
+            if let Ok(list) = std::env::var("XBTUNE_SHOT_LOGS") {
+                for p in list.split(':').filter(|p| !p.is_empty()) {
+                    crate::logs_view::add(&mut app, std::path::Path::new(p));
+                }
+                if let Some(t) = std::env::var("XBTUNE_SHOT_PLAY").ok().and_then(|t| t.parse::<f64>().ok()) {
+                    crate::logs_view::start_playback(&mut app, 0);
+                    let t0 = app.logs.logs[0].log.samples.first().map_or(0.0, |s| s.t);
+                    if let Some(pb) = &mut app.logs.play {
+                        pb.playing = false;
+                    }
+                    crate::logs_view::seek(&mut app, t0 + t);
+                }
+                app.autotune.overlay = match std::env::var("XBTUNE_SHOT_OVERLAY").as_deref() {
+                    Ok("hits") => crate::autotune_view::Overlay::Hits,
+                    Ok("ego") => crate::autotune_view::Overlay::Ego,
+                    _ => Default::default(),
+                };
+                if std::env::var_os("XBTUNE_SHOT_AUTOTUNE").is_some() {
+                    crate::autotune_view::open(&mut app);
+                    crate::autotune_view::analyse_now(&mut app);
+                }
             }
             // XBTUNE_SHOT_FOLDER=<dir>: the files-folder picker there.
             if let Some(dir) = std::env::var_os("XBTUNE_SHOT_FOLDER") {
@@ -305,8 +337,13 @@ impl XbApp {
         self.messages.push(Message { text, error, at: Instant::now() });
     }
 
+    pub fn egui_ctx(&self) -> &egui::Context {
+        &self.egui_ctx
+    }
+
     /// Start a live session to `target`.
     pub fn start(&mut self, target: SavedTarget) {
+        crate::logs_view::stop_playback(self);
         self.stop();
         let (opener, label): (session::Opener, String) = match &target {
             SavedTarget::Demo => {
@@ -613,7 +650,14 @@ impl XbApp {
         ui.horizontal(|ui| {
             ui.label(RichText::new("XBTune").font(theme::strong_font(18.0)).color(p.accent));
             ui.add_space(12.0);
-            let (dot, text) = status_text(&self.link, &p);
+            let (dot, text) = match (self.logs.playing_name(), &self.logs.play) {
+                (Some(name), Some(pb)) => {
+                    let t0 =
+                        self.logs.logs.get(pb.log).and_then(|l| l.log.samples.first()).map_or(0.0, |s| s.t);
+                    (p.accent, format!("Log playback · {name} · {:.0} s", pb.t - t0))
+                }
+                _ => status_text(&self.link, &p),
+            };
             let (r, painter) = ui.allocate_painter(egui::vec2(10.0, 10.0), egui::Sense::hover());
             painter.circle_filled(r.rect.center(), 5.0, dot);
             ui.label(text);
@@ -712,6 +756,7 @@ impl XbApp {
             (View::Diagnostics, "Diagnostics"),
             (View::Resets, "Resets"),
             (View::Tune, "Tune"),
+            (View::Logs, "Logs"),
             (View::Settings, "Settings"),
         ] {
             let selected = self.view == v;
@@ -866,6 +911,7 @@ impl eframe::App for XbApp {
     fn logic(&mut self, _ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.drain_events();
         self.connect.poll();
+        crate::logs_view::tick(self);
         // A panic the app survived (a background task): offer a report now.
         if !self.report.is_open()
             && let Some(c) = crate::report::take_new_crash()
@@ -897,10 +943,12 @@ impl eframe::App for XbApp {
                     View::Diagnostics => crate::diagnostics::show(self, ui),
                     View::Resets => crate::resets::show(self, ui),
                     View::Settings => crate::settings_view::show(self, ui),
+                    View::Logs => crate::logs_view::show(self, ui),
                     View::Tune => crate::tune_view::show(self, ui),
                 }
             });
         crate::burn_view::show(self, ui);
+        crate::autotune_view::show(self, ui);
         // One dialog at a time: a report (or crash offer) before the guide.
         if self.report.is_open() {
             crate::report_view::show(self, ui);

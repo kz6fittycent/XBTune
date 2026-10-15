@@ -374,13 +374,7 @@ fn frac_index(axis: &[f64], x: f64) -> Option<f32> {
 /// Live channel for a map axis, by the axis name (XBTune's reading).
 fn live_for_axis(app: &XbApp, axis: &str) -> Option<f64> {
     let s = app.history.latest()?;
-    let ch = if axis.contains("RPM") {
-        "RPM"
-    } else if axis.contains("Load") {
-        "Load"
-    } else {
-        return None;
-    };
+    let ch = xbtune_core::autotune::channel_for_axis(axis)?;
     s.value(app.link.channel(ch)?)
 }
 
@@ -409,9 +403,10 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         (_, Some((_, l))) => l.clone(),
         _ => (0..rows).map(|r| format!("{}", r + 1)).collect(),
     };
-    // Live operating point, if both axes follow a live channel.
+    // Live operating point (or the log playhead), if both axes follow a
+    // live channel.
     let live = match (&xs, &ys, &v.x_axis, &v.y_axis) {
-        (Some((xv, _)), Some((yv, _)), Some(xn), Some(yn)) if app.link.live() => {
+        (Some((xv, _)), Some((yv, _)), Some(xn), Some(yn)) if app.link.live() || app.logs.play.is_some() => {
             let x = live_for_axis(app, xn).and_then(|x| frac_index(xv, x));
             let y = live_for_axis(app, yn).and_then(|y| frac_index(yv, y));
             x.zip(y).map(|(c, r)| (r, c))
@@ -444,6 +439,27 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
             );
         }
     });
+    // Log overlays and auto-tune, on the fuel maps once logs are open.
+    let is_fuel = xbtune_core::autotune::fuel_maps(t).contains(&v.name);
+    let log_stats = if is_fuel && !app.logs.logs.is_empty() {
+        ui.horizontal_wrapped(|ui| {
+            use crate::autotune_view::Overlay;
+            ui.label(format!("Logs ({}):", app.logs.logs.len()));
+            ui.selectable_value(&mut app.autotune.overlay, Overlay::Off, "Off");
+            ui.selectable_value(&mut app.autotune.overlay, Overlay::Hits, "Samples per cell");
+            ui.selectable_value(&mut app.autotune.overlay, Overlay::Ego, "Average EGO");
+            if ui.button("Auto-tune…").clicked() {
+                crate::autotune_view::open(app);
+            }
+        });
+        if app.autotune.overlay == crate::autotune_view::Overlay::Off {
+            None
+        } else {
+            crate::autotune_view::analysis(app, &v.name)
+        }
+    } else {
+        None
+    };
     if other.is_some() {
         ui.horizontal_wrapped(|ui| {
             ui.label("Show:");
@@ -585,11 +601,18 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         values: &values,
         saved: saved.as_deref(),
         other: other.as_deref(),
-        mode: if other.is_some() { app.tune_ui.mode } else { CellMode::Values },
+        mode: match (&log_stats, app.autotune.overlay) {
+            (Some(_), crate::autotune_view::Overlay::Hits) => CellMode::LogHits,
+            (Some(_), crate::autotune_view::Overlay::Ego) => CellMode::LogEgo,
+            _ if other.is_some() => app.tune_ui.mode,
+            _ => CellMode::Values,
+        },
         row_labels,
         col_labels,
         decimals,
         live,
+        log: log_stats.as_ref().map(|a| a.cells.as_slice()),
+        min_hits: app.autotune.settings.min_hits,
     };
     egui::ScrollArea::horizontal().id_salt("grid").show(ui, |ui| {
         grid(ui, &spec, &mut app.tune_ui.sel);

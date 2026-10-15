@@ -5,6 +5,7 @@
 //! hardware until the owner unlocks them in Settings.
 
 mod app;
+mod autotune_view;
 mod burn_view;
 mod charts;
 mod connect;
@@ -12,6 +13,7 @@ mod dashboard;
 mod diagnostics;
 mod gauge;
 mod grid;
+mod logs_view;
 mod report;
 mod report_view;
 mod resets;
