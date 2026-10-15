@@ -11,6 +11,7 @@ mod diag;
 mod edit;
 mod live;
 mod logs;
+mod remote;
 mod render;
 
 use std::io::Write as _;
@@ -101,6 +102,9 @@ enum Cmd {
     Logstats(logs::StatsArgs),
     /// Propose fuel map corrections from logs (EGO-based); -o saves a new tune (never the ECM).
     Autotune(logs::AutotuneArgs),
+    /// Remote tuning: host a session for a tuner, or join one (docs/REMOTE.md).
+    #[command(subcommand)]
+    Remote(remote::RemoteCmd),
     /// Show what XBTune knows about an ECM ID's definition, and data issues.
     Defs {
         /// ECM ID, e.g. BUEIB.
@@ -302,6 +306,7 @@ async fn run(cmd: Cmd) -> Result<()> {
         Cmd::Test(a) => diag::test(a).await,
         Cmd::TpsReset(a) => diag::tps_reset(a).await,
         Cmd::Log(a) => live::log(a).await,
+        Cmd::Remote(c) => remote::remote(c).await,
     }
 }
 

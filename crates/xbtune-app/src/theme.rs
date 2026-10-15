@@ -203,7 +203,7 @@ mod tests {
 
     /// Inter has no emoji and few symbols; a missing one shows as "?" (the
     /// owner hit ✕ and ✔). Every non-ASCII character in UI text, here and
-    /// in xbtune-core (its messages are shown too), must be in both Inter
+    /// in xbtune-core and xbtune-remote (their messages are shown too), must be in both Inter
     /// files. Comments are skipped.
     #[test]
     fn every_symbol_in_the_ui_is_in_the_font() {
@@ -212,7 +212,7 @@ mod tests {
         assert!(regular.contains(&'A') && regular.contains(&'≠') && !regular.contains(&'\u{2714}'));
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let mut missing = Vec::new();
-        for dir in [root.join("src"), root.join("../xbtune-core/src")] {
+        for dir in [root.join("src"), root.join("../xbtune-core/src"), root.join("../xbtune-remote/src")] {
             for entry in std::fs::read_dir(&dir).unwrap() {
                 let path = entry.unwrap().path();
                 if path.extension().is_none_or(|x| x != "rs") {

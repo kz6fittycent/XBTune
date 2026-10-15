@@ -84,6 +84,10 @@ pub struct Settings {
     pub last_tune: Option<std::path::PathBuf>,
     /// Show "Getting started" when the app starts.
     pub show_wizard: bool,
+    /// Remote tuning: the name shown to the other side.
+    pub remote_name: String,
+    /// Remote tuning: "Don't show this again" on the guide.
+    pub remote_guide_seen: bool,
 }
 
 impl Default for Settings {
@@ -99,6 +103,8 @@ impl Default for Settings {
             chart_seconds: 60.0,
             last_tune: None,
             show_wizard: true,
+            remote_name: String::new(),
+            remote_guide_seen: false,
         }
     }
 }

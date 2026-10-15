@@ -14,6 +14,7 @@ mod diagnostics;
 mod gauge;
 mod grid;
 mod logs_view;
+mod remote_view;
 mod report;
 mod report_view;
 mod resets;

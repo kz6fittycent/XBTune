@@ -29,6 +29,7 @@ xbtune-core.workspace = true
 xbtune-defs.workspace = true
 xbtune-link.workspace = true
 xbtune-proto.workspace = true
+xbtune-remote.workspace = true
 xbtune-sim.workspace = true
 
 [lints]

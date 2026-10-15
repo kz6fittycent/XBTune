@@ -67,6 +67,28 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   (`relay/bug-report/`) is NOT deployed yet: the owner does the Cloudflare/
   token steps in its README. Until then sends fail and reports queue in
   `<data>/app-log/pending/`.
+- **Phase 8 remote tuning, stage R1 (relay + pairing + encrypted chat):
+  built 2026-10-15** (REMOTE.md approved). `crates/xbtune-remote`: `code`
+  (`47-381926`; digits from rustls/ring's secure random), `crypto`
+  (SPAKE2 Ed25519 + HKDF-SHA256 + ChaCha20-Poly1305, counters, epochs),
+  `msg` (hello/chat/bye, unknown ignored), `relay` (client; action in the
+  URL, ticket header, HTTP refusals), `local_relay` (Rust relay with the
+  Worker's rules; `kick`/`sabotage` test hooks), `session` (task: pair,
+  key check = first `hello`, one wrong guess closes the room, rejoin +
+  re-pair per epoch, a side one epoch behind is met there). Worker:
+  `relay/remote/` (Durable Object per room, hibernation API, rate limit
+  10/min/IP, rooms expire 30 min empty / 12 h) - NOT deployed yet: owner
+  runs `npx wrangler@4 deploy` there (README). Default URL
+  `wss://xbtune-remote.jimmy-tigert.workers.dev/v1`, `XBTUNE_REMOTE_URL`
+  overrides. CLI `remote host|join|relay`. App: Remote view
+  (`remote_view.rs`): name, Start session / Join, big code, status, chat,
+  End; first-use guide ("Don't show this again" -> settings
+  `remote_guide_seen`); session ended on app exit. Tests: crypto (5),
+  code/msg, 5 end-to-end over the local relay (incl. 3 resumes and the
+  epoch catch-up), 2 against the Worker under `wrangler dev`
+  (`tools/test_remote_relay.sh`, CI job `remote-relay`). Hooks:
+  `XBTUNE_SHOT_REMOTE=host|guide|join:<code>`, `XBTUNE_SHOT_REMOTE_CHAT`.
+  Snap: `network` on the GUI, `network` + `network-bind` on the CLI.
 - **Factory race ECMs: built 2026-10-15** (owner asked after seeing
   EcmDroid's race support). EcmDroid has no commits after our pin
   `2f17d29f`; its race support is `3c189be` (protocol choice, address
@@ -308,7 +330,9 @@ crates/xbtune-core   env (snap, paths), image (.xbt/.xpr), read (full EEPROM rea
 crates/xbtune-sim    simulated ECM + fault injection + made-up engine; in-process and pty; bin xbtune-sim
 crates/xbtune-cli    xbtune-cli: info, ports, scan, ecms, doctor, dump, show, diff, convert, defs, live, log
 crates/xbtune-app    egui app, binary xbtune (connect, dashboard, live data, charts); assets/fonts (Inter)
+crates/xbtune-remote remote tuning: code, SPAKE2/HKDF/ChaCha20 crypto, relay client, local relay, session
 relay/bug-report/    Cloudflare Worker: app reports -> GitHub issues (not in the snap)
+relay/remote/        Cloudflare Worker + Durable Object: remote-tuning relay (not in the snap)
 data/                ecmdroid.toml (ED-DB derived, RESTRICTED), ecm_models.toml (ours)
 tools/               extract_ecmdroid_db.py
 tests/fixtures/      EcmDroid test images and runtime frame
@@ -325,6 +349,8 @@ cargo deny check
 cargo run -p xbtune-cli -- info --sim
 cargo run -p xbtune-sim -- --drop 0.1 --fragment 0.3   # prints /dev/pts/N
 cargo run -p xbtune-cli -- info --serial /dev/pts/N
+tools/test_remote_relay.sh              # remote relay Worker (wrangler dev) vs the Rust tests
+xbtune-cli remote relay & xbtune-cli remote host --relay ws://127.0.0.1:8790/v1   # local remote session
 snapcraft clean xbtune && snapcraft pack   # clean first, or the version label stays stale
 sudo snap install --dangerous ./xbtune_0.1.0+git<HEAD>_amd64.snap   # name the file; never a glob
 XBTUNE_SCREENSHOT=~/snap/xbtune/common/s.ppm XBTUNE_VIEW=charts xbtune   # GUI check inside the snap

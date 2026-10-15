@@ -1,0 +1,28 @@
+# Cloudflare Worker config for XBTune's remote-tuning relay - see worker.js
+# and README.md beside this file. Deploy from this folder:
+#   npx wrangler@4 deploy
+name = "xbtune-remote"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+# No custom domain - the free <account>.workers.dev address is enough.
+workers_dev = true
+
+# One Durable Object per room (SQLite-backed, available on the free plan).
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
+
+# 10 new sessions or joins per minute from one address (rejoins after a
+# dropped connection aren't limited; they need the room's ticket).
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60

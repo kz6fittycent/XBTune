@@ -122,24 +122,21 @@ any content.
 
 ## 4. Protocol
 
-### 4.1 Relay (control messages, WebSocket text frames, JSON)
+### 4.1 Relay (WebSocket routes and control messages)
 
-Endpoint: `wss://<relay>/v1/ws`. One Durable Object per room
-(`idFromName(room)`); a small "rooms" Durable Object hands out free numbers.
+The action is in the URL, so the relay can pick the room before the
+WebSocket opens (one Durable Object per room, `idFromName(room)`):
 
-| From | Message | Meaning |
+| Route | Who | Answer |
 |---|---|---|
-| host | `{"t":"open","v":1}` | asks for a room |
-| relay | `{"t":"opened","room":"47","ticket":"<32 random bytes, b64>"}` | room number + host's rejoin ticket |
-| guest | `{"t":"join","v":1,"room":"47"}` | joins a room |
-| relay | `{"t":"joined","ticket":"..."}` | to the guest: its rejoin ticket |
-| relay | `{"t":"peer","state":"here"\|"gone"}` | to either side |
-| either | `{"t":"rejoin","room":"47","ticket":"..."}` | after a dropped connection |
-| either | `{"t":"close"}` | ends the room for both |
-| relay | `{"t":"error","code":"...","text":"..."}` | e.g. `no-room`, `room-full`, `rate`, `version` |
+| `/v1/open` | host | text `{"t":"opened","room":"47","ticket":"<hex>"}` |
+| `/v1/join?room=47` | guest | text `{"t":"joined","ticket":"<hex>"}` |
+| `/v1/rejoin?room=47&role=host\|guest` + header `x-xbtune-ticket` | either, after a drop | (no greeting) |
 
-Binary frames are forwarded unchanged to the other side, and only once
-both are present (no store-and-forward; the apps resend, section 4.5).
+Refusals are HTTP statuses on the upgrade: 404 no room, 409 room full,
+403 wrong ticket, 429 rate limit, 503 no free room. Once connected:
+`{"t":"peer","state":"here"|"gone"}` from the relay; `{"t":"close"}` from
+an app ends the room for both.
 
 Relay rules:
 - Room numbers 1-999, random among free ones, so the next number can't be

@@ -36,6 +36,7 @@ pub enum View {
     Resets,
     Tune,
     Logs,
+    Remote,
     Settings,
 }
 
@@ -111,6 +112,7 @@ pub struct XbApp {
     pub logs: crate::logs_view::LogsUi,
     pub autotune: crate::autotune_view::AutotuneUi,
     pub report: crate::report_view::ReportUi,
+    pub remote: crate::remote_view::RemoteUi,
     /// Variables to write again on a retry.
     pub pending_chosen: std::collections::BTreeSet<String>,
     /// EEPROM writes allowed for the current session.
@@ -188,6 +190,7 @@ impl XbApp {
             logs: Default::default(),
             autotune: Default::default(),
             report: Default::default(),
+            remote: Default::default(),
             pending_chosen: Default::default(),
             write_permitted: false,
             demo_sim: None,
@@ -214,8 +217,20 @@ impl XbApp {
             if let Ok(path) = std::env::var("XBTUNE_SHOT_SERIAL") {
                 // UI checks against a pty simulator (`xbtune-sim --ecm ID`).
                 app.start(SavedTarget::Serial { path, race });
-            } else if view != "connect" && std::env::var_os("XBTUNE_SHOT_LOGS").is_none() {
+            } else if view != "connect" && view != "remote" && std::env::var_os("XBTUNE_SHOT_LOGS").is_none()
+            {
                 app.start(SavedTarget::Demo { race });
+            }
+            // `XBTUNE_SHOT_REMOTE=host|join:<code>` (with XBTUNE_REMOTE_URL
+            // pointing at a local relay): start a remote session.
+            match std::env::var("XBTUNE_SHOT_REMOTE").as_deref() {
+                Ok("host") => crate::remote_view::host(&mut app),
+                Ok("guide") => crate::remote_view::open_guide(&mut app),
+                Ok(j) if j.starts_with("join:") => crate::remote_view::join(&mut app, &j[5..]),
+                _ => {}
+            }
+            if let Ok(chat) = std::env::var("XBTUNE_SHOT_REMOTE_CHAT") {
+                crate::remote_view::queue_chat(&mut app, chat);
             }
             app.view = match view.as_str() {
                 "data" => View::Data,
@@ -224,6 +239,7 @@ impl XbApp {
                 "diag" => View::Diagnostics,
                 "resets" => View::Resets,
                 "settings" => View::Settings,
+                "remote" => View::Remote,
                 "logs" => View::Logs,
                 "tune" => View::Tune,
                 _ => View::Dashboard,
@@ -787,6 +803,7 @@ impl XbApp {
             (View::Resets, "Resets"),
             (View::Tune, "Tune"),
             (View::Logs, "Logs"),
+            (View::Remote, "Remote"),
             (View::Settings, "Settings"),
         ] {
             let selected = self.view == v;
@@ -945,6 +962,7 @@ impl eframe::App for XbApp {
     fn logic(&mut self, _ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.drain_events();
         self.connect.poll();
+        crate::remote_view::poll(self);
         crate::logs_view::tick(self);
         // A panic the app survived (a background task): offer a report now.
         if !self.report.is_open()
@@ -977,6 +995,7 @@ impl eframe::App for XbApp {
                     View::Diagnostics => crate::diagnostics::show(self, ui),
                     View::Resets => crate::resets::show(self, ui),
                     View::Settings => crate::settings_view::show(self, ui),
+                    View::Remote => crate::remote_view::show(self, ui),
                     View::Logs => crate::logs_view::show(self, ui),
                     View::Tune => crate::tune_view::show(self, ui),
                 }
@@ -992,6 +1011,7 @@ impl eframe::App for XbApp {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        crate::remote_view::end(self);
         self.save_recovery();
         self.stop();
         self.save_settings();

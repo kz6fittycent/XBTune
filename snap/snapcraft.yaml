@@ -47,7 +47,8 @@ apps:
       - raw-usb
       - home
       - removable-media
-      # Report a problem: one HTTPS POST to the bug-report relay.
+      # Report a problem (one HTTPS POST to the bug-report relay) and
+      # remote tuning (a WebSocket to the remote relay).
       - network
   cli:
     command: bin/xbtune-cli
@@ -56,6 +57,9 @@ apps:
       - raw-usb
       - home
       - removable-media
+      # remote host/join; `remote relay` listens on a local port.
+      - network
+      - network-bind
   sim:
     command: bin/xbtune-sim
     plugs:

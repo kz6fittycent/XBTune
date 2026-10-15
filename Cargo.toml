@@ -15,6 +15,7 @@ xbtune-link = { path = "crates/xbtune-link" }
 xbtune-defs = { path = "crates/xbtune-defs" }
 xbtune-core = { path = "crates/xbtune-core" }
 xbtune-sim = { path = "crates/xbtune-sim" }
+xbtune-remote = { path = "crates/xbtune-remote" }
 
 anyhow = "1"
 bluer = { version = "0.17", features = ["bluetoothd", "rfcomm"] }
@@ -39,6 +40,14 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ureq = { version = "3", default-features = false, features = ["rustls-no-provider", "platform-verifier", "json"] }
 # ureq's crypto provider (ureq without its default webpki-roots: CDLA license).
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+# Remote tuning (phase 8, approved 2026-10-15): WebSockets to the relay
+# (rustls with the system's CA certificates), SPAKE2 pairing, HKDF-SHA256
+# keys, ChaCha20-Poly1305 frames. Versions match spake2 0.4's sha2/hkdf.
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "handshake", "rustls-tls-native-roots"] }
+spake2 = { version = "0.4", features = ["getrandom"] }
+hkdf = "0.12"
+sha2 = "0.10"
+chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

@@ -14,13 +14,14 @@ path = "src/main.rs"
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["io-std"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
 xbtune-core.workspace = true
 xbtune-defs.workspace = true
 xbtune-link.workspace = true
 xbtune-proto.workspace = true
+xbtune-remote.workspace = true
 xbtune-sim.workspace = true
 
 [lints]

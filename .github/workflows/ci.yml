@@ -41,3 +41,26 @@ jobs:
 
       - name: cargo-deny
         uses: EmbarkStudios/cargo-deny-action@v2
+
+  remote-relay:
+    # The remote-tuning Worker under wrangler dev, against the Rust tests.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libdbus-1-dev libudev-dev
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Relay tests
+        run: tools/test_remote_relay.sh
