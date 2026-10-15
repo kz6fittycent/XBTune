@@ -33,8 +33,11 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   2026-10-14** ("quite good"): edited a backup copy, set KRPM_Hard_Hi to
   7450 in it, and "Read from ECM" in the app worked on the bike. Feedback:
   the buttons took some getting used to (consider clearer labels/help).
-  Live-point position not yet confirmed. Don't start phase 6 (burn) until
-  the owner says so.
+  Live point checked on the bike at idle: load-20 row, between the 1350
+  and 1000 RPM columns (consistent with a warm idle), so the RPM/Load
+  pairing behaves sensibly. Engine-running link with the 400 ms timeout:
+  5.6 Hz, 4% errors (was 3.7 Hz). Don't start phase 6 (burn) until the
+  owner says so.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the

@@ -165,7 +165,7 @@ known-good source:**
 | Encoding `raw = round((value - translate) / scale)`, LE, clamped to the element width | XB: the inverse of ED `Variable.refreshValue()` |
 | Pairs: even elements use axis scale/translate | XB (same unconfirmed reading as decoding) |
 | Grid ops, clipboard, undo/redo as byte patches, front/rear partner by name | XB |
-| Live point on maps: axes named "...RPM..." follow the `RPM` channel, "...Load..." the `Load` channel | XB reading, UNCONFIRMED (shown as "approx.") |
+| Live point on maps: axes named "...RPM..." follow the `RPM` channel, "...Load..." the `Load` channel | XB reading, still shown as "approx.". Owner's BUEIB at warm idle (2026-10-14): circle in the load-20 row between 1350 and 1000 RPM, as expected |
 
 ## App assets (`crates/xbtune-app/assets`)
 
