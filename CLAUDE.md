@@ -29,8 +29,12 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   EcmDroid also shows stored 15 (codes cross-checked). `codes --clear`
   on the bike cleared it. TPS reset deliberately not run (owner's choice).
   Phase 4 done.
-- **Phase 5 (offline map editing): built 2026-10-14, waiting for the
-  owner's test.** Don't start phase 6 (burn) until the owner says so.
+- **Phase 5 (offline map editing): built 2026-10-14; owner tested
+  2026-10-14** ("quite good"): edited a backup copy, set KRPM_Hard_Hi to
+  7450 in it, and "Read from ECM" in the app worked on the bike. Feedback:
+  the buttons took some getting used to (consider clearer labels/help).
+  Live-point position not yet confirmed. Don't start phase 6 (burn) until
+  the owner says so.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the
