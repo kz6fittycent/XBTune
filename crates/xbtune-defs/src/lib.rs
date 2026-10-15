@@ -33,7 +33,7 @@ pub const BUILTIN_MODELS: &str = include_str!("../../../data/ecm_models.toml");
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Family {
-    /// Tube-frame bikes. Out of scope.
+    /// 1999-2002 tube-frame bikes (in scope since 2026-10-15).
     Ddfi1,
     /// 2003-2007 XB.
     Ddfi2,
@@ -44,7 +44,7 @@ pub enum Family {
 impl Family {
     /// True for the families XBTune supports.
     pub fn in_scope(self) -> bool {
-        matches!(self, Self::Ddfi2 | Self::Ddfi3)
+        matches!(self, Self::Ddfi1 | Self::Ddfi2 | Self::Ddfi3)
     }
 }
 
@@ -302,6 +302,32 @@ mod tests {
         let c = Catalog::builtin().unwrap();
         for id in ["BUEOD", "BUEWD", "BUEYD", "BUEZD", "BUE1D", "BUE2D", "BUE3D"] {
             assert_eq!(c.lookup(id).unwrap().family, Family::Ddfi3, "{id}");
+        }
+    }
+
+    #[test]
+    fn tube_frame_ids_are_defined() {
+        let c = Catalog::builtin().unwrap();
+        for (id, def, size, rt) in [
+            ("BUEGC", "BUEGC", 1100, 99),
+            ("BUEIA", "BUEIA", 1056, 100),
+            ("BUEJA", "BUEKA", 1072, 99),
+            ("BUEKA", "BUEKA", 1072, 99),
+        ] {
+            let e = c.lookup(id).unwrap();
+            assert_eq!(
+                (e.family, e.definition.as_str(), e.size, e.xsize, e.runtime_len),
+                (Family::Ddfi1, def, size, size, rt)
+            );
+            assert_eq!(e.bikes.as_deref(), Some("Tube frame (1999-2002)"));
+            let d = c.definition(e).unwrap();
+            for v in ["Tab_Fuel_Front", "Tab_Fuel_Rear", "Tab_Spark_Front", "LFuel", "KO2_Midpoint"] {
+                assert!(d.eeprom.contains_key(v), "{id} {v}");
+            }
+            // 2-byte values are one number even where the db gives no
+            // element size (all of BUEGC).
+            assert_eq!(d.eeprom["LFuel"].width, 2, "{id}");
+            assert_eq!(d.eeprom["LFuel"].shape, Shape::Scalar, "{id}");
         }
     }
 

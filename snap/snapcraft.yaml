@@ -1,14 +1,18 @@
 name: xbtune
 adopt-info: xbtune
 title: XBTune
-summary: Diagnostics, logging and tuning for Buell XB motorcycles
+summary: Diagnostics, logging and tuning for Buell DDFI motorcycles
 description: |
-  XBTune reads, logs and tunes the DDFI-2 and DDFI-3 ECMs on 2003-2009
-  Buell XB9 and XB12 motorcycles, over Bluetooth (BuellTooth and other SPP
-  adapters) or a USB serial cable.
+  XBTune reads, logs and tunes Buell DDFI ECMs: the 2003-2009 XB9 and XB12
+  (DDFI-2, DDFI-3), the 1999-2002 tube-frame bikes (DDFI) and factory race
+  ECMs, over Bluetooth (BuellTooth and other SPP adapters) or a USB serial
+  cable.
 
-  This is an early, read-only build: it identifies the ECM, reads and saves
-  the EEPROM, shows and logs live data. It never writes to the ECM.
+  This is an early build. It identifies the ECM, reads and saves the
+  EEPROM, shows and logs live data, reads trouble codes, edits tunes and
+  suggests fuel corrections from logs. Tests, resets and writing to the ECM
+  are locked until you unlock them in Settings; every write makes a backup
+  first and is read back.
 
   After installing, connect the interfaces it needs:
 

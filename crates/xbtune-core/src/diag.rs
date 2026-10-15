@@ -88,12 +88,15 @@ pub fn codes_from_runtime(def: &Definition, frame: &[u8], kind: CodeKind) -> Vec
 }
 
 /// Stored codes in an EEPROM image (`HDiag<n>`), for when there is no
-/// live data. Bytes in a missing page 0 are skipped.
+/// live data. Bytes in a missing page 0 are skipped. Unlike EcmDroid, a
+/// missing `HDiag<n>` doesn't end the list: BUEGC's definition has
+/// `HDiag1`-`HDiag3` but no `HDiag0`.
 pub fn stored_codes_from_image(def: &Definition, img: &ImageView) -> Vec<TroubleCode> {
     let mut bytes = Vec::new();
-    for i in 0.. {
+    let last = (0..32).filter(|i| def.eeprom.contains_key(&format!("HDiag{i}"))).max();
+    for i in 0..=last.unwrap_or(0) {
         let varname = format!("HDiag{i}");
-        let Some(v) = def.eeprom.get(&varname) else { break };
+        let Some(v) = def.eeprom.get(&varname) else { continue };
         let byte = v.raw(img).ok().and_then(|r| r.first().copied()).map(|r| r as u8);
         let bits = v.bits.as_ref().map(|b| b.bits.clone()).unwrap_or_default();
         bytes.push((varname, byte, bits));
@@ -156,10 +159,11 @@ pub fn safety_notice(f: Function) -> &'static str {
     }
 }
 
-/// Whether XBTune offers a TPS reset for this ECM. EcmDroid sends it only
-/// to DDFI-2; for DDFI-3 it says to follow the service manual.
+/// Whether XBTune offers a TPS reset for this ECM. EcmDroid sends it to
+/// every ECM but DDFI-3 (`ActiveTestsFragment.resetTPS()`: DDFI-1 and
+/// DDFI-2); for DDFI-3 it says to follow the service manual.
 pub fn tps_reset_supported(ecm: &EcmDef) -> bool {
-    ecm.family == Family::Ddfi2
+    ecm.family != Family::Ddfi3
 }
 
 /// Proof that commands which change the ECM may be sent to this target.

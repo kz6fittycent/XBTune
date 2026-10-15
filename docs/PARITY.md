@@ -16,6 +16,7 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 |---|---|---|
 | Pick port / adapter, ECM type detected from version | ✅ `info`, `scan`, `ports` | 1 |
 | Unknown ECM type → clear error, point to supported list | ✅ read-only, writes refused | 1 |
+| Tube-frame DDFI ECMs (BUEGC, BUEIA, BUEJA, BUEKA) | ✅ definitions, read, live, codes, TPS/AFV reset, burn; sim only, untested on hardware | 7 |
 | Factory race ECMs (address 0x55, 19200 baud) | ✅ app Connect "ECM type", CLI `--race`; "wrong type?" hint; sim only, untested on hardware | 7 |
 | Fetch EEPROM on connect, with progress | 🟡 `dump` (CLI); app in 5 | 2/5 |
 | Online / offline modes (edit an in-memory copy offline) | ✅ Tune view edits files only; Read from ECM loads a verified copy | 5 |

@@ -117,6 +117,14 @@ known-good source:**
 
 ### Deliberate deviations from EcmDroid
 
+- A 2- or 4-byte `Value` whose `elemsize` is 0 or missing is read as one
+  little-endian number. EcmDroid's `Variable.setWidth()` makes it 1, so it
+  shows such values as byte lists. Affects all of BUEGC's 2-byte values
+  (its db rows have no element sizes; e.g. `LFuel` = AFV, `KTE_Hot`) and
+  BUEOD's `KRPM_TCC_Setpoint`.
+- Stored codes from the EEPROM (`HDiag<n>`) skip a missing `n` instead of
+  stopping there (`ECM.getErrors()` stops): BUEGC has `HDiag1`-`HDiag3`
+  but no `HDiag0`.
 - `Variable.getHigh()` multiplies `high` by `scale` again when `uhigh` is the
   full raw range. Every `rtoffsets.high` in the data is already in
   engineering units (1,142 equal `uhigh * scale + translate`, the other 102

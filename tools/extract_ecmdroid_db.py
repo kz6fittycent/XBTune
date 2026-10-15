@@ -9,7 +9,7 @@ app/src/main/assets/ecmdroid.db.gz) under GPL-3.0. EcmDroid states it was
 converted from a database dump the ECMSpy maintainer allowed it to use under
 GPLv3. See docs/PROVENANCE.md before redistributing the output.
 
-Output: every ECM ID with its page layout, and for in-scope (DDFI-2/DDFI-3)
+Output: every ECM ID with its page layout, and for in-scope (DDFI/DDFI-2/DDFI-3)
 definitions their EEPROM variables, runtime variables, bit sets and the
 display names they reference. Values are copied, not interpreted, except:
 - numeric text columns become numbers (NULL is left out);
@@ -22,7 +22,7 @@ import sqlite3
 import sys
 
 TYPE_TO_FAMILY = {"DDFI": "ddfi1", "DDFI-2": "ddfi2", "DDFI-3": "ddfi3"}
-IN_SCOPE = {"DDFI-2", "DDFI-3"}
+IN_SCOPE = {"DDFI", "DDFI-2", "DDFI-3"}
 
 
 def s(v):

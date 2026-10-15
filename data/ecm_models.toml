@@ -67,3 +67,21 @@ bikes = "XB or 1125 (2008+), EBR race ECM"
 [[model]]
 id = "B3R3D"
 bikes = "XB or 1125 (2008+), EBR race ECM"
+
+# Tube frame (DDFI). Revision Moto lists all four as "Tube frame - 1999-2002"
+# (read 2026-10-15); no source we can cite maps them to individual models.
+[[model]]
+id = "BUEGC"
+bikes = "Tube frame (1999-2002)"
+
+[[model]]
+id = "BUEIA"
+bikes = "Tube frame (1999-2002)"
+
+[[model]]
+id = "BUEJA"
+bikes = "Tube frame (1999-2002)"
+
+[[model]]
+id = "BUEKA"
+bikes = "Tube frame (1999-2002)"

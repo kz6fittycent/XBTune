@@ -211,7 +211,10 @@ impl XbApp {
             let view = std::env::var("XBTUNE_VIEW").unwrap_or_default();
             let race = std::env::var_os("XBTUNE_SHOT_RACE").is_some();
             app.connect.race = race;
-            if view != "connect" && std::env::var_os("XBTUNE_SHOT_LOGS").is_none() {
+            if let Ok(path) = std::env::var("XBTUNE_SHOT_SERIAL") {
+                // UI checks against a pty simulator (`xbtune-sim --ecm ID`).
+                app.start(SavedTarget::Serial { path, race });
+            } else if view != "connect" && std::env::var_os("XBTUNE_SHOT_LOGS").is_none() {
                 app.start(SavedTarget::Demo { race });
             }
             app.view = match view.as_str() {

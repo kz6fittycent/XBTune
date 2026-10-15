@@ -1138,6 +1138,72 @@ mod tests {
         let _ = std::fs::remove_dir_all(&store);
     }
 
+    /// Tube-frame DDFI ECMs (no page 0, own runtime frame): identify, poll,
+    /// read the EEPROM, read codes, AFV reset and burn, all on the sim.
+    #[tokio::test]
+    async fn tube_frame_ecms_end_to_end() {
+        let catalog = Arc::new(Catalog::builtin().unwrap());
+        for id in ["BUEGC", "BUEIA", "BUEJA", "BUEKA"] {
+            let ecm = catalog.lookup(id).unwrap().clone();
+            assert_eq!(ecm.family, xbtune_defs::Family::Ddfi1);
+            assert!(ecm.family.in_scope() && crate::diag::tps_reset_supported(&ecm), "{id}");
+            let def = catalog.definition(&ecm).unwrap().clone();
+            let mut image = vec![0u8; ecm.xsize];
+            // A stored code in the EEPROM's HDiag1 (BUEGC has no HDiag0)
+            // and AFV at 100%.
+            let hd1 = &def.eeprom["HDiag1"];
+            image[hd1.offset as usize] = 0x01;
+            let lfuel = &def.eeprom["LFuel"];
+            image[lfuel.offset as usize..lfuel.offset as usize + 2].copy_from_slice(&1000u16.to_le_bytes());
+            let mut sim = Simulator::new(xbtune_sim::SimConfig::for_ecm(&ecm, "000 01-01-26"), &image)
+                .with_engine(def.clone());
+            sim.set_engine_running(false);
+            let sim = shared(sim);
+            let store = std::env::temp_dir().join(format!("xbtune-tube-{id}-{}", std::process::id()));
+            let mut cfg = SessionConfig::new("sim", EcmAddress::Stock);
+            fast(&mut cfg);
+            cfg.read_timeout = Duration::from_millis(200);
+            cfg.store = Some(store.clone());
+            cfg.write_permit = Some(crate::diag::test_write_permit());
+            let mut s = start(cfg, sim_opener(sim.clone()), catalog.clone(), None);
+            let ev = collect_until(&mut s, |e| matches!(e, Event::Identified(_))).await;
+            let Some(Event::Identified(ident)) = ev.last() else { panic!("{id}: {ev:?}") };
+            assert_eq!(ident.ecm.id, id);
+            let ev = collect_until(&mut s, |e| matches!(e, Event::Sample(_))).await;
+            assert!(matches!(ev.last(), Some(Event::Sample(_))), "{id}");
+
+            s.send(Command::ReadEeprom);
+            let ev =
+                collect_until(&mut s, |e| matches!(e, Event::EepromRead(_) | Event::ReadFailed(_))).await;
+            let Some(Event::EepromRead(img)) = ev.last() else { panic!("{id}: {:?}", ev.last()) };
+            assert_eq!(img.bytes, image, "{id}");
+            assert!(!img.page_zero, "{id}: no page 0 on DDFI-1");
+            let view = xbtune_defs::ImageView { bytes: &img.bytes, page_zero: false };
+            let codes = crate::diag::stored_codes_from_image(&def, &view);
+            assert!(!codes.is_empty(), "{id}: stored code in HDiag1");
+
+            // AFV reset finds LFuel (page 1 here, not page 0 as on XBs).
+            let mut ecm_bytes = img.bytes.clone();
+            ecm_bytes[lfuel.offset as usize..lfuel.offset as usize + 2]
+                .copy_from_slice(&950u16.to_le_bytes());
+            let (reset, names) = crate::burn::afv_reset(&def, &ecm_bytes, false).unwrap();
+            assert_eq!(names, ["LFuel"], "{id}");
+            assert_eq!(&reset[lfuel.offset as usize..lfuel.offset as usize + 2], &1000u16.to_le_bytes());
+
+            // Burn a fuel-map cell.
+            let (backup, _) = prepared(&mut s).await;
+            let mut t = crate::tune::Tune::new(backup, &catalog).unwrap();
+            t.set("cell", &[("Tab_Fuel_Front".into(), 0, 42.0)]).unwrap();
+            s.send(Command::Burn { target: Box::new(t.image.clone()), note: String::new() });
+            let ev = collect_until(&mut s, |e| matches!(e, Event::BurnDone(_))).await;
+            let Some(Event::BurnDone(Ok(sum))) = ev.last() else { panic!("{id}: {:?}", ev.last()) };
+            assert_eq!(sum.report.writes, 1, "{id}");
+            assert_eq!(sim.lock().unwrap().image(), &t.image.bytes[..], "{id}");
+            s.send(Command::Stop);
+            let _ = std::fs::remove_dir_all(&store);
+        }
+    }
+
     #[tokio::test]
     async fn burn_end_to_end_with_backup_and_history() {
         let sim = stopped_bueib();

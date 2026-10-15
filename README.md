@@ -1,7 +1,9 @@
 # XBTune
 
-Diagnostics, logging and tuning for the DDFI-2 and DDFI-3 ECMs on 2003–2009
-Buell XB9 and XB12 motorcycles, for Linux. Bluetooth (BuellTooth and other
+Diagnostics, logging and tuning for Buell DDFI ECMs, for Linux: the XB9
+and XB12 (DDFI-2 and DDFI-3, 2003–2009), the tube-frame bikes (DDFI,
+1999–2002) and factory race ECMs. Tested on a 2005 XB9SX; the others
+only against the built-in simulator so far. Bluetooth (BuellTooth and other
 SPP adapters) is the main link. USB serial cables work too.
 
 **Status: phase 7.** XBTune identifies the ECM, reads and saves the
@@ -18,6 +20,7 @@ xbtune.cli ports                        # USB serial adapters
 xbtune.cli info --bt 00:11:22:AA:BB:CC  # identify the ECM over Bluetooth
 xbtune.cli info --serial /dev/ttyUSB0   # ... or USB
 xbtune.cli info --sim                   # against the built-in simulator
+xbtune.cli info --serial /dev/ttyUSB0 --race   # a factory race ECM (0x55, 19200)
 xbtune.cli dump --bt ADDR -o tune.xbt   # read and save the EEPROM (verified)
 xbtune.cli show tune.xbt Tab_Fuel_Front # decode an image
 xbtune.cli live --bt ADDR               # live data in the terminal

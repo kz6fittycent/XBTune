@@ -79,6 +79,20 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   read/live/burn on the race sim, CLI info. Hook `XBTUNE_SHOT_RACE=1`.
   Untested on a real race ECM (none available). BT adapters must be set
   to 19200 for factory race; XBTune can't change a BuellTooth's baud.
+- **Tube-frame DDFI ECMs: built 2026-10-15** (owner moved them up from
+  phase 9: "add the tuber features too for this phase"). Data regenerated
+  from ecmdroid.db at the pinned commit (fresh clone; extractor reproduced
+  the old toml byte for byte before `IN_SCOPE` gained "DDFI"; only
+  additions). EcmDroid's Java has no DDFI-1 protocol/page differences
+  (only `Bin2MslConverter`, binary logs, which we don't read). Changes:
+  `Family::in_scope` includes Ddfi1; `tps_reset_supported` = not DDFI-3
+  (as EcmDroid); 2-byte Values with elemsize 0 are one number (all of
+  BUEGC; deviation in PROVENANCE); stored codes skip a missing HDiag<n>
+  (BUEGC has no HDiag0). Fitment: Revision Moto says only "Tube frame
+  1999-2002". Tests: session end-to-end for all 4 IDs (identify, live,
+  read, codes, AFV reset, burn), defs catalogue test. UI check hook
+  `XBTUNE_SHOT_SERIAL=<pty>` (+ `xbtune-sim --ecm BUEGC`). Untested on a
+  real tube ECM (none available).
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the
@@ -271,7 +285,7 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 ```
 crates/xbtune-proto  PDU framing, checksum, decoder, EEPROM page model, transaction rules (no I/O)
 crates/xbtune-link   serial + RFCOMM transports (BoxIo), EcmClient (retries/stats), BlueZ scan
-crates/xbtune-defs   catalog + definitions (EEPROM/runtime vars, bit sets) from data/ecmdroid.toml; decoding
+crates/xbtune-defs   catalog + definitions (EEPROM/runtime vars, bit sets) from data/ecmdroid.toml; decoding (DDFI, DDFI-2, DDFI-3)
 crates/xbtune-core   env (snap, paths), image (.xbt/.xpr), read (full EEPROM read), live, session, time
 crates/xbtune-sim    simulated ECM + fault injection + made-up engine; in-process and pty; bin xbtune-sim
 crates/xbtune-cli    xbtune-cli: info, ports, scan, ecms, doctor, dump, show, diff, convert, defs, live, log
@@ -409,7 +423,8 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
      portal by running `dbus-send`, and the title font via `gsettings`:
      make sure both exist in the snap (stage them if not) and test with
      buttons on the left. KDE/X11 draw their own frames already.
-   - **Tube-frame DDFI ECMs** (BUEGC, BUEIA, BUEJA, BUEKA; 1999-2002),
+   - **Tube-frame DDFI ECMs**: DONE early (2026-10-15, see Status).
+     Original note: (BUEGC, BUEIA, BUEJA, BUEKA; 1999-2002),
      which KICKOFF §1 had out of scope: EcmDroid supports them. Needs
      EcmDroid's ecmdroid.db again (not in the repo) to re-run
      tools/extract_ecmdroid_db.py with DDFI in IN_SCOPE; check EcmDroid's

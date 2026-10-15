@@ -58,7 +58,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 0 => {
                     heading(ui, "Welcome to XBTune");
                     ui.label(
-                        "XBTune talks to the ECM on Buell DDFI-2 and DDFI-3 bikes: live data and logging, \
+                        "XBTune talks to the ECM on Buell DDFI, DDFI-2 and DDFI-3 bikes: live data and logging, \
                      trouble codes and tests, and editing and burning tunes.",
                     );
                     ui.add_space(6.0);

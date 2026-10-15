@@ -329,8 +329,14 @@ impl EeRow {
         zero: usize,
     ) -> Option<EeVar> {
         let kind = EeKind::parse(&self.kind)?;
-        // Variable.setWidth(): at least 1.
-        let width = self.elemsize.unwrap_or(0).max(1);
+        // Variable.setWidth(): at least 1. Deviation: a 2- or 4-byte Value
+        // with no element size is one number, not 1-byte pieces (BUEGC's
+        // rows all lack elemsize, e.g. LFuel, KTE_Hot; BUEOD's
+        // KRPM_TCC_Setpoint). EcmDroid shows those as byte lists.
+        let width = match self.elemsize.unwrap_or(0) {
+            0 if kind == EeKind::Value && matches!(self.size, 2 | 4) => self.size,
+            w => w.max(1),
+        };
         let shape = shape(kind, self, width, size, zero);
         Some(EeVar {
             name: self.var.clone(),

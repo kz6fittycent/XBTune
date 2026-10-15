@@ -409,7 +409,7 @@ async fn info(a: InfoArgs) -> Result<()> {
                 def.pages.len()
             );
             if !def.family.in_scope() {
-                println!("Support:     not supported (XBTune covers DDFI-2 and DDFI-3 XBs only)");
+                println!("Support:     not supported (XBTune covers DDFI, DDFI-2 and DDFI-3)");
             }
             if def.is_race() != a.conn.race {
                 println!(

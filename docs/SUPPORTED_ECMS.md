@@ -4,7 +4,8 @@ Built from EcmDroid's `ecmdroid.db` (`eeprom` and `pages` tables) at commit
 `2f17d29f`. Bike fitment comes from public pages (see `docs/PROVENANCE.md`,
 sources RM and BX). The live list is `xbtune-cli ecms`.
 
-**First hardware target:** the owner's 2005 XB9SX. This should report
+**Covers:** tube-frame Buells (DDFI, 1999–2002), XBs (DDFI-2, DDFI-3) and
+factory race ECMs. **First hardware target:** the owner's 2005 XB9SX. This should report
 **BUEIB** (DDFI-2). ECMs are sometimes swapped, so `xbtune-cli info` shows
 what the bike really has.
 
@@ -12,6 +13,10 @@ what the bike really has.
 
 | ECM ID | Family | Bikes | Definition | EEPROM (no page 0 / with page 0) | Pages | Runtime frame | Notes |
 |---|---|---|---|---|---|---|---|
+| BUEGC | DDFI | Tube frame 1999–2002 | BUEGC | 1100 / 1100 | 1–5 (no page 0) | 99 | Simulator only |
+| BUEIA | DDFI | Tube frame 1999–2002 | BUEIA | 1056 / 1056 | 1–5 (no page 0) | 100 | Simulator only |
+| BUEJA | DDFI | Tube frame 1999–2002 | BUEKA | 1072 / 1072 | 1–5 (no page 0) | 99 | Shares BUEKA definitions; simulator only |
+| BUEKA | DDFI | Tube frame 1999–2002 | BUEKA | 1072 / 1072 | 1–5 (no page 0) | 99 | Simulator only |
 | BUECB | DDFI-2 | XB9 2003 | BUECB | 1138 / 1138 | 1–6 (no page 0) | 103 | |
 | BUEGB | DDFI-2 | XB 2004 | BUEGB | 1198 / 1202 | 0–6 | 107 | |
 | BUEIB | DDFI-2 | XB 2005–2007 | BUEIB | 1206 / 1210 | 0–6 | 107 | **Owner's bike (expected)** |
@@ -28,6 +33,9 @@ what the bike really has.
 
 | ECM ID | EEPROM variables | Runtime variables | Data issues |
 |---|---|---|---|
+| BUEGC | 112 | 62 | 2 unnamed; no element sizes in the db (2-byte values read as one number, see PROVENANCE); no `HDiag0` |
+| BUEIA | 146 | 62 | 2 unnamed; `Tab_CR_Start` layout doesn't fit (raw bytes only) |
+| BUEJA / BUEKA | 149 | 62 | 1 unnamed; `Tab_CR_Start` layout doesn't fit (raw bytes only) |
 | BUECB | 214 | 67 | 1 unnamed variable |
 | BUEGB | 233 | 70 | 2 unnamed |
 | BUEIB / BUEIC | 241 | 70 | 3 unnamed (`KSparkCtrl`, `Pad2`, `Pad3`); no layout problems |
@@ -71,9 +79,19 @@ No one has tried a real race ECM yet; reports welcome.
 Whether the EBR race IDs (B3R*D) use the race address or the stock one
 isn't recorded anywhere we can cite: try "Factory race" first, then "Stock".
 
+## Tube frame (DDFI) notes
+
+In scope since 2026-10-15 (owner's request). EcmDroid's Java treats them
+like DDFI-2 apart from the definitions: same protocol, addresses and
+baud rate, no page 0 (so no page-0 writes), and TPS reset is offered
+(EcmDroid only withholds it from DDFI-3). Their runtime frame has its own
+layout, but the channel names match the XBs' (RPM, CLT, O2, EGO Corr.,
+AFV, ...), so dashboards, logs and auto-tune work unchanged. AFV is
+`LFuel` on page 1. Nobody has tried a real tube-frame ECM with XBTune yet;
+all of it is tested against the simulator only.
+
 ## Out of scope
 
-- DDFI (tube frame, 1999–2002): BUEGC, BUEIA, BUEJA, BUEKA.
 - The 1125. It shares DDFI-3 IDs with 2008+ XBs, but has a different
   engine and the definitions may cover XB-only and 1125-only variables.
   XBTune does not try to tell the two apart.
@@ -83,4 +101,7 @@ isn't recorded anywhere we can cite: try "Factory race" first, then "Stock".
 - Which 2008+ XB model and year shipped with which DDFI-3 ID? Neither
   ecmdroid.db nor the public sources map them one to one. This needs
   owner reports or a primary source.
-- All writes stay disabled on every ID until phase 6 sign-off.
+- Which tube-frame model and year shipped with which DDFI ID? Public
+  sources only say "Tube frame, 1999-2002" for all four.
+- Writes are locked on every real ECM until the owner unlocks them in
+  Settings. Only BUEIB has been written on hardware (2026-10-15).
