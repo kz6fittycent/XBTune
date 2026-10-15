@@ -62,7 +62,11 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   C/V, arrows; unsaved edits -> recovery file on exit; last tune reopens.
 - CLI: `set FILE NAME=V NAME[r,c]=V -o OUT`, `copy-table FROM INTO VARS -o
   OUT` (both refuse to overwrite the input without --in-place).
-- Hook: `XBTUNE_TUNE=path XBTUNE_SHOT_TUNE="var=..;select=r,c:r,c;op=pct:5;3d;compare=PATH;mode=diff"`.
+- Hook: `XBTUNE_TUNE=path XBTUNE_SHOT_TUNE="var=..;select=r,c:r,c;op=pct:5;3d;compare=PATH;mode=diff"`,
+  `XBTUNE_SHOT_READ=1` (Read from ECM in the demo). ALWAYS set
+  `XBTUNE_HOME=<scratch dir>` for test runs: it redirects config/data
+  (backups, logs, settings) away from the user's real folders. (2026-10-14:
+  a run without it left files in ~/.local/share/xbtune; trashed.)
 
 ### Phase 4 contents
 

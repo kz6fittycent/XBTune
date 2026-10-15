@@ -26,9 +26,14 @@ pub struct Dirs {
 }
 
 impl Dirs {
-    /// `$SNAP_USER_COMMON/{config,data}` in the snap, XDG directories
-    /// otherwise.
+    /// `$XBTUNE_HOME/{config,data}` if set (tests and UI checks keep out of
+    /// the user's data), else `$SNAP_USER_COMMON/{config,data}` in the snap,
+    /// else XDG directories.
     pub fn detect() -> Option<Self> {
+        if let Some(home) = std::env::var_os("XBTUNE_HOME") {
+            let home = PathBuf::from(home);
+            return Some(Self { config: home.join("config"), data: home.join("data") });
+        }
         if in_snap()
             && let Some(common) = std::env::var_os("SNAP_USER_COMMON")
         {

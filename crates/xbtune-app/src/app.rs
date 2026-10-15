@@ -310,6 +310,9 @@ impl XbApp {
 
     /// Unsaved edits at exit go to a recovery file.
     fn save_recovery(&mut self) {
+        if self.shot.is_some() {
+            return;
+        }
         let Some(t) = &mut self.tune else { return };
         if !t.is_modified() {
             return;
@@ -588,6 +591,14 @@ impl XbApp {
             self.set_demo_engine_running(false);
             self.diag.running = Some((f, None));
             self.send(Command::Function(f));
+        }
+        if self.link.live()
+            && std::env::var_os("XBTUNE_SHOT_READ").is_some()
+            && self.tune_ui.read_progress.is_none()
+            && self.tune.is_none()
+        {
+            self.tune_ui.read_progress = Some((0, 1));
+            self.send(Command::ReadEeprom);
         }
         if self.link.live()
             && self.diag.running.is_none()
