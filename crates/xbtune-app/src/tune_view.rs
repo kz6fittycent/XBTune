@@ -158,10 +158,26 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
 
 fn toolbar(app: &mut XbApp, ui: &mut Ui) {
     let p = Palette::for_visuals(ui.visuals());
+    let waiting = app.remote.host.proposals.len();
+    if waiting > 0 && crate::remote_sync::host_paired(app) {
+        let who = app.remote.peer().unwrap_or_else(|| "Your tuner".into());
+        theme::card(ui).stroke(egui::Stroke::new(1.0, p.accent)).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.label(format!("{who} proposed {waiting} edit(s) to this tune."));
+                if ui.button("Review in Remote").clicked() {
+                    app.view = crate::app::View::Remote;
+                }
+            });
+        });
+        ui.add_space(6.0);
+    }
     ui.horizontal_wrapped(|ui| {
         ui.heading("Tune");
         if let Some(t) = &app.tune {
-            let name = t.path.as_ref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned());
+            let name = crate::remote_sync::shared_label(app).or_else(|| {
+                t.path.as_ref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned())
+            });
             let star = if t.is_modified() { " •" } else { "" };
             ui.label(
                 RichText::new(format!("{}{star}", name.unwrap_or_else(|| "(not saved yet)".into()))).strong(),
@@ -173,8 +189,10 @@ fn toolbar(app: &mut XbApp, ui: &mut Ui) {
             app.tune_ui.pick = Some(Pick::Open);
         }
         let live = app.link.live();
+        // On the tuner's side the bike owner shares the tune instead.
+        let can_read = live && app.link.remote.is_none();
         if ui
-            .add_enabled(live && app.tune_ui.read_progress.is_none(), egui::Button::new("Read from ECM"))
+            .add_enabled(can_read && app.tune_ui.read_progress.is_none(), egui::Button::new("Read from ECM"))
             .on_hover_text(
                 "Read and verify the whole EEPROM (read-only); saved as a backup in the images folder",
             )
@@ -204,10 +222,13 @@ fn toolbar(app: &mut XbApp, ui: &mut Ui) {
             };
             crate::burn_view::start(app, mode);
         }
-        if ui.add_enabled(has, egui::Button::new("Save")).clicked() {
+        let may_save = has && !crate::remote_sync::save_blocked(app);
+        let blocked = "The bike owner hasn't allowed saving a copy of their tune";
+        if ui.add_enabled(may_save, egui::Button::new("Save")).on_disabled_hover_text(blocked).clicked() {
             save(app, false);
         }
-        if ui.add_enabled(has, egui::Button::new("Save as…")).clicked() {
+        if ui.add_enabled(may_save, egui::Button::new("Save as…")).on_disabled_hover_text(blocked).clicked()
+        {
             app.tune_ui.pick = Some(Pick::SaveAs);
         }
         ui.separator();
@@ -864,6 +885,9 @@ fn save(app: &mut XbApp, _force_dialog: bool) {
 }
 
 fn do_save(app: &mut XbApp, path: &Path) {
+    if crate::remote_sync::save_blocked(app) {
+        return app.say("The bike owner hasn't allowed saving a copy of their tune.", true);
+    }
     let catalog = app.catalog.clone();
     let r = app.tune.as_mut().expect("open").save(path, &catalog);
     report(app, r.map(|_| format!("Saved {}", path.display())));

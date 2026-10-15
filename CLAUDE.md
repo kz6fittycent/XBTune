@@ -92,7 +92,43 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   Owner check 2026-10-15 (relay deployed, snap 0500293, laptop <->
   desktop): connected twice, wrong code closed the session as intended.
   R1 PASSED. Owner expected remote AFV reset/tests already (that's R4);
-  asked whether to keep R2-R5 order or bring requests forward.
+  owner: keep the R2-R5 order and continue.
+- **Remote R2-R5: built 2026-10-15** (sim-tested with two app instances;
+  NOT yet tried by the owner). App logic `remote_sync.rs`, UI
+  `remote_view.rs`; session passes app messages through
+  (`Command::Send`/`Event::Message`; msg.rs has all R2-R5 types, binary
+  as base64). R2: host forwards raw runtime frames every 250 ms +
+  identity + link info; tuner's views show the host's bike
+  (`LinkView.remote`, status "Remote · <owner>'s bike"); tuner can't
+  connect a local bike while joined. R3: host shares the open tune (new
+  tune = new share); edits sync as absolute byte patches found by diffing
+  a snapshot every frame (any edit path works); tuner's edits are
+  proposals (host Remote panel: Accept/Reject, Tune view banner) or
+  applied at once with the Edit permission (`Tune::apply_patches`, one
+  undo step "Tuner: ..."); tuner's copy = host truth + pending proposals
+  (`Tune::replace_bytes`); after a re-pair the host resends the whole
+  tune and the tuner resends pending proposals; tuner edits made while
+  disconnected are captured first (`guest_capture`). Journal:
+  `~/XBTune/Remote/<stamp>_room<N>/{start.xbt,journal.jsonl}`, Remote view
+  "Last remote session: Open that tune". Saving a copy blocked when the
+  host turns it off (Save/Save as/Ctrl+S/recovery file; tune closed at
+  session end). R4: tuner's Run/Burn/AFV become requests; without
+  permission the host gets a prompt (Review.../Decline/Later) that opens
+  the normal dialog; with permission: function -> 10 s countdown (Stop)
+  -> runs; burn/AFV -> host PrepareBurn (backup) -> review lines to the
+  tuner -> tuner confirms -> countdown -> `burn_view::confirm_remote`
+  with note "burned remotely by <tuner> (permission granted HH:MM)";
+  revoking a permission stops a countdown; results go back as
+  `request_state`. Record requests: Allow/Decline. R5: Logs view "Send to
+  tuner" (192 KB chunks, SHA-256 checked) -> tuner's
+  `~/XBTune/Remote/Logs/`, opened in Logs. Script hook for UI checks:
+  `XBTUNE_SHOT_SCRIPT` (steps in `remote_view::set_script`),
+  `XBTUNE_SHOT_DEMO=1`, code printed as `XBTUNE_REMOTE_CODE=` in
+  screenshot mode only. Scenarios run (two instances, local relay,
+  demo ECM): live dashboard, proposal review/accept + journal, direct
+  burn with countdown (burn.txt note), Stop, request without permission,
+  reviewed test, direct test, AFV, outage mid-edit (3 edits incl. one
+  made while down), no-save tuner, log share (byte-identical).
 - **Factory race ECMs: built 2026-10-15** (owner asked after seeing
   EcmDroid's race support). EcmDroid has no commits after our pin
   `2f17d29f`; its race support is `3c189be` (protocol choice, address

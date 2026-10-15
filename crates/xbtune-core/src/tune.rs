@@ -209,6 +209,49 @@ impl Tune {
         self.set(format!("copy {name} from other image"), &changes)
     }
 
+    /// Write raw byte patches `(offset, new bytes)` as one undoable step
+    /// (remote tuning: an edit from the other side). Out-of-range patches
+    /// are refused before anything changes. Returns the bytes changed.
+    pub fn apply_patches(
+        &mut self,
+        label: impl Into<String>,
+        patches: &[(usize, Vec<u8>)],
+    ) -> Result<usize, TuneError> {
+        let len = self.image.bytes.len();
+        if let Some((o, b)) = patches.iter().find(|(o, b)| o.checked_add(b.len()).is_none_or(|end| end > len))
+        {
+            return Err(TuneError::Other(format!(
+                "edit outside the image ({} bytes at {o}, image {len})",
+                b.len()
+            )));
+        }
+        let mut done = Vec::new();
+        let mut changed = 0;
+        for (offset, new) in patches {
+            let old = self.image.bytes[*offset..offset + new.len()].to_vec();
+            if old != *new {
+                changed += old.iter().zip(new).filter(|(a, b)| a != b).count();
+                self.image.bytes[*offset..offset + new.len()].copy_from_slice(new);
+                done.push(Patch { offset: *offset, old, new: new.clone() });
+            }
+        }
+        if !done.is_empty() {
+            self.undo.push(Edit { label: label.into(), patches: done });
+            self.redo.clear();
+        }
+        Ok(changed)
+    }
+
+    /// Replace the working bytes from outside (remote tuning: follow the
+    /// other side's copy). Undo history no longer fits, so it's cleared.
+    pub fn replace_bytes(&mut self, bytes: Vec<u8>) {
+        if bytes.len() == self.image.bytes.len() && bytes != self.image.bytes {
+            self.image.bytes = bytes;
+            self.undo.clear();
+            self.redo.clear();
+        }
+    }
+
     pub fn can_undo(&self) -> bool {
         !self.undo.is_empty()
     }
@@ -461,6 +504,7 @@ pub fn partner(def: &Definition, name: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     fn owner_tune() -> Tune {
@@ -651,5 +695,25 @@ mod tests {
         assert!(matches!(t.editable(&p0), Err(TuneError::NotEditable(..))));
         assert!(t.editable("Tab_Fuel_Front").is_ok());
         assert!(matches!(t.editable("Nope"), Err(TuneError::NoVar(_))));
+    }
+
+    #[test]
+    fn remote_patches_are_one_undo_step_and_bounded() {
+        let mut t = owner_tune();
+        let len = t.image.bytes.len();
+        assert!(t.apply_patches("bad", &[(len - 1, vec![1, 2])]).is_err());
+        assert!(t.apply_patches("bad", &[(usize::MAX, vec![1])]).is_err());
+        assert!(!t.can_undo());
+        let before = t.image.bytes.clone();
+        assert_eq!(t.apply_patches("Tuner: two cells", &[(10, vec![5, 6]), (20, vec![7])]).unwrap(), 3);
+        assert_eq!(t.undo_label(), Some("Tuner: two cells"));
+        assert_eq!(&t.image.bytes[10..12], &[5, 6]);
+        t.undo();
+        assert_eq!(t.image.bytes, before);
+        let mut other = before.clone();
+        other[3] = 9;
+        t.replace_bytes(other.clone());
+        assert_eq!(t.image.bytes, other);
+        assert!(!t.can_undo() && !t.can_redo());
     }
 }

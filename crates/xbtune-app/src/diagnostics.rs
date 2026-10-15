@@ -215,9 +215,25 @@ pub fn confirm_dialog(app: &mut XbApp, ui: &mut Ui) {
             "The engine is stopped and the bike is safe for this test"
         };
         ui.checkbox(&mut app.diag.safe, check);
+        let remote = crate::remote_sync::guest_live(app);
+        let owner = app.remote.peer().unwrap_or_else(|| "the bike owner".into());
+        let direct = app.remote.guest.perms.tests;
+        if remote {
+            ui.label(
+                RichText::new(if direct {
+                    format!(
+                        "This runs on {owner}'s bike after a 10 s countdown on their side; they can stop it."
+                    )
+                } else {
+                    format!("This asks {owner}: they check the bike and confirm it on their side.")
+                })
+                .color(p.warn),
+            );
+        }
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            let run = egui::Button::new(RichText::new("Run").color(egui::Color32::WHITE)).fill(p.accent);
+            let label = if remote && !direct { "Ask" } else { "Run" };
+            let run = egui::Button::new(RichText::new(label).color(egui::Color32::WHITE)).fill(p.accent);
             if ui.add_enabled(app.diag.safe, run).clicked() {
                 go = true;
             }
@@ -228,6 +244,10 @@ pub fn confirm_dialog(app: &mut XbApp, ui: &mut Ui) {
     });
     if modal.should_close() || cancel {
         app.diag.confirm = None;
+    } else if go && crate::remote_sync::guest_live(app) {
+        app.diag.confirm = None;
+        let kind = xbtune_remote::msg::RequestKind::Function { name: f.label().into() };
+        crate::remote_sync::request(app, kind, String::new());
     } else if go {
         app.diag.confirm = None;
         app.diag.running = Some((f, None));

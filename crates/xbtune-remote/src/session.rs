@@ -48,7 +48,7 @@ pub enum Start {
     Join(Code),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     /// Host: the code to read out to the tuner.
     Code(Code),
@@ -66,6 +66,8 @@ pub enum Event {
         mine: bool,
         text: String,
     },
+    /// Any other message from the other side (live data, tune, requests...).
+    Message(Msg),
     /// Our connection to the relay dropped; trying again.
     Reconnecting {
         reason: String,
@@ -80,6 +82,9 @@ pub enum Event {
 #[derive(Debug, Clone)]
 pub enum Command {
     Chat(String),
+    /// Send an app message (dropped while not paired; the app resends its
+    /// state on the next `Paired`).
+    Send(Box<Msg>),
     End,
     /// Tests: drop the relay connection as an outage would (then rejoin).
     #[doc(hidden)]
@@ -243,7 +248,7 @@ impl Worker {
                 _ = &mut sleep => return false,
                 c = self.commands.recv() => match c {
                     None | Some(Command::End) => return true,
-                    Some(Command::Chat(_) | Command::SimulateDrop) => {}
+                    Some(Command::Chat(_) | Command::Send(_) | Command::SimulateDrop) => {}
                 },
             }
         }
@@ -307,6 +312,12 @@ impl Worker {
                 Ok(Some(ConnEnd::Done("You ended the session.".into(), false)))
             }
             Some(Command::SimulateDrop) => Err(ConnEnd::Lost("simulated outage".into())),
+            Some(Command::Send(m)) => {
+                if link.hello {
+                    self.send_msg(conn, link, &m).await.map_err(|e| ConnEnd::Lost(e.to_string()))?;
+                }
+                Ok(None)
+            }
             Some(Command::Chat(text)) => {
                 if link.hello {
                     let text = msg::clean_chat(&text);
@@ -480,6 +491,10 @@ impl Worker {
             }
             Msg::Bye => Ok(Some(ConnEnd::Done("The other side ended the session.".into(), true))),
             Msg::Unknown => Ok(None),
+            other => {
+                self.out.send(Event::Message(other));
+                Ok(None)
+            }
         }
     }
 }

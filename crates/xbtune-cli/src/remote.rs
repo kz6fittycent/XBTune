@@ -72,6 +72,8 @@ pub async fn remote(cmd: RemoteCmd) -> Result<()> {
                 Some(Event::PeerGone) => println!("The other side dropped out; waiting for them (up to 30 minutes)..."),
                 Some(Event::Chat { mine: false, text }) => println!("> {text}"),
                 Some(Event::Chat { mine: true, .. }) => {}
+                // Live data, tunes and requests are for the app.
+                Some(Event::Message(_)) => {}
                 Some(Event::Reconnecting { reason }) => println!("Connection to the relay lost ({reason}); reconnecting..."),
                 Some(Event::Ended { reason, .. }) => {
                     println!("Session ended: {reason}");

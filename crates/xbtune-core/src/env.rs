@@ -29,6 +29,7 @@ pub const TUNES: &str = "Tunes";
 pub const BACKUPS: &str = "Backups";
 pub const LOGS: &str = "Logs";
 pub const HISTORY: &str = "History";
+pub const REMOTE: &str = "Remote";
 
 /// Where XBTune keeps things.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -81,6 +82,12 @@ impl Dirs {
     /// One folder per burn: before.xbt, after.xbt, burn.txt.
     pub fn history(&self) -> PathBuf {
         self.files.join(HISTORY)
+    }
+
+    /// Remote tuning: one folder per shared tune (start image + edit
+    /// journal), and logs a host shared with this side.
+    pub fn remote(&self) -> PathBuf {
+        self.files.join(REMOTE)
     }
 
     /// The files folder used when none is chosen.

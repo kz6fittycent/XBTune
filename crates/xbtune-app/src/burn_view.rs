@@ -80,6 +80,21 @@ impl BurnUi {
 
 /// Start a burn of `mode`: ask the session to prepare.
 pub fn start(app: &mut XbApp, mode: Mode) {
+    // Tuner's side of a remote session: ask the bike owner's XBTune.
+    if crate::remote_sync::guest_live(app) {
+        match mode {
+            Mode::Tune { .. } if !app.remote.guest.following => app.say(
+                "Burning goes to the bike owner's ECM: go back to the shared tune first (Remote).",
+                true,
+            ),
+            Mode::Tune { .. } => app.remote.guest.ask_burn = Some((false, String::new())),
+            Mode::Afv => app.remote.guest.ask_burn = Some((true, String::new())),
+            Mode::Restore { .. } => {
+                app.say("Restoring a backup can only be done on the bike owner's side.", true)
+            }
+        }
+        return;
+    }
     app.burn = BurnUi::Preparing { mode, progress: 0.0, then_burn: false };
     app.send(Command::PrepareBurn);
 }
@@ -144,6 +159,40 @@ pub fn on_prepared(app: &mut XbApp, backup: Image, path: PathBuf, link: LinkChec
         note: String::new(),
         confirmed: false,
     };
+    crate::remote_sync::on_burn_prepared(app);
+}
+
+/// Remote tuning: the changes the review would write, one line each.
+pub fn review_lines(app: &XbApp) -> Vec<String> {
+    let BurnUi::Review { changes, chosen, .. } = &app.burn else { return Vec::new() };
+    changes
+        .iter()
+        .filter(|c| chosen.contains(&c.name))
+        .map(|c| format!("{}: {} -> {}", c.label, c.ecm, c.tune))
+        .collect()
+}
+
+/// Remote tuning: how many variables the review would write.
+pub fn chosen_count(app: &XbApp) -> usize {
+    match &app.burn {
+        BurnUi::Review { chosen, .. } => chosen.len(),
+        _ => 0,
+    }
+}
+
+/// Remote tuning: the tuner confirmed the review and the host's countdown
+/// ran out. Write what the review had chosen, with `note` in burn.txt.
+pub fn confirm_remote(app: &mut XbApp, note: String) -> bool {
+    if !matches!(app.burn, BurnUi::Review { .. }) {
+        return false;
+    }
+    if let BurnUi::Review { mode, backup, path, chosen, .. } = std::mem::take(&mut app.burn) {
+        if chosen.is_empty() {
+            return false;
+        }
+        burn_now(app, mode, *backup, path, chosen, note);
+    }
+    matches!(app.burn, BurnUi::Burning { .. })
 }
 
 fn burn_now(
@@ -187,6 +236,11 @@ pub fn on_read_progress(app: &mut XbApp, done: usize, total: usize) -> bool {
 }
 
 pub fn on_done(app: &mut XbApp, result: Result<BurnSummary, BurnFailure>) {
+    let text = match &result {
+        Ok(s) => format!("written and verified, {} write(s)", s.report.writes),
+        Err(f) => f.message.clone(),
+    };
+    crate::remote_sync::on_burn_done(app, result.is_ok(), &text);
     let prev = std::mem::take(&mut app.burn);
     app.burn = match (result, prev) {
         (Ok(s), _) => BurnUi::Done(s),

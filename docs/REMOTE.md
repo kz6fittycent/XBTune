@@ -220,7 +220,6 @@ The name is what the other side sees ("Requested by Dave").
 | R3 | `op` | g -> h | proposed edit: `{id, var, cells, op}` with the same ops as `Tune::apply_op` |
 | R3 | `applied` | h -> g | host accepted: `{seq, op, by}`; every accepted edit, host's own included |
 | R3 | `rejected` | h -> g | `{id, reason}` |
-| R3 | `sync` | g -> h | "I have up to seq N" after a reconnect |
 | R3 | `permissions` | h -> g | `{edit, burn, tests}` whenever they change |
 | R4 | `request` | g -> h | `{id, kind: burn\|test\|reset\|clear_codes\|record, vars?, note?, test?, direct}`; `direct: true` = run under a permission, after the host's countdown |
 | R4 | `burn_review` | h -> g | the host's prepared backup/diff for a direct burn, for the tuner's review |
@@ -234,12 +233,14 @@ The name is what the other side sees ("Requested by Dave").
   as `applied`; the guest's copy follows `applied` in order.
 - **Journal:** the host appends every `applied` op to
   `~/XBTune/Remote/<date>_<room>/journal.jsonl` and flushes it before
-  sending, together with the starting image (`start.xbt`). After a crash
-  the host can replay it ("Recover the remote session's edits?").
-- **Drops:** the guest keeps its last `seq`; after a rejoin it sends
-  `sync`, and the host resends the missed `applied` ops (or the whole
-  `tune` if more than 500 behind). Unconfirmed guest proposals are resent
-  with the same `id` (the host ignores duplicates).
+  sending, together with the starting image (`start.xbt`). After a crash the Remote view offers
+  "Last remote session: Open that tune" (start + every edit).
+- **Drops:** after a re-pair the host resends the whole `tune` (a few KB,
+  simpler than replaying ops); the guest re-applies its unconfirmed
+  proposals on top and resends them with the same `id`. Patches carry
+  absolute bytes, so applying one twice changes nothing. Edits the tuner
+  made while the link was down are captured before the resent tune
+  replaces its copy. (Built 2026-10-15; the `sync` message was dropped.)
 - **Undo** on the host undoes the last op (journaled as an op too).
 - **Files:** the host's tune file changes only on the host's Save
   (temp + rename, as today). Burning uses the host's working copy and the

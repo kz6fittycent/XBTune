@@ -197,6 +197,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     // Loaded logs.
     let mut close = None;
     let mut play = None;
+    let mut share: Option<PathBuf> = None;
     theme::card(ui).show(ui, |ui| {
         ui.set_width(ui.available_width());
         egui::Grid::new("logs").num_columns(5).spacing([14.0, 4.0]).show(ui, |ui| {
@@ -214,6 +215,14 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 } else if b.clicked() {
                     play = Some(i);
                 }
+                if crate::remote_sync::host_paired(app)
+                    && ui
+                        .small_button("Send to tuner")
+                        .on_hover_text("Send this log to your remote tuner")
+                        .clicked()
+                {
+                    share = Some(l.log.path.clone());
+                }
                 if ui.small_button("Close").clicked() {
                     close = Some(i);
                 }
@@ -223,6 +232,9 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     });
     if let Some(i) = play {
         start_playback(app, i);
+    }
+    if let Some(p) = share {
+        crate::remote_sync::share_log(app, &p);
     }
     if let Some(i) = close {
         if app.logs.play.as_ref().is_some_and(|pb| pb.log == i) {

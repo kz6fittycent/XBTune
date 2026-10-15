@@ -158,3 +158,28 @@ async fn a_side_one_epoch_behind_catches_up() {
     let got = until(&mut h, |e| matches!(e, Event::Chat { mine: false, .. })).await;
     assert_eq!(got, Event::Chat { mine: false, text: "caught up".into() });
 }
+
+#[tokio::test]
+async fn app_messages_pass_through_in_order() {
+    use xbtune_remote::msg::{B64, FrameMsg, Msg};
+    let relay = LocalRelay::start("127.0.0.1:0").await.unwrap();
+    let mut h = session::start(cfg(&relay, "Owner"), Start::Host, None);
+    let code = host_code(&mut h).await;
+    let mut g = session::start(cfg(&relay, "Tuner"), Start::Join(code), None);
+    paired(&mut h).await;
+    paired(&mut g).await;
+    for i in 0..50u8 {
+        let m = Msg::Frames { frames: vec![FrameMsg { t: f64::from(i), raw: B64(vec![i; 107]) }] };
+        h.send(Command::Send(Box::new(m)));
+    }
+    // A big one (a shared log chunk) too.
+    let big = Msg::LogChunk { id: 1, index: 0, data: B64(vec![7; xbtune_remote::msg::LOG_CHUNK]) };
+    h.send(Command::Send(Box::new(big.clone())));
+    for i in 0..50u8 {
+        match until(&mut g, |e| matches!(e, Event::Message(_))).await {
+            Event::Message(Msg::Frames { frames }) => assert_eq!(frames[0].raw.0, vec![i; 107]),
+            e => panic!("{e:?}"),
+        }
+    }
+    assert_eq!(until(&mut g, |e| matches!(e, Event::Message(_))).await, Event::Message(big));
+}

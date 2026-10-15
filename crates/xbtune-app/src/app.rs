@@ -51,6 +51,8 @@ pub struct LinkView {
     pub hz: f64,
     pub reconnects: u32,
     pub log: Option<(PathBuf, u64)>,
+    /// Remote tuning: the bike owner whose bike this is (tuner's side).
+    pub remote: Option<String>,
 }
 
 impl LinkView {
@@ -217,7 +219,10 @@ impl XbApp {
             if let Ok(path) = std::env::var("XBTUNE_SHOT_SERIAL") {
                 // UI checks against a pty simulator (`xbtune-sim --ecm ID`).
                 app.start(SavedTarget::Serial { path, race });
-            } else if view != "connect" && view != "remote" && std::env::var_os("XBTUNE_SHOT_LOGS").is_none()
+            } else if (view != "connect"
+                && view != "remote"
+                && std::env::var_os("XBTUNE_SHOT_LOGS").is_none())
+                || std::env::var_os("XBTUNE_SHOT_DEMO").is_some()
             {
                 app.start(SavedTarget::Demo { race });
             }
@@ -228,6 +233,9 @@ impl XbApp {
                 Ok("guide") => crate::remote_view::open_guide(&mut app),
                 Ok(j) if j.starts_with("join:") => crate::remote_view::join(&mut app, &j[5..]),
                 _ => {}
+            }
+            if let Ok(script) = std::env::var("XBTUNE_SHOT_SCRIPT") {
+                crate::remote_view::set_script(&mut app, &script);
             }
             if let Ok(chat) = std::env::var("XBTUNE_SHOT_REMOTE_CHAT") {
                 crate::remote_view::queue_chat(&mut app, chat);
@@ -364,6 +372,13 @@ impl XbApp {
 
     /// Start a live session to `target`.
     pub fn start(&mut self, target: SavedTarget) {
+        if crate::remote_sync::is_guest(self) {
+            let owner = self.remote.peer().unwrap_or_else(|| "the bike owner".into());
+            return self.say(
+                format!("You're in a remote session with {owner}: end it (Remote) before connecting to a bike here."),
+                true,
+            );
+        }
         crate::logs_view::stop_playback(self);
         self.stop();
         let (opener, label): (session::Opener, String) = match &target {
@@ -472,7 +487,7 @@ impl XbApp {
 
     /// Unsaved edits at exit go to a recovery file.
     fn save_recovery(&mut self) {
-        if self.shot.is_some() {
+        if self.shot.is_some() || crate::remote_sync::save_blocked(self) {
             return;
         }
         let Some(t) = &mut self.tune else { return };
@@ -558,12 +573,24 @@ impl XbApp {
         self.send(Command::SetPermits { permit, write_permit });
     }
 
+    /// Burn buttons usable. On the tuner's side of a remote session they
+    /// send requests instead (the bike owner's side decides).
     pub fn writes_permitted(&self) -> bool {
-        self.write_permitted
+        self.write_permitted || crate::remote_sync::guest_live(self)
     }
 
+    /// Test/reset buttons usable (requests on the tuner's side).
     pub fn session_permitted(&self) -> bool {
-        self.permitted
+        self.permitted || crate::remote_sync::guest_live(self)
+    }
+
+    pub fn session_active(&self) -> bool {
+        self.session.is_some()
+    }
+
+    /// Keep unsaved edits before something replaces the open tune.
+    pub fn save_recovery_now(&mut self) {
+        self.save_recovery();
     }
 
     pub fn is_demo(&self) -> bool {
@@ -641,7 +668,10 @@ impl XbApp {
                     self.link.channels = channels(&id.definition);
                     self.link.identity = Some(id);
                 }
-                Event::Sample(s) => self.history.push(s),
+                Event::Sample(s) => {
+                    crate::remote_sync::on_sample(self, &s);
+                    self.history.push(s)
+                }
                 Event::Stats { stats, hz, reconnects, log_rows } => {
                     self.link.stats = Some(stats);
                     self.link.hz = hz;
@@ -662,6 +692,12 @@ impl XbApp {
                     self.diag.running = Some((function, Some(stage)))
                 }
                 Event::FunctionDone { function, result } => {
+                    let text = match &result {
+                        Ok(o) if o.acknowledged => String::new(),
+                        Ok(_) => format!("{}: ran (reply lost, the ECM showed it busy)", function.label()),
+                        Err(e) => e.clone(),
+                    };
+                    crate::remote_sync::on_function_done(self, result.is_ok(), text);
                     self.diag.running = None;
                     self.diag.last = Some((function, result));
                 }
@@ -935,6 +971,18 @@ impl XbApp {
 }
 
 fn status_text(link: &LinkView, p: &Palette) -> (Color32, String) {
+    if let Some(owner) = &link.remote {
+        let id = link
+            .identity
+            .as_ref()
+            .map(|i| format!(" · {} · {}", i.version.trim(), i.ecm.family))
+            .unwrap_or_default();
+        return match &link.state {
+            Some(LinkState::Live) => (p.good, format!("Remote · {owner}'s bike{id}")),
+            Some(_) => (p.warn, format!("Remote · {owner}'s bike: link down{id}")),
+            None => (p.muted, format!("Remote · {owner} isn't connected to the bike")),
+        };
+    }
     let target = link.target.as_ref().map(|t| t.label()).unwrap_or_default();
     match &link.state {
         None | Some(LinkState::Stopped { .. }) => (p.muted, "Not connected".into()),
@@ -1002,6 +1050,7 @@ impl eframe::App for XbApp {
             });
         crate::burn_view::show(self, ui);
         crate::autotune_view::show(self, ui);
+        crate::remote_view::dialogs(self, ui);
         // One dialog at a time: a report (or crash offer) before the guide.
         if self.report.is_open() {
             crate::report_view::show(self, ui);

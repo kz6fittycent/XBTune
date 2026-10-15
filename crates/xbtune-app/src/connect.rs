@@ -89,6 +89,19 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         );
         ui.add_space(8.0);
 
+        if crate::remote_sync::is_guest(app) {
+            let owner = app.remote.peer().unwrap_or_else(|| "the bike owner".into());
+            theme::card(ui).stroke(egui::Stroke::new(1.0, p.accent)).show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.label(RichText::new(format!("Remote session with {owner}")).font(theme::strong_font(15.0)));
+                ui.label(
+                    RichText::new("You see their bike. To connect to a bike here, end the remote session first.")
+                        .color(p.muted),
+                );
+            });
+            ui.add_space(8.0);
+        }
+
         let missing: Vec<_> = app.plugs.iter().filter(|s| s.connected == Some(false)).cloned().collect();
         if !missing.is_empty() {
             theme::card(ui).stroke(egui::Stroke::new(1.0, p.warn)).show(ui, |ui| {
