@@ -540,6 +540,31 @@ snap: xbtune_0.1.0+git8a55efa_amd64.snap). Resume here.
    phase 8 remote tuning (see "Phase plan"; write docs/REMOTE.md first),
    only on the owner's go; then phase 9 polish + release.
 
+## Remote tuning checklist (R2-R5; laptop = bike owner, desktop = tuner)
+
+Both on the same snap. Laptop: connect to the BuellTooth, open a tune
+(Tune -> Read from ECM or a backup), Remote -> Start session; desktop:
+Remote -> Join.
+1. R2: desktop Dashboard/Charts move with the bike; header "Remote ·
+   <owner>'s bike". Laptop Disconnect -> desktop shows not connected.
+2. R3: desktop Tune shows "(shared by ...)". Change a value -> laptop
+   Remote shows the proposal (and a Tune banner); Accept -> desktop's
+   value stays, laptop Undo puts it back on both. Reject -> desktop's
+   value goes back. Laptop edits appear on the desktop. Tick "Edit the
+   tune directly" -> desktop edits land at once. Desktop Wi-Fi off,
+   edit, Wi-Fi on -> the edit arrives.
+3. R4 (engine off, ignition on): desktop Diagnostics -> Fan -> Ask ->
+   laptop prompt -> Review... -> normal confirm -> runs; desktop sees
+   "done". Tick "Run tests and resets" -> desktop Fan -> Run -> laptop
+   10 s countdown; press Stop once, let it run once. Burn: with writes
+   unlocked on the laptop and "Burn" ticked, desktop changes
+   KRPM_Hard_Hi, Tune -> Burn to ECM... -> Start -> desktop reviews ->
+   Burn -> laptop countdown -> written and verified; burn.txt says who.
+   Restore it from the laptop (Restore backup or burn 7500 back).
+4. R5: laptop Logs -> open a log -> Send to tuner -> desktop Logs shows it.
+5. End session on either side; desktop with "Save a copy" off: Save is
+   greyed and the tune closes at the end.
+
 ## Phase 7 checklist (no ECM writes)
 
 1. Warm the engine fully, then Record a log of steady riding: hold
