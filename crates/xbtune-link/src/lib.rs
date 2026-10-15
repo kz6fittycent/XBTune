@@ -63,6 +63,16 @@ impl OpenError {
             }
         }
     }
+
+    /// True if the OS says the device is busy (EBUSY). On RFCOMM this is
+    /// BlueZ still holding the old link after the adapter lost power (the
+    /// ignition was switched off): it clears by itself within ~20 s.
+    pub fn is_busy(&self) -> bool {
+        match self {
+            Self::Io { source, .. } => source.raw_os_error() == Some(libc::EBUSY),
+            Self::Serial { .. } => false,
+        }
+    }
 }
 
 /// Open a transport.

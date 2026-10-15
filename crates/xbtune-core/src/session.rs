@@ -52,6 +52,12 @@ pub fn open_error_text(target: &Target, e: &OpenError) -> String {
     };
     if e.is_permission_denied() {
         format!("{e}\n\n{}", crate::env::permission_hint(plug))
+    } else if e.is_busy() && matches!(target, Target::Rfcomm { .. }) {
+        format!(
+            "{e}\n\nBluetooth is still closing the last connection (usually because the adapter lost \
+             power: ignition off). XBTune keeps trying; it clears within about 20 seconds once the \
+             ignition is on."
+        )
     } else if let Target::Rfcomm { address, .. } = target {
         format!(
             "{e}\n\nIs the adapter powered (ignition on) and paired? To pair:\n    \
@@ -355,7 +361,6 @@ impl Worker {
             if self.cfg.max_reconnects.is_some_and(|m| failed_in_a_row > m) {
                 return Some(format!("gave up after {} failed reconnects: {reason}", failed_in_a_row - 1));
             }
-            info!(%reason, "link lost; reconnecting");
             self.reconnects += 1;
             let max = self.cfg.reconnect_delay;
             let delay = (max / 8).saturating_mul(1 << (failed_in_a_row - 1).min(3)).min(max);
@@ -751,7 +756,6 @@ impl Worker {
             Ok(o) => format!("{}: done after {:.1} s", f.label(), o.busy_for.as_secs_f64()),
             Err(e) => format!("{}: {e}", f.label()),
         };
-        tracing::info!("{what}");
         self.log_event(&what);
         self.out.send(Event::FunctionDone { function: f, result });
     }
@@ -801,7 +805,9 @@ impl Worker {
     }
 
     /// Note a link event in the log as a `# event:` line.
+    /// A note for the app log, and for the CSV data log when recording.
     fn log_event(&mut self, what: &str) {
+        info!("{what}");
         let t = self.started.elapsed().as_secs_f64();
         let Some(log) = &mut self.log else { return };
         if let Err(e) = log.writer.event(t, what) {

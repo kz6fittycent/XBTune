@@ -535,7 +535,8 @@ impl XbApp {
         for e in events {
             match e {
                 Event::State(st) => {
-                    if !matches!(st, LinkState::Connecting { .. }) {
+                    // Reconnects are logged by the session, with their reason.
+                    if !matches!(st, LinkState::Connecting { .. } | LinkState::Reconnecting { .. }) {
                         tracing::info!(state = ?st, "link");
                     }
                     match &st {

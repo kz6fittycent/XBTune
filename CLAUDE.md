@@ -35,9 +35,13 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   verified) differ in exactly 1 byte (0x01d2). Second burn 16:41:52 put
   7500 back. History folders checked: each burn 1 chunk/16 bytes on page 2,
   1 byte changed; ECM between burns == burn 1's after; final ECM ==
-  original (all 1210 bytes). Round trip on the bike confirmed. Top bar
-  showed 11 reconnects that session, 0% errors: timing unknown (app.log not
-  sent). AFV reset not yet tried on the bike. Idea offered: burn.txt could
+  original (all 1210 bytes). Round trip on the bike confirmed. The 11
+  reconnects (owner's app.log): two outages of ~20 s, each starting ~10 s
+  after a burn (16:40:27, 16:42:02), i.e. the owner switching the ignition
+  off/on as the checklist says; then BlueZ returned EBUSY on RFCOMM connect
+  until the old link timed out, and the app reconnected by itself. Not a
+  fault. Since then: EBUSY gets its own message (no pairing advice), and
+  session notes (burn steps, reconnects, failed requests) go to app.log. AFV reset not yet tried on the bike. Idea offered: burn.txt could
   list changed variables and "verified: yes".
   EEPROM writes are LOCKED on real hardware by their own key
   (`eeprom_writes = true` in hardware.toml), separate from `ecm_commands`.
