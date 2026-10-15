@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! Core logic shared by the CLI and the app.
 //!
+//! - [`burn`]: writing changes to the ECM, verified (KICKOFF §6).
 //! - [`diag`]: trouble codes, active tests, TPS reset (guarded by a permit).
 //! - [`env`]: snap detection, storage locations, plug checks.
 //! - [`image`]: EEPROM images and their file formats (`.xbt`, EcmDroid `.xpr`).
@@ -10,6 +11,7 @@
 //! - [`tune`]: offline editing with undo/redo.
 //! - [`time`]: UTC timestamps without extra dependencies.
 
+pub mod burn;
 pub mod diag;
 pub mod env;
 pub mod image;

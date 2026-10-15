@@ -75,6 +75,17 @@ pub enum Fault {
     LoseRequest,
 }
 
+/// How the simulated EEPROM takes writes (for testing the burn path).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum WriteFault {
+    #[default]
+    None,
+    /// ACK the write but don't store it.
+    Ignore,
+    /// Store it with the lowest bit of the first byte flipped.
+    FlipBit,
+}
+
 /// Random faults, as probabilities per reply (0.0..=1.0).
 #[derive(Debug, Clone, Default)]
 pub struct FaultRates {
@@ -157,6 +168,9 @@ pub struct Simulator {
     /// for tests.
     engine: Option<(engine::Engine, Instant, Option<f64>)>,
     engine_running: bool,
+    write_fault: WriteFault,
+    /// After this many more writes, the ECM goes silent (power cut).
+    writes_left: Option<usize>,
     /// Busy (state 1) until then, after a test command.
     busy_until: Option<Instant>,
     pub journal: Journal,
@@ -189,6 +203,8 @@ impl Simulator {
             flips: 0,
             engine: None,
             engine_running: true,
+            write_fault: WriteFault::None,
+            writes_left: None,
             busy_until: None,
             journal: Journal::default(),
         }
@@ -211,6 +227,21 @@ impl Simulator {
     pub fn with_engine(mut self, def: Arc<xbtune_defs::Definition>) -> Self {
         self.engine = Some((engine::Engine::new(def), Instant::now(), None));
         self
+    }
+
+    pub fn set_write_fault(&mut self, f: WriteFault) {
+        self.write_fault = f;
+    }
+
+    /// Go silent after `n` more EEPROM writes (`None`: never).
+    pub fn cut_power_after_writes(&mut self, n: Option<usize>) {
+        self.writes_left = n;
+    }
+
+    /// Change EEPROM bytes behind the host's back (the ECM storing AFV,
+    /// codes, ...).
+    pub fn poke(&mut self, at: usize, bytes: &[u8]) {
+        self.image[at..at + bytes.len()].copy_from_slice(bytes);
     }
 
     /// Start or stop the made-up engine (stopped: ignition on, RPM 0).
@@ -265,6 +296,9 @@ impl Simulator {
     /// Handle one decoded frame. Returns what to send back.
     pub fn respond(&mut self, frame: &Pdu) -> Vec<Emission> {
         if !frame.is_request_to(self.cfg.address) {
+            return Vec::new();
+        }
+        if self.writes_left == Some(0) {
             return Vec::new();
         }
         self.journal.requests += 1;
@@ -339,8 +373,19 @@ impl Simulator {
             [CMD_SET, offset, page, data @ ..] if !data.is_empty() => {
                 match self.map(*page, *offset, data.len()) {
                     Some(r) => {
-                        self.image[r].copy_from_slice(data);
+                        match self.write_fault {
+                            WriteFault::None => self.image[r].copy_from_slice(data),
+                            WriteFault::Ignore => {}
+                            WriteFault::FlipBit => {
+                                let start = r.start;
+                                self.image[r].copy_from_slice(data);
+                                self.image[start] ^= 1;
+                            }
+                        }
                         self.journal.writes.push((*page, *offset, data.to_vec()));
+                        if let Some(n) = &mut self.writes_left {
+                            *n = n.saturating_sub(1);
+                        }
                         self.reply(ACK, &[])
                     }
                     None => self.reply(SIM_NAK, &[]),
