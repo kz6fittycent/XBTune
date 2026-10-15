@@ -245,7 +245,7 @@ fn set_and_copy_table_edit_files_only() {
         cli(&["set", base.to_str().unwrap(), "Tab_Fuel_Front[12,0]=1", "-o", tmp("x.xbt").to_str().unwrap()]);
     assert!(!ok && out.contains("outside"), "{out}");
     // Copy the map back from the original: only the rev limit differs then.
-    let back = tmp("back.xbt");
+    let back = tmp("copied-back.xbt");
     let (ok, out) = cli(&[
         "copy-table",
         base.to_str().unwrap(),
