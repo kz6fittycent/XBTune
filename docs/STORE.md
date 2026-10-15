@@ -1,5 +1,8 @@
 # Snap Store notes
 
+The name `xbtune` was registered by the owner on 2026-10-14 (reserved only;
+nothing has been uploaded).
+
 Nothing is uploaded until the repo can go public (KICKOFF §2 and the
 ecmdroid.db question in `PROVENANCE.md`). The publishing workflows are
 switched off by the `XBTUNE_STORE_PUBLISH` repository variable.
