@@ -158,7 +158,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                         "Once connected, open Tune and click Read from ECM. XBTune reads the whole EEPROM \
                      twice to check it, then saves it in:",
                     );
-                    let mut dir = crate::tune_view::images_dir().display().to_string();
+                    let mut dir = crate::tune_view::tunes_dir().display().to_string();
                     ui.add(
                         egui::TextEdit::singleline(&mut dir)
                             .font(egui::TextStyle::Monospace)
@@ -166,7 +166,8 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     );
                     ui.label(
                         "Keep that file somewhere safe as well (a USB stick, cloud storage). It's your way \
-                     back to how the bike is today.",
+                     back to how the bike is today. Backups before burns, data logs and burn history go \
+                     next to it; Settings can move them all to another folder.",
                     );
                 }
                 _ => {

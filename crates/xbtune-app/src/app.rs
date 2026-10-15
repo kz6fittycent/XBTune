@@ -218,6 +218,17 @@ impl XbApp {
                 _ => View::Dashboard,
             };
         }
+        // Files from before the visible files folder existed move there once.
+        if let Some(d) = xbtune_core::env::Dirs::detect() {
+            let moved = xbtune_core::env::move_old_layout(&d);
+            if moved.files > 0 {
+                tracing::info!(files = moved.files, to = %d.files.display(), "moved earlier files");
+                app.say(format!("Your tunes, backups and logs now live in {}", d.files.display()), false);
+            }
+            for (path, why) in &moved.skipped {
+                tracing::warn!(path = %path.display(), why, "file not moved");
+            }
+        }
         // A crash last time comes first; the guide waits for the next start.
         if let Some(c) = crash.clone()
             && app.shot.is_none()
@@ -235,6 +246,10 @@ impl XbApp {
                     .zip([Some(true), Some(false), None])
                     .map(|(&(plug, purpose), connected)| PlugState { plug, purpose, connected })
                     .collect();
+            }
+            // XBTUNE_SHOT_FOLDER=<dir>: the files-folder picker there.
+            if let Some(dir) = std::env::var_os("XBTUNE_SHOT_FOLDER") {
+                app.settings_ui.pick_folder(dir.into());
             }
             // XBTUNE_SHOT_UNLOCK=commands|writes: the unlock confirmation.
             if let Ok(which) = std::env::var("XBTUNE_SHOT_UNLOCK") {
@@ -360,7 +375,7 @@ impl XbApp {
     /// A verified read from the ECM: save it as a backup, then open it (or,
     /// with unsaved edits open, offer it for comparison).
     fn got_eeprom(&mut self, img: xbtune_core::image::Image) {
-        let path = crate::tune_view::images_dir().join(format!(
+        let path = crate::tune_view::tunes_dir().join(format!(
             "{}_{}.xbt",
             img.ecm_id,
             xbtune_core::time::file_stamp(SystemTime::now())
@@ -394,7 +409,7 @@ impl XbApp {
         if !t.is_modified() {
             return;
         }
-        let path = crate::tune_view::images_dir().join(format!(
+        let path = crate::tune_view::tunes_dir().join(format!(
             "recovered_{}_{}.xbt",
             t.ecm.id,
             xbtune_core::time::file_stamp(SystemTime::now())
@@ -403,6 +418,44 @@ impl XbApp {
         if let Err(e) = t.save(&path, &catalog) {
             tracing::warn!(error = %e, "could not save recovery file");
         }
+    }
+
+    /// Use `dir` for the user's files (`None`: the default), moving what's
+    /// in the current folder there if asked. Errors are for the dialog.
+    pub fn set_files_folder(&mut self, dir: Option<PathBuf>, move_existing: bool) -> Result<(), String> {
+        use xbtune_core::env;
+        let d = env::Dirs::detect().ok_or("no home folder")?;
+        let target = dir.clone().or_else(|| d.default_files()).ok_or("no home folder")?;
+        if target == d.files {
+            return Ok(());
+        }
+        if move_existing && (target.starts_with(&d.files) || d.files.starts_with(&target)) {
+            return Err("Pick a folder that isn't inside the current one (or the other way round), \
+                        or untick moving the files."
+                .into());
+        }
+        // The default is stored as "no choice", so it follows the home folder.
+        let store = if Some(&target) == d.default_files().as_ref() { None } else { Some(target.as_path()) };
+        env::check_writable(&target)
+            .map_err(|e| format!("XBTune can't write to {}: {e}", target.display()))?;
+        env::set_files_dir(&d.config, store).map_err(|e| format!("Couldn't save the setting: {e}"))?;
+        let mut note = String::new();
+        if move_existing {
+            let moved = env::move_files(&env::folder_pairs(&d.files, &target));
+            for (path, why) in &moved.skipped {
+                tracing::warn!(path = %path.display(), why, "file not moved");
+            }
+            note = format!(" (moved {} file(s)", moved.files);
+            if !moved.skipped.is_empty() {
+                note.push_str(&format!(", {} left in the old folder: see the log", moved.skipped.len()));
+            }
+            note.push(')');
+        }
+        tracing::info!(from = %d.files.display(), to = %target.display(), "files folder changed");
+        self.say(format!("Your files now go to {}{note}", target.display()), false);
+        self.tune_ui.dir = target.join(env::TUNES);
+        self.send(Command::SetStore(target));
+        Ok(())
     }
 
     /// The owner changed a safety lock in Settings: save it and apply it to
@@ -698,8 +751,13 @@ impl XbApp {
                 .corner_radius(8)
                 .inner_margin(10)
                 .show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(&m.text);
+                    // The text wraps (long paths) and leaves room for Dismiss.
+                    ui.horizontal_top(|ui| {
+                        let w = (ui.available_width() - 90.0).max(100.0);
+                        ui.allocate_ui(egui::vec2(w, 0.0), |ui| {
+                            ui.set_width(w);
+                            ui.add(egui::Label::new(&m.text).wrap());
+                        });
                         ui.with_layout(Layout::right_to_left(Align::TOP), |ui| {
                             if ui.small_button("Dismiss").clicked() {
                                 dismiss = Some(i);

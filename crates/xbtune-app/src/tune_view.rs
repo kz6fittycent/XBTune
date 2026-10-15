@@ -34,7 +34,7 @@ pub struct TuneUi {
     mode: CellMode,
     clip: Option<Clip>,
     pub pick: Option<Pick>,
-    dir: PathBuf,
+    pub dir: PathBuf,
     file_name: String,
     /// Open/compare a file the user picked while there were unsaved edits.
     confirm_discard: Option<PathBuf>,
@@ -55,7 +55,7 @@ impl Default for TuneUi {
             mode: CellMode::Values,
             clip: None,
             pick: None,
-            dir: images_dir(),
+            dir: tunes_dir(),
             file_name: String::new(),
             confirm_discard: None,
             read_progress: None,
@@ -64,17 +64,19 @@ impl Default for TuneUi {
     }
 }
 
-/// Where images read from the ECM are kept.
-pub fn images_dir() -> PathBuf {
-    xbtune_core::env::Dirs::detect().map(|d| d.data.join("images")).unwrap_or_else(|| PathBuf::from("."))
+/// Where tunes read from the ECM are kept (`<files>/Tunes`).
+pub fn tunes_dir() -> PathBuf {
+    xbtune_core::env::Dirs::detect().map(|d| d.tunes()).unwrap_or_else(|| PathBuf::from("."))
+}
+
+/// Backups taken before burns (`<files>/Backups`).
+pub fn backups_dir() -> PathBuf {
+    xbtune_core::env::Dirs::detect().map(|d| d.backups()).unwrap_or_else(|| PathBuf::from("."))
 }
 
 /// The user's real home folder (in the snap, `$HOME` is per-snap).
 fn home_dir() -> PathBuf {
-    std::env::var_os("SNAP_REAL_HOME")
-        .or_else(|| std::env::var_os("HOME"))
-        .map(PathBuf::from)
-        .unwrap_or_default()
+    xbtune_core::env::real_home().unwrap_or_default()
 }
 
 /// (rows, cols) of the grid shown for a variable, and how a cell maps to
@@ -903,7 +905,7 @@ fn file_dialog(app: &mut XbApp, ui: &mut Ui) {
         ui.set_width(560.0);
         ui.label(RichText::new(title).font(theme::strong_font(18.0)));
         ui.horizontal_wrapped(|ui| {
-            for (label, dir) in [("Images", images_dir()), ("Home", home_dir())] {
+            for (label, dir) in [("Tunes", tunes_dir()), ("Backups", backups_dir()), ("Home", home_dir())] {
                 if ui.small_button(label).clicked() {
                     app.tune_ui.dir = dir;
                 }

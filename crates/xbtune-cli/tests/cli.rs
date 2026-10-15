@@ -310,6 +310,6 @@ fn burn_restore_and_afv_reset_on_sim() {
     let (ok, out) = cli(&a);
     assert!(!ok && out.contains("writing refused"), "{out}");
     // Backups and history went to the scratch home.
-    assert!(home().join("data/backups").read_dir().unwrap().count() >= 3);
-    assert!(home().join("data/history").read_dir().unwrap().count() >= 2);
+    assert!(home().join("files/Backups").read_dir().unwrap().count() >= 3);
+    assert!(home().join("files/History").read_dir().unwrap().count() >= 2);
 }

@@ -269,7 +269,17 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 - Bluetooth uses a direct RFCOMM socket (default channel 1, `--channel`).
   Discovery and pairing state come over D-Bus (bluer). No SDP lookup yet;
   if BuellTooth isn't on channel 1, add SDP via a BlueZ Profile.
-- Snap stores everything under `$SNAP_USER_COMMON` (`xbtune_core::env::Dirs`).
+- Storage (`xbtune_core::env::Dirs`), changed 2026-10-15 at the owner's
+  request: the user's files go in a visible folder, `~/XBTune` (real home,
+  `$SNAP_REAL_HOME`) by default or chosen in Settings (`<config>/folders.toml`,
+  CLI reads it too), with `Tunes/ Backups/ Logs/ History/`. XBTune's own
+  files (settings, hardware.toml, app log, pending reports) stay in
+  `$SNAP_USER_COMMON/{config,data}`. This amends KICKOFF §3's "data under
+  $SNAP_USER_COMMON": ~/XBTune also survives refreshes and reverts (and
+  removal). Old `<data>/{images,backups,logs,history}` move over once at
+  start (app and CLI; never overwrite; `env::move_old_layout`). Changing
+  the folder can move the files too and sends `Command::SetStore`.
+  `XBTUNE_HOME` -> `$XBTUNE_HOME/files`. Hook: `XBTUNE_SHOT_FOLDER=<dir>`.
 - Snap apps: `xbtune` (GUI, gnome extension), `xbtune.cli`, `xbtune.sim`.
 - Snap build does NOT use the rust plugin: the gnome extension's
   LD_LIBRARY_PATH (SDK libc) breaks host rustup/cargo, and snapd 2.76 in the

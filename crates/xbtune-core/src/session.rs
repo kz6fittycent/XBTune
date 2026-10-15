@@ -91,7 +91,7 @@ pub struct SessionConfig {
     pub read_timeout: Duration,
     /// Allows burns; `None` refuses them.
     pub write_permit: Option<crate::diag::WritePermit>,
-    /// Where burn backups (`backups/`) and history (`history/`) go.
+    /// The files folder: burn backups go in `Backups/`, records in `History/`.
     pub store: Option<PathBuf>,
     pub link_limits: crate::burn::LinkLimits,
     pub function_timing: crate::diag::FunctionTiming,
@@ -110,7 +110,7 @@ impl SessionConfig {
             permit: None,
             read_timeout: RetryPolicy::default().timeout,
             write_permit: None,
-            store: crate::env::Dirs::detect().map(|d| d.data),
+            store: crate::env::Dirs::detect().map(|d| d.files),
             link_limits: crate::burn::LinkLimits::default(),
             function_timing: crate::diag::FunctionTiming::default(),
         }
@@ -138,6 +138,9 @@ pub enum Command {
         target: Box<crate::image::Image>,
         note: String,
     },
+    /// The files folder changed (app Settings): backups and burn history
+    /// go to the new one from now on.
+    SetStore(PathBuf),
     /// The owner changed the unlocks (app Settings): replace both permits.
     SetPermits {
         permit: Option<crate::diag::Permit>,
@@ -391,6 +394,10 @@ impl Worker {
                     self.out.send(Event::ReadFailed("cancelled".into()));
                 }
             }
+            Command::SetStore(dir) => {
+                info!(dir = %dir.display(), "files folder changed");
+                self.cfg.store = Some(dir);
+            }
             Command::SetPermits { permit, write_permit } => {
                 info!(commands = permit.is_some(), writes = write_permit.is_some(), "permits changed");
                 self.cfg.permit = permit;
@@ -539,7 +546,7 @@ impl Worker {
             .store
             .clone()
             .ok_or("no folder to keep the backup in, so nothing will be written")?
-            .join("backups");
+            .join(crate::env::BACKUPS);
         let path = crate::time::unique_path(
             &dir,
             &format!("{}_{}_before-burn", id.ecm.id, crate::time::file_stamp(now)),
@@ -641,7 +648,7 @@ impl Worker {
     ) -> Option<PathBuf> {
         let now = SystemTime::now();
         let dir = crate::time::unique_path(
-            &self.cfg.store.as_ref()?.join("history"),
+            &self.cfg.store.as_ref()?.join(crate::env::HISTORY),
             &format!("{}_{}", after.ecm_id, crate::time::file_stamp(now)),
             "",
         );
@@ -1069,7 +1076,7 @@ mod tests {
         let mut s = burn_session(sim.clone(), true, &store);
         collect_until(&mut s, |e| matches!(e, Event::Identified(_))).await;
         let (backup, path) = prepared(&mut s).await;
-        assert!(path.exists() && path.starts_with(store.join("backups")));
+        assert!(path.exists() && path.starts_with(store.join(crate::env::BACKUPS)));
         assert_eq!(backup.bytes, sim.lock().unwrap().image());
         // Edit the rev limit over the backup.
         let c = Catalog::builtin().unwrap();

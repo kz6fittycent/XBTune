@@ -240,6 +240,17 @@ fn main() -> ExitCode {
         .with_writer(std::io::stderr)
         .init();
 
+    // Files from before the visible files folder existed move there once.
+    if let Some(d) = env::Dirs::detect() {
+        let moved = env::move_old_layout(&d);
+        if moved.files > 0 {
+            eprintln!("Moved {} earlier file(s) to {}", moved.files, d.files.display());
+        }
+        for (path, why) in &moved.skipped {
+            eprintln!("Left {} where it was: {why}", path.display());
+        }
+    }
+
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
     match rt.block_on(run(cli.cmd)) {
         Ok(()) => ExitCode::SUCCESS,
@@ -541,8 +552,9 @@ fn doctor() {
     }
     match env::Dirs::detect() {
         Some(d) => {
+            println!("Your files:  {}  (Tunes, Backups, Logs, History)", d.files.display());
             println!("Config dir:  {}", d.config.display());
-            println!("Data dir:    {}", d.data.display());
+            println!("App data:    {}", d.data.display());
         }
         None => println!("Could not determine storage directories (no $HOME?)."),
     }
@@ -550,7 +562,7 @@ fn doctor() {
 
 /// Default place for images read from the ECM.
 fn images_dir() -> PathBuf {
-    env::Dirs::detect().map(|d| d.data.join("images")).unwrap_or_else(|| PathBuf::from("."))
+    env::Dirs::detect().map(|d| d.tunes()).unwrap_or_else(|| PathBuf::from("."))
 }
 
 async fn dump(a: DumpArgs) -> Result<()> {

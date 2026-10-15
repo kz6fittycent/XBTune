@@ -1,25 +1,43 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! The Settings view: safety locks (what XBTune may do on a real bike),
-//! startup and appearance.
+//! The Settings view: where your files go, safety locks (what XBTune may
+//! do on a real bike), startup and appearance.
 //!
 //! The locks live in `hardware.toml` (`xbtune_core::diag::Unlocks`), which
 //! the CLI reads too. Unlocking takes a click on a switch and a confirmation
 //! naming the risk; locking again is immediate. Both apply to the running
 //! connection at once. The demo is always unlocked.
 
+use std::path::PathBuf;
+
 use egui::{RichText, Ui};
 use xbtune_core::diag::{self, Unlocks};
+use xbtune_core::env::Dirs;
 
 use crate::app::XbApp;
 use crate::theme::{self, Palette, ThemePref};
 
-/// Which unlock is waiting for confirmation, and its "I understand" box.
+/// Which unlock is waiting for confirmation, and its "I understand" box;
+/// the folder picker when open.
 #[derive(Default)]
 pub struct SettingsUi {
     confirm: Option<(Lock, bool)>,
+    folder: Option<FolderPick>,
+}
+
+/// The folder picker for the files folder.
+struct FolderPick {
+    dir: PathBuf,
+    new_name: String,
+    move_existing: bool,
+    error: Option<String>,
 }
 
 impl SettingsUi {
+    /// UI checks: open the folder picker at `dir`.
+    pub fn pick_folder(&mut self, dir: PathBuf) {
+        self.folder = Some(FolderPick { dir, new_name: String::new(), move_existing: true, error: None });
+    }
+
     /// UI checks: open the unlock confirmation ("commands" or "writes").
     pub fn ask(&mut self, which: &str) {
         self.confirm = Some((if which == "writes" { Lock::Writes } else { Lock::Commands }, false));
@@ -69,6 +87,9 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     let current = diag::unlocks();
     egui::ScrollArea::vertical().show(ui, |ui| {
         ui.heading("Settings");
+        ui.add_space(8.0);
+
+        files_card(app, ui, &p);
         ui.add_space(8.0);
 
         theme::card(ui).show(ui, |ui| {
@@ -142,6 +163,158 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         });
     });
     confirm(app, ui, &p, current);
+    folder_dialog(app, ui, &p);
+}
+
+fn files_card(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
+    let Some(d) = Dirs::detect() else { return };
+    theme::card(ui).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.label(RichText::new("Your files").font(theme::strong_font(17.0)));
+        ui.label(
+            RichText::new("Tunes read from the ECM, backups taken before burns, data logs and burn history.")
+                .color(p.muted),
+        );
+        ui.add_space(4.0);
+        let mut shown = d.files.display().to_string();
+        ui.add(
+            egui::TextEdit::singleline(&mut shown)
+                .font(egui::TextStyle::Monospace)
+                .desired_width(f32::INFINITY),
+        );
+        ui.label(
+            RichText::new(format!(
+                "In it: {}, {}, {}, {}",
+                xbtune_core::env::TUNES,
+                xbtune_core::env::BACKUPS,
+                xbtune_core::env::LOGS,
+                xbtune_core::env::HISTORY
+            ))
+            .small()
+            .color(p.muted),
+        );
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            if ui.button("Change folder…").clicked() {
+                app.settings_ui.folder = Some(FolderPick {
+                    dir: d.files.clone(),
+                    new_name: String::new(),
+                    move_existing: true,
+                    error: None,
+                });
+            }
+            if let Some(default) = d.default_files()
+                && default != d.files
+                && ui.button(format!("Use the default ({})", default.display())).clicked()
+                && let Err(e) = app.set_files_folder(None, true)
+            {
+                app.say(e, true);
+            }
+        });
+    });
+}
+
+fn folder_dialog(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
+    let Some(pick) = &mut app.settings_ui.folder else { return };
+    let mut chosen = None;
+    let mut cancel = false;
+    let modal = egui::Modal::new(egui::Id::new("files-folder")).show(ui.ctx(), |ui| {
+        ui.set_width(540.0);
+        ui.label(RichText::new("Choose a folder for your files").font(theme::strong_font(18.0)));
+        ui.horizontal_wrapped(|ui| {
+            if ui.small_button("Home").clicked()
+                && let Some(h) = xbtune_core::env::real_home()
+            {
+                pick.dir = h;
+            }
+            if ui.small_button("Up").clicked()
+                && let Some(parent) = pick.dir.parent()
+            {
+                pick.dir = parent.to_path_buf();
+            }
+            ui.label(RichText::new(pick.dir.display().to_string()).small().color(p.muted));
+        });
+        let mut dirs: Vec<PathBuf> = std::fs::read_dir(&pick.dir)
+            .map(|rd| {
+                rd.filter_map(|e| e.ok())
+                    .map(|e| e.path())
+                    .filter(|p| {
+                        p.is_dir() && !p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.'))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        dirs.sort();
+        egui::ScrollArea::vertical().max_height(260.0).show(ui, |ui| {
+            if dirs.is_empty() {
+                ui.label(RichText::new("No folders here.").color(p.muted));
+            }
+            for d in dirs {
+                let name = d.file_name().unwrap_or_default().to_string_lossy().into_owned();
+                if ui.selectable_label(false, format!("{name}/")).clicked() {
+                    pick.dir = d;
+                }
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::TextEdit::singleline(&mut pick.new_name)
+                    .hint_text("New folder name")
+                    .desired_width(220.0),
+            );
+            let name = pick.new_name.trim().to_string();
+            let valid = !name.is_empty() && !name.contains('/') && !name.starts_with('.');
+            if ui.add_enabled(valid, egui::Button::new("Create")).clicked() {
+                let d = pick.dir.join(&name);
+                match std::fs::create_dir_all(&d) {
+                    Ok(()) => {
+                        pick.dir = d;
+                        pick.new_name.clear();
+                        pick.error = None;
+                    }
+                    Err(e) => pick.error = Some(format!("Couldn't create {name}: {e}")),
+                }
+            }
+        });
+        ui.separator();
+        ui.checkbox(&mut pick.move_existing, "Move my existing files there");
+        if xbtune_core::env::in_snap() {
+            ui.label(
+                RichText::new(
+                    "XBTune can use folders in your home (not hidden ones), and on USB drives once \
+                     removable-media is allowed.",
+                )
+                .small()
+                .color(p.muted),
+            );
+        }
+        if let Some(e) = &pick.error {
+            ui.label(RichText::new(e).color(p.bad));
+        }
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            let b = egui::Button::new(RichText::new("Use this folder").color(egui::Color32::WHITE))
+                .fill(p.accent);
+            if ui.add(b).clicked() {
+                chosen = Some((pick.dir.clone(), pick.move_existing));
+            }
+            if ui.button("Cancel").clicked() {
+                cancel = true;
+            }
+        });
+    });
+    if let Some((dir, move_existing)) = chosen {
+        match app.set_files_folder(Some(dir), move_existing) {
+            Ok(()) => app.settings_ui.folder = None,
+            Err(e) => {
+                if let Some(pick) = &mut app.settings_ui.folder {
+                    pick.error = Some(e);
+                }
+            }
+        }
+    } else if cancel || modal.should_close() {
+        app.settings_ui.folder = None;
+    }
 }
 
 fn lock_row(app: &mut XbApp, ui: &mut Ui, p: &Palette, lock: Lock, on: bool, label: &str, what: &str) {
