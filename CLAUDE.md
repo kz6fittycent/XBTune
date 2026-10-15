@@ -408,8 +408,13 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 "Polish + release" becomes phase 9:
 7. Log viewer + auto-tune (built 2026-10-15; owner testing).
 8. **Remote tuning** (owner's idea, 2026-10-15; owner said go
-   2026-10-15). `docs/REMOTE.md` written and WAITING FOR APPROVAL (its
-   section 1 lists 5 open decisions). No code before approval. Decisions made:
+   2026-10-15). `docs/REMOTE.md` APPROVED 2026-10-15 (code `47-381926`
+   = room + 6 digits; review-each default; tuner may save a copy; separate
+   `relay/remote/` Worker; x25519-dalek dropped). Owner AMENDED the "guest
+   can't write" rule: per-session host permissions (edit directly / burn /
+   tests+resets), all off at start; tuner-started burns run in the host's
+   session with §6 checks, tuner confirms the review, host gets a 10 s
+   countdown with Stop (REMOTE.md 2.1). Original decisions:
    - Bike owner = host (has the bike); tuner = guest. Host shows a 6-digit
      code, reads it to the tuner, who types it in: PAKE (SPAKE2), then an
      end-to-end encrypted channel (X25519/HKDF/ChaCha20-Poly1305). The relay
