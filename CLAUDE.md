@@ -32,10 +32,13 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 - **Phase 6 (burn): built 2026-10-14; FIRST REAL BURN 2026-10-15** (laptop,
   snap 31eeddf, writes unlocked by the owner in Settings): KRPM_Hard_Hi
   7500 -> 7450. The two auto backups (16:39:49 / 16:41:38 UTC, both
-  verified) differ in exactly 1 byte (0x01d2). A second burn followed
-  (probably back to 7500): not yet confirmed; asked for the history/
-  folders and app.log. Top bar showed 11 reconnects that session, 0% errors:
-  check when they happened. AFV reset not yet tried on the bike.
+  verified) differ in exactly 1 byte (0x01d2). Second burn 16:41:52 put
+  7500 back. History folders checked: each burn 1 chunk/16 bytes on page 2,
+  1 byte changed; ECM between burns == burn 1's after; final ECM ==
+  original (all 1210 bytes). Round trip on the bike confirmed. Top bar
+  showed 11 reconnects that session, 0% errors: timing unknown (app.log not
+  sent). AFV reset not yet tried on the bike. Idea offered: burn.txt could
+  list changed variables and "verified: yes".
   EEPROM writes are LOCKED on real hardware by their own key
   (`eeprom_writes = true` in hardware.toml), separate from `ecm_commands`.
   The owner unlocks it only after signing off on the simulator results:
