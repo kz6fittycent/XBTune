@@ -28,6 +28,19 @@ jobs:
           # whole time.
           snapcraft-args: pack
 
+      # The .snap for installing by hand (the bike tests run on a laptop:
+      # `sudo snap install --dangerous <file>`). Download it from the run's
+      # Summary page; it's zipped, so unzip first. Before the review, so a
+      # build the review flags can still be looked at. Nothing goes to the
+      # store here.
+      - name: Upload Snap
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.build.outputs.snap }}
+          path: ${{ steps.build.outputs.snap }}
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Snapcraft Review
         uses: diddlesnaps/snapcraft-review-action@v1
         with:
