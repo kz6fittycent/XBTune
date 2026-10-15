@@ -326,6 +326,38 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
   list), so it's built with `platform-verifier` (system CA certs). Ask
   before adding any others.
 
+## Phase plan (amended by the owner 2026-10-15)
+
+KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
+"Polish + release" becomes phase 9:
+7. Log viewer + auto-tune (next; start only on the owner's go).
+8. **Remote tuning** (owner's idea, 2026-10-15). Decisions made:
+   - Bike owner = host (has the bike); tuner = guest. Host shows a 6-digit
+     code, reads it to the tuner, who types it in: PAKE (SPAKE2), then an
+     end-to-end encrypted channel (X25519/HKDF/ChaCha20-Poly1305). The relay
+     only forwards ciphertext and rate-limits code guesses.
+   - Relay: Cloudflare Worker (Durable Object + WebSockets) on the owner's
+     account, like relay/bug-report.
+   - Guest may view live data/dashboard, read shared logs, open the tune
+     and propose edits, and REQUEST burns/tests/resets. Only the host
+     connects to the bike, unlocks, accepts edits, and approves each
+     burn/test/reset with the normal local review (KICKOFF §6 unchanged).
+   - Edits: shared working copy, numbered ops (Tune patch undo model),
+     journaled to the host's disk as they arrive; on a drop keep up to the
+     last confirmed op, resync on reconnect; host files change only on the
+     host's Save (temp + rename). Never auto-burn.
+   - First-use guide dialog with "Don't show again".
+   - Stages R1 relay+pairing+encrypted chat, R2 live view, R3 shared
+     editing + journal, R4 approved requests, R5 log sharing. Write
+     docs/REMOTE.md (protocol, threat model, tests) for owner approval
+     before code.
+   - Deps approved for it: tokio-tungstenite, spake2, x25519-dalek,
+     chacha20poly1305, hkdf, sha2 (licenses must still pass cargo-deny).
+9. Polish + release. Partly done (themes, Getting started guide with snap
+   checks, CI promotion workflows). Left: store listing + auto-connect
+   request (docs/STORE.md), docs, and the ecmdroid.toml licence question
+   (blocks distribution, and remote tuning needs other people to install).
+
 ## Next steps
 
 Paused 2026-10-14 at the owner's request (HEAD 8a55efa, tree clean; laptop
@@ -337,7 +369,8 @@ snap: xbtune_0.1.0+git8a55efa_amd64.snap). Resume here.
    below). Suggested first real burn: a harmless, reversible change.
 2. Optional: btsnoop capture of EcmDroid reading the EEPROM / live data, to
    confirm frames byte for byte.
-3. Phase 7 (only after the owner says go): log viewer + auto-tune.
+3. Phase 7 (only after the owner says go): log viewer + auto-tune. Then
+   phase 8 remote tuning (see "Phase plan"), then phase 9 polish + release.
 
 ## Phase 6 checklist
 
