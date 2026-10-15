@@ -1,0 +1,31 @@
+name: 🧹 Close Stale Bug Reports
+
+# Issues filed from XBTune's Report a problem (label: user-report, via
+# relay/bug-report) are closed automatically once they go quiet, so the
+# tracker doesn't need sweeping by hand. A report that's real gets a
+# comment, a label, or a fix - any activity resets the clock. Add the
+# "keep" label to exempt one for good.
+on:
+  schedule:
+    - cron: "30 7 * * *"  # daily, 07:30 UTC
+  workflow_dispatch: {}
+
+permissions:
+  issues: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          only-issue-labels: user-report
+          exempt-issue-labels: keep
+          days-before-issue-stale: 53
+          days-before-issue-close: 7
+          stale-issue-message: >
+            No activity on this report for a while; it will close in a week
+            unless something changes. Thanks for reporting it.
+          close-issue-message: Closed for inactivity. If it happens again, file a new report from the app.
+          days-before-pr-stale: -1
+          days-before-pr-close: -1

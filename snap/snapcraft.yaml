@@ -43,6 +43,8 @@ apps:
       - raw-usb
       - home
       - removable-media
+      # Report a problem: one HTTPS POST to the bug-report relay.
+      - network
   cli:
     command: bin/xbtune-cli
     plugs:

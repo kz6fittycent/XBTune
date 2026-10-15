@@ -28,6 +28,13 @@ xbtune.cli burn --bt ADDR new.xbt --vars KRPM_Hard_Hi   # write (locked until un
 xbtune                                  # the desktop app
 ```
 
+The app opens with a short **Getting started** guide (tick "Don't show this at
+startup" to turn it off; it stays in the side bar). **Report a problem** in the
+side bar sends a report with the app's recent log to the developer as a GitHub
+issue, without needing a GitHub account. If the app crashes, it offers to send a
+report the next time it starts. Nothing is sent unless you click Send. The relay
+is in `relay/bug-report/`.
+
 ## Credits and license
 
 The protocol code is a Rust port of [EcmDroid](https://github.com/ecmdroid/ecmdroid)

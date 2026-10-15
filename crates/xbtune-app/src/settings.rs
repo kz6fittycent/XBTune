@@ -52,6 +52,8 @@ pub struct Settings {
     pub chart_seconds: f64,
     /// Tune file to reopen at start.
     pub last_tune: Option<std::path::PathBuf>,
+    /// Show "Getting started" when the app starts.
+    pub show_wizard: bool,
 }
 
 impl Default for Settings {
@@ -66,6 +68,7 @@ impl Default for Settings {
             chart_channels: ["RPM", "TPD", "CLT", "O2"].map(String::from).to_vec(),
             chart_seconds: 60.0,
             last_tune: None,
+            show_wizard: true,
         }
     }
 }

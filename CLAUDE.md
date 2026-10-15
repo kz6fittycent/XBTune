@@ -43,6 +43,11 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   pairing behaves sensibly. Engine-running link with the 400 ms timeout:
   5.6 Hz, 4% errors (was 3.7 Hz). Don't start phase 6 (burn) until the
   owner says so.
+- **Getting started + bug reports: built 2026-10-15** (owner asked; network
+  feature OK'd by the owner per KICKOFF §9). Not yet on the laptop. The relay
+  (`relay/bug-report/`) is NOT deployed yet: the owner does the Cloudflare/
+  token steps in its README. Until then sends fail and reports queue in
+  `<data>/app-log/pending/`.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the
@@ -57,6 +62,29 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   (origin, added 2026-10-15; owner OK'd pushing). Keep it private.
   Don't publish to the store. The snap name `xbtune` is registered (owner,
   2026-10-14); registration only, nothing uploaded.
+
+### Getting started + bug reports
+
+- `xbtune-app::wizard`: 6-step modal (welcome/safety, adapter + snap plugs,
+  connecting, demo, back up first, reporting). Shown at start while
+  `settings.show_wizard` (default true); "Don't show this at startup" box on
+  every step; Finish turns it off; side bar "Getting started" reopens it.
+- `xbtune-app::report`: tracing to `<data>/app-log/app.log` (+ `.1`, 2 MB
+  rotation) besides stderr; panic hook -> `crash.json` (first panic of a
+  session; summary/fingerprint from the innermost XBTune backtrace frame,
+  FNV-1a, no line numbers); SIGSEGV/BUS/ILL/FPE/ABRT handler writes a line to
+  `fatal.log` then chains to the previous handler (Rust's stack-overflow one).
+  Reports: `build` (masked: /home/<user> -> ~, BT MACs), `send` (ureq on a
+  thread; failure -> `pending/`, max 5, 30 days; retried 15 s after start).
+- `report_view`: Report a problem (optional text + contact, "What gets sent"
+  preview), crash offer at the next start or at once if the app survived
+  (background panic). Nothing is sent without a click; UI checks never send.
+- Relay: copy of Desktop Scriptures' Cloudflare Worker (`relay/bug-report/`,
+  repo kz6fittycent/XBTune, label `user-report`, extra `ecm` field) and
+  `.github/workflows/close-stale-reports.yml`.
+- Hooks: `XBTUNE_SHOT_WIZARD=N`, `XBTUNE_SHOT_REPORT=1|crash`,
+  `XBTUNE_CRASH_TEST=panic|thread|segv|abort`, `XBTUNE_REPORT_URL=...`.
+- Snap: `network` plug on the GUI app.
 
 ### Phase 6 contents
 
@@ -175,6 +203,7 @@ crates/xbtune-core   env (snap, paths), image (.xbt/.xpr), read (full EEPROM rea
 crates/xbtune-sim    simulated ECM + fault injection + made-up engine; in-process and pty; bin xbtune-sim
 crates/xbtune-cli    xbtune-cli: info, ports, scan, ecms, doctor, dump, show, diff, convert, defs, live, log
 crates/xbtune-app    egui app, binary xbtune (connect, dashboard, live data, charts); assets/fonts (Inter)
+relay/bug-report/    Cloudflare Worker: app reports -> GitHub issues (not in the snap)
 data/                ecmdroid.toml (ED-DB derived, RESTRICTED), ecm_models.toml (ours)
 tools/               extract_ecmdroid_db.py
 tests/fixtures/      EcmDroid test images and runtime frame
@@ -252,7 +281,11 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 - `dump` verifies by default: a chunk counts only when two consecutive reads
   agree (the XOR frame checksum misses some errors). Backups must use it.
 - Approved extra deps (2026-10-14): clap, thiserror, anyhow, tracing,
-  tracing-subscriber, libc, futures. Ask before adding any others.
+  tracing-subscriber, libc, futures; (2026-10-15) ureq, serde_json for bug
+  reports. rustls is direct only to pick ureq's crypto provider: ureq's
+  default TLS pulls webpki-roots (CDLA-Permissive-2.0, not on the license
+  list), so it's built with `platform-verifier` (system CA certs). Ask
+  before adding any others.
 
 ## Next steps
 

@@ -1,0 +1,23 @@
+# Cloudflare Worker config for XBTune's "Report a problem" relay - see worker.js
+# and README.md beside this file. Deploy from this folder:
+#   npx wrangler@4 deploy
+name = "xbtune-bug-report"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+# No custom domain - the free <account>.workers.dev address is enough.
+workers_dev = true
+
+# 2 reports per minute from one address. (The rate-limit binding only
+# offers 10- or 60-second windows; a person filing a real report never
+# comes close, a script does.)
+[[ratelimits]]
+name = "REPORT_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 2
+  period = 60
+
+# GITHUB_TOKEN is a secret, never in this file:
+#   npx wrangler@4 secret put GITHUB_TOKEN

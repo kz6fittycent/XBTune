@@ -103,6 +103,8 @@ pub struct XbApp {
     pub compare: Option<(PathBuf, xbtune_core::image::Image)>,
     pub tune_ui: crate::tune_view::TuneUi,
     pub burn: crate::burn_view::BurnUi,
+    pub wizard: crate::wizard::WizardUi,
+    pub report: crate::report_view::ReportUi,
     /// Variables to write again on a retry.
     pub pending_chosen: std::collections::BTreeSet<String>,
     /// EEPROM writes allowed for the current session.
@@ -136,7 +138,7 @@ fn write_ppm(path: &std::path::Path, img: &egui::ColorImage) -> std::io::Result<
 }
 
 impl XbApp {
-    pub fn new(cc: &eframe::CreationContext<'_>, rt: Handle) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, rt: Handle, crash: Option<crate::report::Crash>) -> Self {
         theme::install(&cc.egui_ctx);
         let shot = std::env::var_os("XBTUNE_SCREENSHOT").map(|p| Shot {
             path: p.into(),
@@ -175,6 +177,8 @@ impl XbApp {
             compare: None,
             tune_ui: Default::default(),
             burn: Default::default(),
+            wizard: Default::default(),
+            report: Default::default(),
             pending_chosen: Default::default(),
             write_permitted: false,
             demo_sim: None,
@@ -208,6 +212,39 @@ impl XbApp {
                 _ => View::Dashboard,
             };
         }
+        // A crash last time comes first; the guide waits for the next start.
+        if let Some(c) = crash.clone()
+            && app.shot.is_none()
+        {
+            app.report.offer_crash(c, true);
+        } else if app.shot.is_none() && app.settings.show_wizard {
+            app.wizard.open();
+        }
+        if app.shot.is_some() {
+            // XBTUNE_SHOT_WIZARD=N: guide step N; XBTUNE_SHOT_REPORT=1|crash
+            // (the previous session's crash if there is one, else a made-up one).
+            if let Some(n) = std::env::var("XBTUNE_SHOT_WIZARD").ok().and_then(|n| n.parse::<usize>().ok()) {
+                app.wizard.step = Some(n.min(crate::wizard::STEPS - 1));
+            }
+            match std::env::var("XBTUNE_SHOT_REPORT").as_deref() {
+                Ok("crash") => app.report.offer_crash(
+                    crash.unwrap_or_else(|| crate::report::Crash {
+                        summary: "panic in tune_view::show".into(),
+                        message: "index out of bounds: the len is 16 but the index is 16".into(),
+                        fingerprint: crate::report::fingerprint("shot"),
+                        version: crate::report::version(),
+                        when: 0,
+                        details: String::new(),
+                    }),
+                    true,
+                ),
+                Ok(_) => app.report.open(),
+                Err(_) => {}
+            }
+        } else {
+            // Reports that couldn't be sent before.
+            crate::report::send_pending_later(Duration::from_secs(15));
+        }
         if app.settings.auto_connect
             && let Some(t) = app.settings.last.clone()
         {
@@ -216,12 +253,22 @@ impl XbApp {
         app
     }
 
+    pub fn is_screenshot(&self) -> bool {
+        self.shot.is_some()
+    }
+
     pub fn save_settings(&self) {
         self.settings.save(self.settings_path.as_deref());
     }
 
     pub fn say(&mut self, text: impl Into<String>, error: bool) {
-        self.messages.push(Message { text: text.into(), error, at: Instant::now() });
+        let text = text.into();
+        if error {
+            tracing::warn!("shown to user: {text}");
+        } else {
+            tracing::info!("shown to user: {text}");
+        }
+        self.messages.push(Message { text, error, at: Instant::now() });
     }
 
     /// Start a live session to `target`.
@@ -257,6 +304,7 @@ impl XbApp {
                 (session::target_opener(t.clone()), t.to_string())
             }
         };
+        tracing::info!("connecting to {label}");
         let mut cfg = SessionConfig::new(label, EcmAddress::Stock);
         cfg.permit = xbtune_core::diag::permit(target == SavedTarget::Demo).ok();
         self.permitted = cfg.permit.is_some();
@@ -385,6 +433,9 @@ impl XbApp {
         for e in events {
             match e {
                 Event::State(st) => {
+                    if !matches!(st, LinkState::Connecting { .. }) {
+                        tracing::info!(state = ?st, "link");
+                    }
                     match &st {
                         LinkState::Live if self.view == View::Connect && self.shot.is_none() => {
                             self.view = View::Dashboard
@@ -400,6 +451,7 @@ impl XbApp {
                     self.link.state = Some(st);
                 }
                 Event::Identified(id) => {
+                    tracing::info!("ECM {} ({}, {})", id.version.trim(), id.ecm.id, id.ecm.family);
                     self.link.channels = channels(&id.definition);
                     self.link.identity = Some(id);
                 }
@@ -569,6 +621,14 @@ impl XbApp {
             ui.add_space(6.0);
             ui.label(RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).small().weak());
             ui.label(RichText::new("EEPROM writes only via Burn").small().weak());
+            ui.add_space(6.0);
+            let w = ui.available_width();
+            if ui.add_sized([w, 28.0], egui::Button::new("Report a problem")).clicked() {
+                self.report.open();
+            }
+            if ui.add_sized([w, 28.0], egui::Button::new("Getting started")).clicked() {
+                self.wizard.open();
+            }
         });
     }
 
@@ -696,6 +756,12 @@ impl eframe::App for XbApp {
     fn logic(&mut self, _ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.drain_events();
         self.connect.poll();
+        // A panic the app survived (a background task): offer a report now.
+        if !self.report.is_open()
+            && let Some(c) = crate::report::take_new_crash()
+        {
+            self.report.offer_crash(c, false);
+        }
     }
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
@@ -723,6 +789,12 @@ impl eframe::App for XbApp {
                 }
             });
         crate::burn_view::show(self, ui);
+        // One dialog at a time: a report (or crash offer) before the guide.
+        if self.report.is_open() {
+            crate::report_view::show(self, ui);
+        } else {
+            crate::wizard::show(self, ui);
+        }
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

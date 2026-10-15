@@ -11,20 +11,18 @@ mod dashboard;
 mod diagnostics;
 mod gauge;
 mod grid;
+mod report;
+mod report_view;
 mod settings;
 mod table;
 mod theme;
 mod tune_view;
+mod wizard;
 
 fn main() -> eframe::Result {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                // zbus warns when confinement blocks the accessibility bus; harmless.
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn,zbus=error")),
-        )
-        .with_writer(std::io::stderr)
-        .init();
+    // Logging (terminal + app log file) and crash capture.
+    let crash = report::init();
+    report::crash_test(std::env::var("XBTUNE_CRASH_TEST").ok().as_deref());
 
     // The ECM link and Bluetooth run here, off the UI thread.
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
@@ -38,8 +36,12 @@ fn main() -> eframe::Result {
             .with_min_inner_size([760.0, 520.0]),
         ..Default::default()
     };
-    let result =
-        eframe::run_native("XBTune", options, Box::new(move |cc| Ok(Box::new(app::XbApp::new(cc, handle)))));
+    let result = eframe::run_native(
+        "XBTune",
+        options,
+        Box::new(move |cc| Ok(Box::new(app::XbApp::new(cc, handle, crash)))),
+    );
     rt.shutdown_timeout(std::time::Duration::from_secs(1));
+    report::clean_exit();
     result
 }
