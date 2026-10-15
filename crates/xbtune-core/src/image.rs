@@ -42,7 +42,7 @@ pub struct Meta {
     /// When the image was made (RFC 3339 UTC).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub created: String,
-    /// Where it came from, e.g. "read from ECM over Bluetooth 00:11:22:33:44:55".
+    /// Where it came from, e.g. "read from ECM over Bluetooth 00:11:22:AA:BB:CC".
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub source: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]

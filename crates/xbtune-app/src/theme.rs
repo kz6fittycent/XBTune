@@ -162,3 +162,78 @@ pub fn card(ui: &egui::Ui) -> egui::Frame {
         .inner_margin(egui::Margin::same(14))
         .stroke(Stroke::new(1.0, ui.visuals().widgets.noninteractive.bg_stroke.color.gamma_multiply(0.6)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The characters a TrueType font maps (its cmap, format 4 or 12).
+    /// egui's own `has_glyph` can't tell when a family has a single font.
+    fn mapped_chars(font: &[u8]) -> std::collections::HashSet<char> {
+        let u16_at = |o: usize| u16::from_be_bytes([font[o], font[o + 1]]) as usize;
+        let u32_at = |o: usize| u32::from_be_bytes([font[o], font[o + 1], font[o + 2], font[o + 3]]) as usize;
+        let cmap = (0..u16_at(4))
+            .map(|i| 12 + 16 * i)
+            .find(|&r| &font[r..r + 4] == b"cmap")
+            .map(|r| u32_at(r + 8))
+            .expect("cmap table");
+        let mut out = std::collections::HashSet::new();
+        for i in 0..u16_at(cmap + 2) {
+            let sub = cmap + u32_at(cmap + 4 + 8 * i + 4);
+            match u16_at(sub) {
+                12 => {
+                    for g in 0..u32_at(sub + 12) {
+                        let (a, b) = (u32_at(sub + 16 + 12 * g), u32_at(sub + 20 + 12 * g));
+                        out.extend((a..=b).filter_map(|c| char::from_u32(c as u32)));
+                    }
+                }
+                4 => {
+                    let segs = u16_at(sub + 6) / 2;
+                    for g in 0..segs {
+                        let end = u16_at(sub + 14 + 2 * g);
+                        let start = u16_at(sub + 16 + 2 * segs + 2 * g);
+                        out.extend((start..=end.min(0xfffe)).filter_map(|c| char::from_u32(c as u32)));
+                    }
+                }
+                _ => {}
+            }
+        }
+        out
+    }
+
+    /// Inter has no emoji and few symbols; a missing one shows as "?" (the
+    /// owner hit ✕ and ✔). Every non-ASCII character in UI text, here and
+    /// in xbtune-core (its messages are shown too), must be in both Inter
+    /// files. Comments are skipped.
+    #[test]
+    fn every_symbol_in_the_ui_is_in_the_font() {
+        let regular = mapped_chars(INTER_REGULAR);
+        let semibold = mapped_chars(INTER_SEMIBOLD);
+        assert!(regular.contains(&'A') && regular.contains(&'≠') && !regular.contains(&'\u{2714}'));
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut missing = Vec::new();
+        for dir in [root.join("src"), root.join("../xbtune-core/src")] {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.extension().is_none_or(|x| x != "rs") {
+                    continue;
+                }
+                let text = std::fs::read_to_string(&path).unwrap();
+                for (n, line) in text.lines().enumerate() {
+                    let code = line.trim_start();
+                    if code.starts_with("//") {
+                        continue;
+                    }
+                    let code = code.split(" // ").next().unwrap_or(code);
+                    for c in code.chars().filter(|c| !c.is_ascii()) {
+                        if !regular.contains(&c) || !semibold.contains(&c) {
+                            let file = path.file_name().unwrap().to_string_lossy();
+                            missing.push(format!("{file}:{}: {c} U+{:04X}", n + 1, c as u32));
+                        }
+                    }
+                }
+            }
+        }
+        assert!(missing.is_empty(), "not in Inter:\n{}", missing.join("\n"));
+    }
+}

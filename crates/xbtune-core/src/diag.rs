@@ -178,10 +178,50 @@ pub fn locked_message() -> String {
     let path =
         permit_file().map(|p| p.display().to_string()).unwrap_or_else(|| "<config>/hardware.toml".into());
     format!(
-        "ECM commands (active tests, clearing codes, TPS reset) are locked on real hardware until the \
-         owner signs off on the simulator tests (KICKOFF section 6.7). To unlock, create {path} containing:\n    \
+        "ECM commands (active tests, clearing codes, TPS reset) are locked on a real bike. Try them in \
+         the demo first, then unlock them in the app's Settings, or add this line to {path}:\n    \
          ecm_commands = true"
     )
+}
+
+/// What the owner has unlocked on real hardware (`hardware.toml`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Unlocks {
+    /// Active tests, clearing codes, TPS reset.
+    pub ecm_commands: bool,
+    /// Burn, restore, AFV reset.
+    pub eeprom_writes: bool,
+}
+
+pub fn unlocks() -> Unlocks {
+    let h = permit_file().map(|p| hw(&p)).unwrap_or_default();
+    Unlocks { ecm_commands: h.ecm_commands, eeprom_writes: h.eeprom_writes }
+}
+
+/// Save the unlocks (the app's Settings; the CLI reads the same file).
+/// Only ever called on the owner's explicit choice.
+pub fn set_unlocks(u: Unlocks) -> std::io::Result<PathBuf> {
+    let path = permit_file().ok_or_else(|| std::io::Error::other("no config folder"))?;
+    write_unlocks(&path, u)?;
+    Ok(path)
+}
+
+fn write_unlocks(path: &std::path::Path, u: Unlocks) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let text = format!(
+        "# What XBTune may do on a real bike. Changed from the app's Settings,\n\
+         # or edit by hand. The demo is always unlocked.\n\
+         # Active tests, clearing codes, TPS reset:\n\
+         ecm_commands = {}\n\
+         # Writing to the ECM (burn, restore, AFV reset):\n\
+         eeprom_writes = {}\n",
+        u.ecm_commands, u.eeprom_writes
+    );
+    let tmp = path.with_extension("toml.tmp");
+    std::fs::write(&tmp, text)?;
+    std::fs::rename(&tmp, path)
 }
 
 /// A permit for the simulator (always), or for real hardware when the
@@ -222,8 +262,8 @@ pub fn write_locked_message() -> String {
     let path =
         permit_file().map(|p| p.display().to_string()).unwrap_or_else(|| "<config>/hardware.toml".into());
     format!(
-        "Writing to the ECM's EEPROM is locked on real hardware until the owner signs off on the \
-         simulator burn tests (KICKOFF section 6). To unlock, add this line to {path}:\n    \
+        "Writing to the ECM (burn, restore, AFV reset) is locked on a real bike. Try it in the demo \
+         first, then unlock it in the app's Settings, or add this line to {path}:\n    \
          eeprom_writes = true"
     )
 }
@@ -472,6 +512,17 @@ mod tests {
         assert!(!unlocked(&unlocked_file));
         let _ = std::fs::remove_file(&unlocked_file);
         assert!(!unlocked(std::path::Path::new("/nonexistent/hardware.toml")));
+        // What the app's Settings writes reads back the same.
+        for u in [
+            Unlocks { ecm_commands: true, eeprom_writes: false },
+            Unlocks { ecm_commands: false, eeprom_writes: true },
+            Unlocks::default(),
+        ] {
+            write_unlocks(&unlocked_file, u).unwrap();
+            let h = hw(&unlocked_file);
+            assert_eq!((h.ecm_commands, h.eeprom_writes), (u.ecm_commands, u.eeprom_writes));
+        }
+        let _ = std::fs::remove_file(&unlocked_file);
         assert!(locked_message().contains("ecm_commands = true"));
     }
 

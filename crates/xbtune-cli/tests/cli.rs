@@ -201,7 +201,7 @@ fn active_tests_are_guarded() {
     // Real hardware stays locked (the test environment has no unlock file).
     let (ok, out) = cli(&["test", "fan", "--serial", "/dev/null", "--yes"]);
     assert!(!ok);
-    assert!(out.contains("locked on real hardware"), "{out}");
+    assert!(out.contains("locked on a real bike"), "{out}");
     let (ok, out) = cli(&["test", "warp-drive", "--sim"]);
     assert!(!ok);
     assert!(out.contains("no test 'warp-drive'"), "{out}");
@@ -300,7 +300,7 @@ fn burn_restore_and_afv_reset_on_sim() {
     let (ok, out) = cli(&["burn", "--sim", "--sim-engine-running", tune.to_str().unwrap(), "--all", "--yes"]);
     assert!(!ok && out.contains("engine is running"), "{out}");
     let (ok, out) = cli(&["burn", "--serial", "/dev/null", tune.to_str().unwrap(), "--all", "--yes"]);
-    assert!(!ok && out.contains("locked on real hardware"), "{out}");
+    assert!(!ok && out.contains("locked on a real bike"), "{out}");
     // A tune for another ECM is refused.
     let other = tmp("BUE2D_other.xpr");
     std::fs::write(&other, include_bytes!("../../../tests/fixtures/BUE2D.eeprom")).unwrap();

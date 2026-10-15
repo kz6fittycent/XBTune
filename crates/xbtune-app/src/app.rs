@@ -33,7 +33,9 @@ pub enum View {
     Data,
     Charts,
     Diagnostics,
+    Resets,
     Tune,
+    Settings,
 }
 
 /// What the UI knows about the link.
@@ -104,6 +106,7 @@ pub struct XbApp {
     pub tune_ui: crate::tune_view::TuneUi,
     pub burn: crate::burn_view::BurnUi,
     pub wizard: crate::wizard::WizardUi,
+    pub settings_ui: crate::settings_view::SettingsUi,
     pub report: crate::report_view::ReportUi,
     /// Variables to write again on a retry.
     pub pending_chosen: std::collections::BTreeSet<String>,
@@ -178,6 +181,7 @@ impl XbApp {
             tune_ui: Default::default(),
             burn: Default::default(),
             wizard: Default::default(),
+            settings_ui: Default::default(),
             report: Default::default(),
             pending_chosen: Default::default(),
             write_permitted: false,
@@ -208,6 +212,8 @@ impl XbApp {
                 "charts" => View::Charts,
                 "connect" => View::Connect,
                 "diag" => View::Diagnostics,
+                "resets" => View::Resets,
+                "settings" => View::Settings,
                 "tune" => View::Tune,
                 _ => View::Dashboard,
             };
@@ -221,6 +227,10 @@ impl XbApp {
             app.wizard.open();
         }
         if app.shot.is_some() {
+            // XBTUNE_SHOT_UNLOCK=commands|writes: the unlock confirmation.
+            if let Ok(which) = std::env::var("XBTUNE_SHOT_UNLOCK") {
+                app.settings_ui.ask(&which);
+            }
             // XBTUNE_SHOT_WIZARD=N: guide step N; XBTUNE_SHOT_REPORT=1|crash
             // (the previous session's crash if there is one, else a made-up one).
             if let Some(n) = std::env::var("XBTUNE_SHOT_WIZARD").ok().and_then(|n| n.parse::<usize>().ok()) {
@@ -384,6 +394,36 @@ impl XbApp {
         if let Err(e) = t.save(&path, &catalog) {
             tracing::warn!(error = %e, "could not save recovery file");
         }
+    }
+
+    /// The owner changed a safety lock in Settings: save it and apply it to
+    /// the running connection at once.
+    pub fn apply_unlocks(&mut self, u: xbtune_core::diag::Unlocks) {
+        // UI checks never change the real file (they normally run with
+        // XBTUNE_HOME anyway).
+        if self.shot.is_none() {
+            let before = xbtune_core::diag::unlocks();
+            match xbtune_core::diag::set_unlocks(u) {
+                Ok(path) => {
+                    tracing::info!(?u, path = %path.display(), "safety locks changed");
+                    for (was, now, what) in [
+                        (before.ecm_commands, u.ecm_commands, "ECM commands"),
+                        (before.eeprom_writes, u.eeprom_writes, "Writing to the ECM"),
+                    ] {
+                        if was != now {
+                            self.say(format!("{what} {}.", if now { "unlocked" } else { "locked" }), false);
+                        }
+                    }
+                }
+                Err(e) => return self.say(format!("Couldn't save the safety locks: {e}"), true),
+            }
+        }
+        let demo = self.link.target == Some(SavedTarget::Demo);
+        let permit = xbtune_core::diag::permit(demo).ok();
+        let write_permit = xbtune_core::diag::write_permit(demo).ok();
+        self.permitted = permit.is_some();
+        self.write_permitted = write_permit.is_some();
+        self.send(Command::SetPermits { permit, write_permit });
     }
 
     pub fn writes_permitted(&self) -> bool {
@@ -607,7 +647,9 @@ impl XbApp {
             (View::Data, "Live data"),
             (View::Charts, "Charts"),
             (View::Diagnostics, "Diagnostics"),
+            (View::Resets, "Resets"),
             (View::Tune, "Tune"),
+            (View::Settings, "Settings"),
         ] {
             let selected = self.view == v;
             let text = RichText::new(label).size(15.0);
@@ -785,6 +827,8 @@ impl eframe::App for XbApp {
                     View::Data => crate::table::show(self, ui),
                     View::Charts => crate::charts::show(self, ui),
                     View::Diagnostics => crate::diagnostics::show(self, ui),
+                    View::Resets => crate::resets::show(self, ui),
+                    View::Settings => crate::settings_view::show(self, ui),
                     View::Tune => crate::tune_view::show(self, ui),
                 }
             });

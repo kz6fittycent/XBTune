@@ -138,6 +138,11 @@ pub enum Command {
         target: Box<crate::image::Image>,
         note: String,
     },
+    /// The owner changed the unlocks (app Settings): replace both permits.
+    SetPermits {
+        permit: Option<crate::diag::Permit>,
+        write_permit: Option<crate::diag::WritePermit>,
+    },
     Stop,
 }
 
@@ -385,6 +390,11 @@ impl Worker {
                 if self.read.take().is_some() {
                     self.out.send(Event::ReadFailed("cancelled".into()));
                 }
+            }
+            Command::SetPermits { permit, write_permit } => {
+                info!(commands = permit.is_some(), writes = write_permit.is_some(), "permits changed");
+                self.cfg.permit = permit;
+                self.cfg.write_permit = write_permit;
             }
             Command::Stop => {}
         }
@@ -982,6 +992,18 @@ mod tests {
         let Some(Event::FunctionDone { result: Err(e), .. }) = ev.last() else { panic!("{ev:?}") };
         assert!(e.contains("locked"), "{e}");
         assert!(sim.lock().unwrap().journal.functions.is_empty());
+        // Unlocked in the app's Settings while connected: works at once.
+        s.send(Command::SetPermits { permit: Some(crate::diag::test_permit()), write_permit: None });
+        s.send(Command::Function(xbtune_proto::Function::FuelPump));
+        let ev = collect_until(&mut s, |e| matches!(e, Event::FunctionDone { .. })).await;
+        assert!(matches!(ev.last(), Some(Event::FunctionDone { result: Ok(_), .. })), "{ev:?}");
+        assert_eq!(sim.lock().unwrap().journal.functions.len(), 1);
+        // Locked again: refused again.
+        s.send(Command::SetPermits { permit: None, write_permit: None });
+        s.send(Command::Function(xbtune_proto::Function::FuelPump));
+        let ev = collect_until(&mut s, |e| matches!(e, Event::FunctionDone { .. })).await;
+        assert!(matches!(ev.last(), Some(Event::FunctionDone { result: Err(_), .. })), "{ev:?}");
+        assert_eq!(sim.lock().unwrap().journal.functions.len(), 1);
         s.send(Command::Stop);
     }
 

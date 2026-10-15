@@ -4,3 +4,6 @@
 /stage/
 /prime/
 /.craft/
+
+# Wrangler (Cloudflare) local state from deploying the relay
+.wrangler/

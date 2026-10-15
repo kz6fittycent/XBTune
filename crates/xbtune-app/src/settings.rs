@@ -116,7 +116,7 @@ mod tests {
         let p = dir.join("settings.toml");
         let s = Settings {
             last: Some(SavedTarget::Bluetooth {
-                address: "00:11:22:33:44:55".into(),
+                address: "00:11:22:AA:BB:CC".into(),
                 channel: 1,
                 name: None,
             }),

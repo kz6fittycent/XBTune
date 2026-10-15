@@ -17,9 +17,9 @@ use crate::theme::{self, Palette};
 #[derive(Default)]
 pub struct DiagUi {
     /// Function waiting for the user to confirm.
-    confirm: Option<Function>,
+    pub confirm: Option<Function>,
     /// "The bike is safe" box in the dialog.
-    safe: bool,
+    pub safe: bool,
     /// Function in progress and its last stage.
     pub running: Option<(Function, Option<Stage>)>,
     pub last: Option<(Function, Result<Outcome, String>)>,
@@ -47,56 +47,20 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     egui::ScrollArea::vertical().show(ui, |ui| {
         ui.heading("Diagnostics");
         ui.add_space(6.0);
-        // Progress and last result, at the top where they're seen.
-        if let Some((f, stage)) = &app.diag.running {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.label(match stage {
-                    None | Some(Stage::Checking) => format!("{}: checking the bike is safe…", f.label()),
-                    Some(Stage::Sent) => format!("{}: sent, waiting for the ECM…", f.label()),
-                    Some(Stage::Running { seconds }) => format!("{}: running {seconds:.0} s…", f.label()),
-                });
-            });
-        } else if let Some((f, r)) = &app.diag.last {
-            match r {
-                Ok(o) => ui.colored_label(
-                    p.good,
-                    format!(
-                        "{}: done after {:.1} s{}",
-                        f.label(),
-                        o.busy_for.as_secs_f64(),
-                        if o.acknowledged { "" } else { " (reply lost; the busy state showed it ran)" }
-                    ),
-                ),
-                Err(e) => ui.colored_label(p.bad, format!("{}: {e}", f.label())),
-            };
-        }
+        status(app, ui, &p);
         ui.add_space(6.0);
 
         if !app.session_permitted() {
-            theme::card(ui).stroke(egui::Stroke::new(1.0, p.warn)).show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.label(RichText::new("ECM commands are locked").font(theme::strong_font(15.0)).color(p.warn));
-                ui.label(diag::locked_message());
-                ui.label(RichText::new("Reading trouble codes works without unlocking.").color(p.muted));
-            });
-            ui.add_space(8.0);
+            locked_card(
+                app,
+                ui,
+                "ECM commands are locked",
+                "Active tests and clearing codes are locked on a real bike. Reading trouble codes works \
+                 without unlocking.",
+            );
         }
 
-        if app.is_demo() {
-            theme::card(ui).show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Demo engine").font(theme::strong_font(15.0)));
-                    let mut running = app.demo_engine_running();
-                    if ui.checkbox(&mut running, "running").changed() {
-                        app.set_demo_engine_running(running);
-                    }
-                    ui.label(RichText::new("Tests refuse to run while the engine is running.").color(p.muted));
-                });
-            });
-            ui.add_space(8.0);
-        }
+        demo_engine_card(app, ui, &p);
 
         // Trouble codes
         theme::card(ui).show(ui, |ui| {
@@ -147,42 +111,74 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 }
             });
         });
-        ui.add_space(8.0);
-
-        // TPS and AFV
-        theme::card(ui).show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            ui.label(RichText::new("TPS reset").font(theme::strong_font(16.0)));
-            if diag::tps_reset_supported(&id.ecm) {
-                ui.label(diag::safety_notice(Function::TpsReset));
-                if ui.add_enabled(can_command, egui::Button::new("TPS reset…")).clicked() {
-                    app.diag.confirm = Some(Function::TpsReset);
-                    app.diag.safe = false;
-                }
-            } else {
-                ui.label(format!("{} is a {} ECM: follow the service manual for its TPS reset.", id.ecm.id, id.ecm.family));
-            }
-            ui.add_space(6.0);
-            ui.label(RichText::new("AFV reset").font(theme::strong_font(16.0)));
-            ui.label(
-                RichText::new(
-                    "Sets the adaptive fuel value back to 100% through the verified write path (backup, \
-                     review, write, read back). Turn the ignition off and on afterwards.",
-                )
-                .color(p.muted),
-            );
-            let can = app.link.live() && app.writes_permitted() && !app.burn.is_open();
-            let r = ui.add_enabled(can, egui::Button::new("AFV reset…"));
-            if !app.writes_permitted() {
-                r.on_disabled_hover_text(xbtune_core::diag::write_locked_message());
-            } else if r.clicked() {
-                crate::burn_view::start(app, crate::burn_view::Mode::Afv);
-            }
-        });
 
     });
 
     confirm_dialog(app, ui);
+}
+
+/// Progress and the last result of a test or reset, shown at the top of
+/// the views that run them.
+pub fn status(app: &XbApp, ui: &mut Ui, p: &Palette) {
+    if let Some((f, stage)) = &app.diag.running {
+        ui.horizontal(|ui| {
+            ui.spinner();
+            ui.label(match stage {
+                None | Some(Stage::Checking) => format!("{}: checking the bike is safe…", f.label()),
+                Some(Stage::Sent) => format!("{}: sent, waiting for the ECM…", f.label()),
+                Some(Stage::Running { seconds }) => format!("{}: running {seconds:.0} s…", f.label()),
+            });
+        });
+    } else if let Some((f, r)) = &app.diag.last {
+        match r {
+            Ok(o) => ui.colored_label(
+                p.good,
+                format!(
+                    "{}: done after {:.1} s{}",
+                    f.label(),
+                    o.busy_for.as_secs_f64(),
+                    if o.acknowledged { "" } else { " (reply lost; the busy state showed it ran)" }
+                ),
+            ),
+            Err(e) => ui.colored_label(p.bad, format!("{}: {e}", f.label())),
+        };
+    }
+}
+
+/// The demo's engine switch: tests and resets refuse while it runs.
+pub fn demo_engine_card(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
+    if app.is_demo() {
+        theme::card(ui).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Demo engine").font(theme::strong_font(15.0)));
+                let mut running = app.demo_engine_running();
+                if ui.checkbox(&mut running, "running").changed() {
+                    app.set_demo_engine_running(running);
+                }
+                ui.label(
+                    RichText::new("Tests and resets refuse to run while the engine is running.")
+                        .color(p.muted),
+                );
+            });
+        });
+        ui.add_space(8.0);
+    }
+}
+
+/// "Locked" card with a button to the Settings, where the owner unlocks.
+pub fn locked_card(app: &mut XbApp, ui: &mut Ui, title: &str, text: &str) {
+    let p = Palette::for_visuals(ui.visuals());
+    theme::card(ui).stroke(egui::Stroke::new(1.0, p.warn)).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.label(RichText::new(title).font(theme::strong_font(15.0)).color(p.warn));
+        ui.label(text);
+        ui.label(RichText::new("Everything can be tried in the demo without unlocking.").color(p.muted));
+        if ui.button("Unlock in Settings…").clicked() {
+            app.view = crate::app::View::Settings;
+        }
+    });
+    ui.add_space(8.0);
 }
 
 fn codes_table(ui: &mut Ui, p: &Palette, title: &str, codes: &[TroubleCode]) {
@@ -202,7 +198,7 @@ fn codes_table(ui: &mut Ui, p: &Palette, title: &str, codes: &[TroubleCode]) {
     });
 }
 
-fn confirm_dialog(app: &mut XbApp, ui: &mut Ui) {
+pub fn confirm_dialog(app: &mut XbApp, ui: &mut Ui) {
     let Some(f) = app.diag.confirm else { return };
     let p = Palette::for_visuals(ui.visuals());
     let mut go = false;

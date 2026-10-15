@@ -66,8 +66,8 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     bullet(ui, "Connecting, live data, logging and reading the ECM never change the bike.");
                     bullet(
                         ui,
-                        "Tests, clearing codes and writing to the ECM are locked on a real bike until you \
-                     unlock them. The demo lets you try all of it first.",
+                        "Tests, resets, clearing codes and writing to the ECM are locked on a real bike until \
+                     you switch them on in Settings. Try them all in the demo first.",
                     );
                     bullet(ui, "Before every write, XBTune saves a verified backup of the ECM.");
                 }
@@ -88,12 +88,13 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                         ui.label("The snap also needs permission to use them:");
                         for s in &app.plugs {
                             ui.horizontal(|ui| {
+                                // ✓/✗: Inter has these, not the heavy ✔/✘.
                                 let (mark, color) = match s.connected {
-                                    Some(true) => ("✔", p.good),
-                                    Some(false) => ("✘", p.bad),
-                                    None => ("?", p.muted),
+                                    Some(true) => ("✓ allowed", p.good),
+                                    Some(false) => ("✗ not allowed", p.bad),
+                                    None => ("unknown", p.muted),
                                 };
-                                ui.label(RichText::new(mark).color(color));
+                                ui.add_sized([110.0, 18.0], egui::Label::new(RichText::new(mark).color(color)));
                                 ui.label(s.purpose);
                             });
                             if s.connected == Some(false) {

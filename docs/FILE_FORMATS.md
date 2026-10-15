@@ -20,7 +20,7 @@ data = """
 
 [meta]
 created = "2026-10-14T19:44:19Z"
-source = "read from ECM over Bluetooth 00:11:22:33:44:55 channel 1, every chunk read twice and matched"
+source = "read from ECM over Bluetooth 00:11:22:AA:BB:CC channel 1, every chunk read twice and matched"
 vin = ""
 notes = "stock"
 ```
@@ -78,7 +78,7 @@ row, then one row per runtime frame:
 # app: xbtune 0.1.0
 # ecm_id: BUEIB
 # version: BUEIB310 12-11-03
-# target: Bluetooth 00:11:22:33:44:55 channel 1
+# target: Bluetooth 00:11:22:AA:BB:CC channel 1
 # started: 2026-10-14T21:00:00Z
 # note: first ride            (only if given; newlines become spaces)
 # channel: RPM | Engine Speed | RPM

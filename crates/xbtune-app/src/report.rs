@@ -755,7 +755,7 @@ mod tests {
 
     #[test]
     fn mask_hides_home_and_bt_addresses() {
-        let t = "opened /home/jane/snap/xbtune/common/data/a.xbt; target rfcomm:00:11:22:33:44:55 ch 1";
+        let t = "opened /home/jane/snap/xbtune/common/data/a.xbt; target rfcomm:00:11:22:AA:BB:CC ch 1";
         assert_eq!(mask(t), "opened ~/snap/xbtune/common/data/a.xbt; target rfcomm:XX:XX:XX:XX:XX:XX ch 1");
         assert_eq!(mask("\"/home/jane\" ok"), "\"~\" ok");
         // Times and hex dumps aren't addresses.

@@ -202,7 +202,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 ui.horizontal(|ui| {
                     ui.add(
                         egui::TextEdit::singleline(&mut app.connect.manual_address)
-                            .hint_text("00:11:22:33:44:55")
+                            .hint_text("XX:XX:XX:XX:XX:XX")
                             .desired_width(170.0),
                     );
                     ui.label("Channel");

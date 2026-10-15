@@ -32,8 +32,11 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 - **Phase 6 (burn): built 2026-10-14, sim-tested; NOT used on the bike.**
   EEPROM writes are LOCKED on real hardware by their own key
   (`eeprom_writes = true` in hardware.toml), separate from `ecm_commands`.
-  The owner adds it only after signing off on the simulator results.
-  Never create or edit that file ourselves.
+  The owner unlocks it only after signing off on the simulator results:
+  since 2026-10-15 via the app's Settings -> Safety locks (a switch plus a
+  confirmation; the app writes hardware.toml on that click), or by hand.
+  Never create or edit that file ourselves, and never click it in a test
+  run against the real config (UI checks never write it; use XBTUNE_HOME).
 - **Phase 5 (offline map editing): built 2026-10-14; owner tested
   2026-10-14** ("quite good"): edited a backup copy, set KRPM_Hard_Hi to
   7450 in it, and "Read from ECM" in the app worked on the bike. Feedback:
@@ -87,6 +90,14 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 - Hooks: `XBTUNE_SHOT_WIZARD=N`, `XBTUNE_SHOT_REPORT=1|crash`,
   `XBTUNE_CRASH_TEST=panic|thread|segv|abort`, `XBTUNE_REPORT_URL=...`.
 - Snap: `network` plug on the GUI app.
+- 2026-10-15 owner feedback round: wizard plug status showed "?" because
+  Inter has no ✔/✘ (now ✓/✗ + words; `theme::tests` checks every non-ASCII
+  UI character against the font's cmap). Owner's BT MAC removed from hint
+  text/docs/tests (hint is "XX:XX:XX:XX:XX:XX"). New views: Resets (TPS +
+  AFV, live TPD/TPS V/AFV) and Settings (safety locks -> `diag::set_unlocks`
+  + `Command::SetPermits` to the live session; startup; theme).
+  Snap permissions still need `snap connect` (a snap can't grant its own);
+  store auto-connect for bluez/raw-usb would remove that once published.
 
 ### Phase 6 contents
 
@@ -150,8 +161,8 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 - Sim (ASSUMED): busy for `test_duration` after a test, clear zeroes
   `HDiag*_LD`, `set_engine_running`, `Fault::LoseRequest`.
 - Hardware unlock: `<Dirs.config>/hardware.toml` with `ecm_commands = true`
-  (snap: `~/snap/xbtune/common/config/hardware.toml`). Created by the
-  OWNER only, after sign-off. Never create it ourselves.
+  (snap: `~/snap/xbtune/common/config/hardware.toml`). Set by the OWNER
+  only (app Settings since 2026-10-15, or by hand). Never create it ourselves.
 - AFV reset is NOT in phase 4: AFV is page-0 `LFuel1`, so it's an EEPROM
   write -> phase 6 burn path.
 
@@ -308,7 +319,8 @@ Sim first (no unlock needed): app -> Connect -> Start demo -> Diagnostics ->
 untick Demo engine "running" -> Tune -> open a tune, change a value ->
 "Burn to ECM…" -> review -> tick -> Write. Also try AFV reset, and the
 engine-running refusal. CLI: `xbtune.cli burn --sim <tune> --vars X --yes`.
-Real bike, only after the owner signs off and adds `eeprom_writes = true`:
+Real bike, only after the owner signs off and unlocks writing (app ->
+Settings -> "Allow writing to the ECM"):
 1. Engine OFF, ignition ON, laptop close to the bike (or USB cable).
 2. `xbtune.cli dump --bt ... -o ~/before.xbt` (extra copy).
 3. First burn: one small reversible value, e.g. KRPM_Hard_Hi 7450 (stock
