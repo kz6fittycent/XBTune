@@ -290,6 +290,7 @@ pub fn start(cfg: SessionConfig, opener: Opener, catalog: Arc<Catalog>, notify: 
             out,
             commands: crx,
             identity: None,
+            unanswered: 0,
             read: None,
             prepared: None,
             log: None,
@@ -339,7 +340,15 @@ struct Worker {
     log: Option<Log>,
     started: Instant,
     reconnects: u32,
+    /// Links that opened but got no answer to the version request, before
+    /// the ECM was ever identified.
+    unanswered: u32,
 }
+
+/// Opened links with no answer to the version request before the session
+/// gives up, when the ECM has never answered: the wrong ECM type (or a
+/// switched-off ECM on a cable) won't fix itself by retrying.
+pub const UNANSWERED_LIMIT: u32 = 3;
 
 /// Why a connection ended.
 enum End {
@@ -430,11 +439,22 @@ impl Worker {
     async fn connected(&mut self, mut client: EcmClient, failed_in_a_row: &mut u32) -> End {
         let version = match client.version().await {
             Ok(v) => v,
+            Err(e) if !e.is_silence() => {
+                // It answered (a NAK or a garbled reply): not the wrong type.
+                return End::Retry(format!("bad answer to the version request: {e}"));
+            }
             Err(e) => {
-                return End::Retry(format!(
-                    "no answer to the version request: {e}. {}",
-                    wrong_type_hint(self.cfg.address)
-                ));
+                let hint = wrong_type_hint(self.cfg.address);
+                if self.identity.is_none() {
+                    self.unanswered += 1;
+                    if self.unanswered >= UNANSWERED_LIMIT {
+                        return End::Stop(Some(format!(
+                            "The ECM didn't answer ({} tries; {e}). Is the ignition on and the kill switch at RUN? {hint}",
+                            self.unanswered
+                        )));
+                    }
+                }
+                return End::Retry(format!("no answer to the version request: {e}. {hint}"));
             }
         };
         let Some(ecm) = self.catalog.lookup(&version).cloned() else {
@@ -1106,10 +1126,12 @@ mod tests {
         let mut cfg = SessionConfig::new("sim", EcmAddress::Stock);
         fast(&mut cfg);
         let mut s = start(cfg, sim_opener(sim.clone()), catalog.clone(), None);
-        let ev = collect_until(&mut s, |e| matches!(e, Event::State(LinkState::Reconnecting { .. }))).await;
-        let Some(Event::State(LinkState::Reconnecting { reason, .. })) = ev.last() else { panic!("{ev:?}") };
-        assert!(reason.contains("Factory race") && reason.contains("--race"), "{reason}");
-        s.send(Command::Stop);
+        // A few tries, then it stops with the reason (shown as an error).
+        let ev = collect_until(&mut s, |e| matches!(e, Event::State(LinkState::Stopped { .. }))).await;
+        let Some(Event::State(LinkState::Stopped { reason: Some(r) })) = ev.last() else { panic!("{ev:?}") };
+        assert!(r.contains("didn't answer") && r.contains("Factory race") && r.contains("--race"), "{r}");
+        let retries = ev.iter().filter(|e| matches!(e, Event::State(LinkState::Reconnecting { .. }))).count();
+        assert_eq!(retries as u32, UNANSWERED_LIMIT - 1);
         s.task.await.unwrap();
 
         let store = std::env::temp_dir().join(format!("xbtune-race-{}", std::process::id()));

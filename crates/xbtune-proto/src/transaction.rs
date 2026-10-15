@@ -49,6 +49,16 @@ impl TransactionError {
     pub fn is_transient(&self) -> bool {
         !matches!(self, Self::Nak(_))
     }
+
+    /// True if nothing answered at all (every attempt timed out). A NAK or
+    /// a corrupt reply means something is there.
+    pub fn is_silence(&self) -> bool {
+        match self {
+            Self::Timeout(_) => true,
+            Self::Exhausted { last, .. } => last.is_silence(),
+            _ => false,
+        }
+    }
 }
 
 /// Classify `frame` as a reply to `request` sent to `ecm`.
@@ -236,6 +246,13 @@ mod tests {
     fn ignores_echo_and_other_addresses() {
         let echo = Request::Version.to_pdu(EcmAddress::Stock);
         assert_eq!(judge(&Request::Version, EcmAddress::Stock, &echo), Verdict::Ignore);
+        let silent = TransactionError::Exhausted {
+            attempts: 3,
+            last: Box::new(TransactionError::Timeout(Duration::from_millis(400))),
+        };
+        assert!(silent.is_silence());
+        let nak = TransactionError::Exhausted { attempts: 2, last: Box::new(TransactionError::Nak(0x15)) };
+        assert!(!nak.is_silence());
         let race = Pdu::new(0x55, HOST_ID, &[0x06]);
         assert_eq!(judge(&Request::Version, EcmAddress::Stock, &race), Verdict::Ignore);
     }

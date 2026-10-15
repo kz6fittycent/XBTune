@@ -8,6 +8,7 @@ is the owner's own calibration.
 | `BUEIB_xbtune.xpr` (or `xbtune.xbt`) | `xbtune.cli dump --bt <ADDR> --xpr BUEIB_xbtune.xpr` (verified read) |
 | `BUEIB_20261014-162837.xpr` (or `ecmdroid.xpr`) | EcmDroid: EEPROM → Fetch, then Save, from the same ECM, same day |
 | `idle.csv`, `BUEIB_20261014-231006.csv` | Live logs from the bike, engine running (`xbtune.cli log` and the app's Record), snap git a1bd3e7 |
+| `BUEIB_20261015-200748.csv` | Warm ride (219 s, CLT 98-164 °C), app Record, snap git 2aad16b; poor link (3.2 Hz, NAKs) and O2 dipping to 0.00 V when lean |
 | `ecmdroid_values.toml` | Values read off EcmDroid's Setup screens (see the test for the format) |
 
 `crates/xbtune-core/tests/owner_golden.rs` checks that both images are

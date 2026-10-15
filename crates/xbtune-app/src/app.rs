@@ -385,6 +385,13 @@ impl XbApp {
                 (session::target_opener(t.clone()), t.to_string())
             }
         };
+        // The ECM type goes into the label, so app.log and the log file's
+        // `target:` line show which address was used.
+        let label = if target.race() && !target.is_demo() {
+            format!("{label}, factory race ECM (0x55)")
+        } else {
+            label
+        };
         tracing::info!("connecting to {label}");
         let mut cfg = SessionConfig::new(label, target_address(&target));
         cfg.permit = xbtune_core::diag::permit(target.is_demo()).ok();
@@ -602,6 +609,19 @@ impl XbApp {
                 }
                 Event::Identified(id) => {
                     tracing::info!("ECM {} ({}, {})", id.version.trim(), id.ecm.id, id.ecm.family);
+                    let race = self.link.target.as_ref().is_some_and(SavedTarget::race);
+                    if race && !id.ecm.is_race() {
+                        // Not expected (EcmDroid: only factory race ECMs use
+                        // 0x55); worth knowing if a street ECM does.
+                        self.say(
+                            format!(
+                                "Connected as \"Factory race\" (address 0x55), but {} is a street ECM and answered \
+                                 anyway. \"Stock\" works for it too.",
+                                id.ecm.id
+                            ),
+                            false,
+                        );
+                    }
                     self.link.channels = channels(&id.definition);
                     self.link.identity = Some(id);
                 }
@@ -905,6 +925,10 @@ fn status_text(link: &LinkView, p: &Palette) -> (Color32, String) {
             (p.warn, format!("Connecting to {target} (attempt {attempt})…"))
         }
         Some(LinkState::Connecting { .. }) => (p.warn, format!("Connecting to {target}…")),
+        // Never answered yet: retrying a few times, then the reason shows.
+        Some(LinkState::Reconnecting { .. }) if link.identity.is_none() => {
+            (p.warn, format!("No answer from {target}, trying again…"))
+        }
         Some(LinkState::Reconnecting { .. }) => (p.warn, format!("Link lost, reconnecting to {target}…")),
         Some(LinkState::Live) => {
             let id = link

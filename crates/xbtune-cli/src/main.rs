@@ -25,7 +25,7 @@ use xbtune_core::image::{Image, crc32, diff_ranges};
 use xbtune_core::read::EepromRead;
 use xbtune_defs::{Catalog, EeKind, Shape};
 use xbtune_link::{EcmClient, OpenError, Target, bluetooth};
-use xbtune_proto::{EcmAddress, LinkStats, RetryPolicy};
+use xbtune_proto::{EcmAddress, LinkStats, RetryPolicy, TransactionError};
 
 #[derive(Parser)]
 #[command(
@@ -208,8 +208,9 @@ impl Connection {
     }
 
     /// Appended to "no answer" errors: the other ECM type stays silent.
-    fn no_answer_hint(&self) -> &'static str {
-        xbtune_core::session::wrong_type_hint(self.address())
+    /// Only when nothing answered: a NAK means the ECM is there.
+    fn no_answer_hint(&self, e: &TransactionError) -> &'static str {
+        if e.is_silence() { xbtune_core::session::wrong_type_hint(self.address()) } else { "" }
     }
 
     fn policy(&self) -> RetryPolicy {
@@ -389,7 +390,7 @@ async fn info(a: InfoArgs) -> Result<()> {
         anyhow!(
             "no answer to the version request ({e}). Is the ignition on and the adapter on the diagnostic \
              connector? {}",
-            a.conn.no_answer_hint()
+            a.conn.no_answer_hint(&e)
         )
     })?;
     println!("Version:     {version}");
@@ -608,7 +609,7 @@ async fn dump(a: DumpArgs) -> Result<()> {
                 eprintln!("  no answer to the version request ({e}); trying again");
             }
             Err(e) => {
-                bail!("no answer to the version request ({e}). {}", a.conn.no_answer_hint());
+                bail!("no answer to the version request ({e}). {}", a.conn.no_answer_hint(&e));
             }
         }
     };

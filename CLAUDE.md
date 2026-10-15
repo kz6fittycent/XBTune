@@ -79,6 +79,22 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   read/live/burn on the race sim, CLI info. Hook `XBTUNE_SHOT_RACE=1`.
   Untested on a real race ECM (none available). BT adapters must be set
   to 19200 for factory race; XBTune can't change a BuellTooth's baud.
+- **2026-10-15 evening owner test (snap 2aad16b):** warm ride logged
+  (`tests/fixtures/owner/BUEIB_20261015-200748.csv`); auto-tune in the
+  app proposed 8 cells (4/map, ~-3 units at load 20 idle and load 30
+  2900-3400 rpm, EGO ~95%), CLI agrees. Ride link: 3.2 Hz, 192 timeouts,
+  50 NAKs (0x15), 10 corrupt; garage logs had no NAKs, so likely
+  garbled requests on the move (one lost frame each; left as is). O2
+  lean swings reach 0.00 V: they were counted as "sensor error" (28%);
+  now only > 1.10 V is an error. "Factory race" didn't stop the
+  connection: most likely "Last used" ignored the ECM type (fixed: ECM
+  type card is first and applies to Last used; the session label/log
+  `target:` line says "factory race ECM (0x55)"; a street ECM answering
+  on 0x55 gets a visible note). Also: a never-answered link stops after
+  `UNANSWERED_LIMIT` (3) silent version requests with the hint as an
+  error message (it retried forever with the hint hidden); NAKs and
+  garbled replies don't count as silence (`TransactionError::is_silence`).
+  Owner to retest the ECM type on the bike.
 - **Tube-frame DDFI ECMs: built 2026-10-15** (owner moved them up from
   phase 9: "add the tuber features too for this phase"). Data regenerated
   from ecmdroid.db at the pinned commit (fresh clone; extractor reproduced

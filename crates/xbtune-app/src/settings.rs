@@ -52,6 +52,16 @@ impl SavedTarget {
         }
     }
 
+    /// The same target with the ECM type set to `race`.
+    pub fn with_race(mut self, race: bool) -> Self {
+        match &mut self {
+            Self::Bluetooth { race: r, .. } | Self::Serial { race: r, .. } | Self::Demo { race: r } => {
+                *r = race
+            }
+        }
+        self
+    }
+
     pub fn is_demo(&self) -> bool {
         matches!(self, Self::Demo { .. })
     }

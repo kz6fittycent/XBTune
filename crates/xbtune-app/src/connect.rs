@@ -115,7 +115,13 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             ui.add_space(8.0);
         }
 
-        if let Some(last) = app.settings.last.clone() {
+        // ECM type first: it applies to every Connect button below,
+        // "Last used" included.
+        ecm_type(app, ui, &p);
+        ui.add_space(8.0);
+        let race = app.connect.race;
+
+        if let Some(last) = app.settings.last.clone().map(|t| t.with_race(race)) {
             theme::card(ui).show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
@@ -143,10 +149,6 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             });
             ui.add_space(8.0);
         }
-
-        ecm_type(app, ui, &p);
-        ui.add_space(8.0);
-        let race = app.connect.race;
 
         // Bluetooth
         theme::card(ui).show(ui, |ui| {

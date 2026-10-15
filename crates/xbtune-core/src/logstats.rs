@@ -5,8 +5,10 @@
 use crate::logfile::Log;
 
 /// Narrowband O2 statistics. Rich/lean are split at the ECM's O2 target
-/// voltage (`KO2_Midpoint`, 0.49 V on the owner's BUEIB); readings outside
-/// 0.05-1.10 V count as sensor errors (unplugged, shorted, cold).
+/// voltage (`KO2_Midpoint`, 0.49 V on the owner's BUEIB); readings above
+/// 1.10 V (or below 0) count as sensor errors. Readings near 0 V are lean,
+/// not errors: the owner's warm cruise log (2026-10-15) dips to 0.00-0.04 V
+/// between normal switching while EGO keeps working.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct O2Stats {
     pub samples: usize,
@@ -20,7 +22,7 @@ pub struct O2Stats {
 pub fn o2_stats(log: &Log, midpoint: f64) -> O2Stats {
     let (mut rich, mut lean, mut err) = (Vec::new(), Vec::new(), 0usize);
     for v in log.series("O2").into_iter().flatten() {
-        if !(0.05..=1.10).contains(&v) {
+        if !(0.0..=1.10).contains(&v) {
             err += 1;
         } else if v >= midpoint {
             rich.push(v);
@@ -109,5 +111,20 @@ mod tests {
         for a in anomalies(&log) {
             assert!(a.t >= log.samples[0].t, "{a:?}");
         }
+    }
+
+    /// Warm ride, 2026-10-15: lean swings reach 0.00 V; those are lean
+    /// readings, not sensor errors (28% were counted as errors before).
+    #[test]
+    fn owner_ride_low_o2_is_lean() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/owner");
+        let path = dir.join("BUEIB_20261015-200748.csv");
+        if !path.exists() {
+            return;
+        }
+        let log = Log::open(&path, &Catalog::builtin().unwrap()).unwrap();
+        let s = o2_stats(&log, 0.49);
+        assert_eq!(s.error_pct, 0.0, "{s:?}");
+        assert!(s.lean_pct > 40.0 && s.rich_pct > 40.0, "{s:?}");
     }
 }
