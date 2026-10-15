@@ -1,0 +1,179 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//! `logstats` and `autotune`: offline work on recorded logs. Neither talks
+//! to the ECM; `autotune` writes a new tune file only when asked (-o).
+
+use std::path::PathBuf;
+
+use anyhow::{Context, Result, bail};
+use clap::Args;
+use xbtune_core::autotune::{self, Filters, Settings};
+use xbtune_core::logfile::Log;
+use xbtune_core::logstats;
+use xbtune_core::tune::Tune;
+use xbtune_defs::Catalog;
+
+#[derive(Args)]
+pub struct StatsArgs {
+    /// Log files (.csv from `log` or the app's Record).
+    #[arg(required = true)]
+    logs: Vec<PathBuf>,
+    /// O2 target voltage that splits rich from lean.
+    #[arg(long, default_value_t = 0.49)]
+    midpoint: f64,
+}
+
+#[derive(Args)]
+pub struct AutotuneArgs {
+    /// Tune to correct (.xbt or .xpr): usually a fresh read of the ECM the
+    /// logs were recorded with.
+    #[arg(long)]
+    tune: PathBuf,
+    /// Log files to learn from.
+    #[arg(required = true)]
+    logs: Vec<PathBuf>,
+    /// Save the corrected tune here. Without it (or --in-place) nothing is saved.
+    #[arg(short, long)]
+    output: Option<PathBuf>,
+    /// Overwrite the tune file.
+    #[arg(long)]
+    in_place: bool,
+    /// Which fuel maps: front, rear or both.
+    #[arg(long, default_value = "both")]
+    maps: String,
+    /// Minimum sample weight per cell (~6.5 per second spent in a cell).
+    #[arg(long, default_value_t = 30.0)]
+    min_hits: f64,
+    /// Largest change per cell, in percent.
+    #[arg(long, default_value_t = 10.0)]
+    max_change: f64,
+    /// Ignore samples below this engine temperature (°C).
+    #[arg(long, default_value_t = 80.0)]
+    min_clt: f64,
+}
+
+fn open_logs(paths: &[PathBuf], catalog: &Catalog) -> Result<Vec<Log>> {
+    paths.iter().map(|p| Log::open(p, catalog).map_err(anyhow::Error::from)).collect()
+}
+
+pub fn logstats(a: StatsArgs) -> Result<()> {
+    let catalog = Catalog::builtin()?;
+    for log in open_logs(&a.logs, &catalog)? {
+        println!("{}", log.name());
+        println!("  ECM:       {} ({})", log.version, log.ecm.family);
+        if let Some(s) = &log.started {
+            println!("  Started:   {s}");
+        }
+        if let Some(n) = &log.note {
+            println!("  Note:      {n}");
+        }
+        println!(
+            "  Samples:   {} over {:.0} s ({:.1} Hz); {} link event(s); {} unreadable row(s)",
+            log.samples.len(),
+            log.duration(),
+            log.rate(),
+            log.events.len(),
+            log.skipped
+        );
+        let o2 = logstats::o2_stats(&log, a.midpoint);
+        let v = |x: Option<f64>| x.map_or("-".into(), |v| format!("{v:.2} V"));
+        println!(
+            "  O2:        {:.0}% rich, {:.0}% lean, {:.0}% sensor error; average rich {}, lean {}",
+            o2.rich_pct,
+            o2.lean_pct,
+            o2.error_pct,
+            v(o2.avg_rich_v),
+            v(o2.avg_lean_v)
+        );
+        let an = logstats::anomalies(&log);
+        if an.is_empty() {
+            println!("  Anomalies: none");
+        } else {
+            println!("  Anomalies: {}", an.len());
+            for x in an.iter().take(20) {
+                println!("    t={:.1} s  {}", x.t, x.text);
+            }
+            if an.len() > 20 {
+                println!("    ... and {} more", an.len() - 20);
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn autotune(a: AutotuneArgs) -> Result<()> {
+    let catalog = Catalog::builtin()?;
+    let out = match (&a.output, a.in_place) {
+        (Some(o), false) if *o == a.tune => bail!("-o is the tune file; use --in-place to overwrite it"),
+        (Some(o), false) => Some(o.clone()),
+        (None, true) => Some(a.tune.clone()),
+        (Some(_), true) => bail!("give either -o or --in-place, not both"),
+        (None, false) => None,
+    };
+    let mut tune = Tune::open(&a.tune, &catalog).with_context(|| format!("opening {}", a.tune.display()))?;
+    let logs = open_logs(&a.logs, &catalog)?;
+    let maps: Vec<String> = autotune::fuel_maps(&tune)
+        .into_iter()
+        .filter(|m| match a.maps.as_str() {
+            "front" => m.contains("Front"),
+            "rear" => m.contains("Rear"),
+            _ => true,
+        })
+        .collect();
+    if maps.is_empty() {
+        bail!("{}: no fuel maps to tune (--maps front, rear or both)", tune.ecm.id);
+    }
+    let settings = Settings {
+        filters: Filters { min_clt: a.min_clt, ..Default::default() },
+        min_hits: a.min_hits,
+        max_change: a.max_change / 100.0,
+    };
+    let mut all = Vec::new();
+    let mut afv = None;
+    for map in &maps {
+        let an = autotune::analyze(&logs, &tune, map, &settings.filters).map_err(anyhow::Error::msg)?;
+        afv = afv.or(an.afv);
+        let r = &an.rejected;
+        println!(
+            "{map}: {} of {} samples used (left out: {} open loop, {} cold, {} changing, {} enrichment, {} after a gap, {} missing)",
+            an.used, an.samples, r.open_loop, r.cold, r.transient, r.enrichment, r.gap, r.missing
+        );
+        let ys = tune.var(map).ok().and_then(|v| v.y_axis.clone()).and_then(|n| tune.elements(&n).ok());
+        let xs = tune.var(map).ok().and_then(|v| v.x_axis.clone()).and_then(|n| tune.elements(&n).ok());
+        let p = autotune::propose(&an, &tune, &settings).map_err(anyhow::Error::msg)?;
+        if p.is_empty() {
+            println!("  no cell has enough samples ({} needed) and a change to make", a.min_hits);
+        }
+        for x in &p {
+            let at = |v: &Option<Vec<f64>>, i: usize| {
+                v.as_ref().and_then(|v| v.get(i)).map_or("?".into(), |v| format!("{v}"))
+            };
+            println!(
+                "  load {:>4} rpm {:>5}: {:>6.1} -> {:>6.1}  (EGO {:.1}%, {:.0} hits){}",
+                at(&ys, x.row),
+                at(&xs, x.col),
+                x.old,
+                x.new,
+                x.ego,
+                x.hits,
+                if x.limited { "  capped" } else { "" }
+            );
+        }
+        all.extend(p);
+    }
+    if let Some(v) = afv {
+        println!(
+            "AFV in the logs: {v:.1}%. The EGO corrections above already include it: after burning this \
+             tune, reset AFV (xbtune.cli afv-reset) so it isn't counted twice."
+        );
+    }
+    match out {
+        None => println!("Nothing saved (add -o FILE to save the corrected tune)."),
+        Some(_) if all.is_empty() => println!("Nothing to change; nothing saved."),
+        Some(path) => {
+            let n = autotune::apply(&mut tune, &all).map_err(anyhow::Error::msg)?;
+            tune.save(&path, &catalog)?;
+            println!("{n} cell(s) changed; saved {}. Nothing was written to the ECM.", path.display());
+        }
+    }
+    Ok(())
+}

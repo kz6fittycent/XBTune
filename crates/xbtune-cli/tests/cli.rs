@@ -313,3 +313,43 @@ fn burn_restore_and_afv_reset_on_sim() {
     assert!(home().join("files/Backups").read_dir().unwrap().count() >= 3);
     assert!(home().join("files/History").read_dir().unwrap().count() >= 2);
 }
+
+#[test]
+fn logstats_and_autotune_on_owner_logs() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/owner");
+    let (tune, log) = (dir.join("BUEIB_xbtune.xpr"), dir.join("idle.csv"));
+    if !tune.exists() || !log.exists() {
+        eprintln!("skipping: owner fixtures not present");
+        return;
+    }
+    let (ok, out) = cli(&["logstats", log.to_str().unwrap()]);
+    assert!(ok && out.contains("% rich") && out.contains("Hz"), "{out}");
+    // Without -o nothing is saved.
+    let (ok, out) = cli(&["autotune", "--tune", tune.to_str().unwrap(), log.to_str().unwrap()]);
+    assert!(ok && out.contains("Nothing saved") && out.contains("EGO"), "{out}");
+    // With -o: a new file whose only differences are fuel map cells.
+    let fixed = tmp("autotuned.xbt");
+    let (ok, out) = cli(&[
+        "autotune",
+        "--tune",
+        tune.to_str().unwrap(),
+        log.to_str().unwrap(),
+        "-o",
+        fixed.to_str().unwrap(),
+    ]);
+    assert!(ok && out.contains("Nothing was written to the ECM"), "{out}");
+    let (ok, out) = cli(&["diff", tune.to_str().unwrap(), fixed.to_str().unwrap()]);
+    assert!(ok, "{out}");
+    let named: Vec<&str> = out.lines().filter(|l| l.contains("..")).collect();
+    assert!(!named.is_empty() && named.iter().all(|l| l.contains("Tab_Fuel_")), "{out}");
+    // Refuses to overwrite the input without --in-place.
+    let (ok, out) = cli(&[
+        "autotune",
+        "--tune",
+        tune.to_str().unwrap(),
+        log.to_str().unwrap(),
+        "-o",
+        tune.to_str().unwrap(),
+    ]);
+    assert!(!ok && out.contains("--in-place"), "{out}");
+}
