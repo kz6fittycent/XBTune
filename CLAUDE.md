@@ -89,6 +89,10 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   (`tools/test_remote_relay.sh`, CI job `remote-relay`). Hooks:
   `XBTUNE_SHOT_REMOTE=host|guide|join:<code>`, `XBTUNE_SHOT_REMOTE_CHAT`.
   Snap: `network` on the GUI, `network` + `network-bind` on the CLI.
+  Owner check 2026-10-15 (relay deployed, snap 0500293, laptop <->
+  desktop): connected twice, wrong code closed the session as intended.
+  R1 PASSED. Owner expected remote AFV reset/tests already (that's R4);
+  asked whether to keep R2-R5 order or bring requests forward.
 - **Factory race ECMs: built 2026-10-15** (owner asked after seeing
   EcmDroid's race support). EcmDroid has no commits after our pin
   `2f17d29f`; its race support is `3c189be` (protocol choice, address
