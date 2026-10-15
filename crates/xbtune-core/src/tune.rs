@@ -70,7 +70,9 @@ pub struct Tune {
     pub path: Option<PathBuf>,
     /// Bytes as opened or last saved, for "changed" markers.
     saved: Vec<u8>,
-    /// Bytes as first opened, for `parent_crc32`.
+    /// Bytes as first opened (for `parent_crc32`, and to tell the user's
+    /// edits from bytes the ECM changed by itself when burning).
+    opened: Vec<u8>,
     opened_crc: u32,
     undo: Vec<Edit>,
     redo: Vec<Edit>,
@@ -88,7 +90,18 @@ impl Tune {
             .ok_or_else(|| TuneError::Other(format!("{}: no definition", ecm.id)))?;
         let saved = image.bytes.clone();
         let opened_crc = crc32(&saved);
-        Ok(Self { image, ecm, def, path: None, saved, opened_crc, undo: Vec::new(), redo: Vec::new() })
+        let opened = saved.clone();
+        Ok(Self {
+            image,
+            ecm,
+            def,
+            path: None,
+            saved,
+            opened,
+            opened_crc,
+            undo: Vec::new(),
+            redo: Vec::new(),
+        })
     }
 
     pub fn open(path: &Path, catalog: &Catalog) -> Result<Self, TuneError> {
@@ -231,6 +244,11 @@ impl Tune {
         let label = e.label.clone();
         self.undo.push(e);
         Some(label)
+    }
+
+    /// The bytes as first opened.
+    pub fn opened_bytes(&self) -> &[u8] {
+        &self.opened
     }
 
     /// True if the bytes differ from the last save.

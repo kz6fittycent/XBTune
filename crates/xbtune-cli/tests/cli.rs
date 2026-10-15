@@ -3,8 +3,17 @@
 
 use std::process::Command;
 
+/// Scratch config/data folder: tests never touch the user's real ones.
+fn home() -> std::path::PathBuf {
+    std::env::temp_dir().join(format!("xbtune-cli-home-{}", std::process::id()))
+}
+
 fn cli(args: &[&str]) -> (bool, String) {
-    let out = Command::new(env!("CARGO_BIN_EXE_xbtune-cli")).args(args).output().unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_xbtune-cli"))
+        .env("XBTUNE_HOME", home())
+        .args(args)
+        .output()
+        .unwrap();
     let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
     if !out.status.success() {
         text.push_str(&String::from_utf8_lossy(&out.stderr));
@@ -198,6 +207,7 @@ fn active_tests_are_guarded() {
     assert!(out.contains("no test 'warp-drive'"), "{out}");
     // Without --yes, anything but "yes" cancels.
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_xbtune-cli"))
+        .env("XBTUNE_HOME", home())
         .args(["test", "fan", "--sim"])
         .stdin(std::process::Stdio::null())
         .output()
@@ -248,4 +258,58 @@ fn set_and_copy_table_edit_files_only() {
     let (ok, out) = cli(&["diff", base.to_str().unwrap(), back.to_str().unwrap()]);
     assert!(ok, "{out}");
     assert!(out.contains("KRPM_Hard_Hi") && !out.contains("Tab_Fuel_Front"), "{out}");
+}
+
+#[test]
+fn burn_restore_and_afv_reset_on_sim() {
+    let fast = ["--sim", "--sim-latency-ms", "0", "--sim-baud", "0"];
+    let base = tmp("burn_base.xbt");
+    let (ok, out) = cli(&["dump", "--sim", "-o", base.to_str().unwrap()]);
+    assert!(ok, "{out}");
+    let tune = tmp("burn_tune.xbt");
+    let (ok, out) = cli(&["set", base.to_str().unwrap(), "KRPM_Hard_Hi=7000", "-o", tune.to_str().unwrap()]);
+    assert!(ok, "{out}");
+    // Without a choice it lists and writes nothing.
+    let mut a = vec!["burn"];
+    a.extend(fast);
+    a.push(tune.to_str().unwrap());
+    let (ok, out) = cli(&a);
+    assert!(!ok && out.contains("KRPM_Hard_Hi") && out.contains("Nothing was written"), "{out}");
+    // Write it.
+    let mut a = vec!["burn"];
+    a.extend(fast);
+    a.extend([tune.to_str().unwrap(), "--vars", "KRPM_Hard_Hi", "--note", "t", "--yes"]);
+    let (ok, out) = cli(&a);
+    assert!(ok, "{out}");
+    assert!(out.contains("Written and verified: 1 write(s)"), "{out}");
+    assert!(out.contains("Backup:"), "{out}");
+    // AFV reset.
+    let mut a = vec!["afv-reset"];
+    a.extend(fast);
+    a.push("--yes");
+    let (ok, out) = cli(&a);
+    assert!(ok && out.contains("AFV Rear (LFuel)") && out.contains("Written and verified"), "{out}");
+    // Restore: the in-process sim starts fresh each run, so restoring the
+    // base image over it has nothing to do.
+    let mut a = vec!["restore"];
+    a.extend(fast);
+    a.extend([base.to_str().unwrap(), "--yes"]);
+    let (ok, out) = cli(&a);
+    assert!(ok && out.contains("already matches"), "{out}");
+    // Refusals.
+    let (ok, out) = cli(&["burn", "--sim", "--sim-engine-running", tune.to_str().unwrap(), "--all", "--yes"]);
+    assert!(!ok && out.contains("engine is running"), "{out}");
+    let (ok, out) = cli(&["burn", "--serial", "/dev/null", tune.to_str().unwrap(), "--all", "--yes"]);
+    assert!(!ok && out.contains("locked on real hardware"), "{out}");
+    // A tune for another ECM is refused.
+    let other = tmp("BUE2D_other.xpr");
+    std::fs::write(&other, include_bytes!("../../../tests/fixtures/BUE2D.eeprom")).unwrap();
+    let mut a = vec!["burn"];
+    a.extend(fast);
+    a.extend([other.to_str().unwrap(), "--all", "--yes"]);
+    let (ok, out) = cli(&a);
+    assert!(!ok && out.contains("writing refused"), "{out}");
+    // Backups and history went to the scratch home.
+    assert!(home().join("data/backups").read_dir().unwrap().count() >= 3);
+    assert!(home().join("data/history").read_dir().unwrap().count() >= 2);
 }

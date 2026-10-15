@@ -460,6 +460,23 @@ pub async fn execute(
     Ok(BurnReport { writes: total, bytes: plan.bytes(), pages: plan.pages.iter().copied().collect() })
 }
 
+/// Require a fresh runtime frame showing the engine stopped (RPM 0).
+pub async fn engine_stopped(client: &mut EcmClient, def: &Definition) -> Result<(), String> {
+    let frame = client.runtime_data().await.map_err(|e| format!("can't check the engine is stopped: {e}"))?;
+    let rpm = def
+        .runtime
+        .values()
+        .find(|v| v.varname == "RPM")
+        .and_then(|v| v.value(frame.as_bytes()))
+        .ok_or("can't check the engine is stopped: no RPM channel")?;
+    if rpm > 0.0 {
+        return Err(format!(
+            "the engine is running ({rpm:.0} RPM); stop it (ignition ON, engine OFF) before writing"
+        ));
+    }
+    Ok(())
+}
+
 /// The tune with AFV set to neutral (100%), for an AFV reset.
 pub fn afv_reset(def: &Definition, ecm: &[u8], page_zero: bool) -> Result<(Vec<u8>, Vec<String>), String> {
     let view = ImageView { bytes: ecm, page_zero };

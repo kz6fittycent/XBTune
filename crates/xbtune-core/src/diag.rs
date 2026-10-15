@@ -194,16 +194,53 @@ pub fn permit(simulated: bool) -> Result<Permit, String> {
     }
 }
 
+#[derive(serde::Deserialize, Default)]
+struct Hw {
+    #[serde(default)]
+    ecm_commands: bool,
+    #[serde(default)]
+    eeprom_writes: bool,
+}
+
+fn hw(path: &std::path::Path) -> Hw {
+    std::fs::read_to_string(path).ok().and_then(|t| toml::from_str::<Hw>(&t).ok()).unwrap_or_default()
+}
+
 fn unlocked(path: &std::path::Path) -> bool {
-    #[derive(serde::Deserialize)]
-    struct Hw {
-        #[serde(default)]
-        ecm_commands: bool,
+    hw(path).ecm_commands
+}
+
+/// Proof that EEPROM writes (burns) may go to this target. Separate from
+/// [`Permit`]: the owner unlocks writing on its own, after signing off on
+/// the simulator burn tests.
+#[derive(Debug, Clone)]
+pub struct WritePermit {
+    _private: (),
+}
+
+pub fn write_locked_message() -> String {
+    let path =
+        permit_file().map(|p| p.display().to_string()).unwrap_or_else(|| "<config>/hardware.toml".into());
+    format!(
+        "Writing to the ECM's EEPROM is locked on real hardware until the owner signs off on the \
+         simulator burn tests (KICKOFF section 6). To unlock, add this line to {path}:\n    \
+         eeprom_writes = true"
+    )
+}
+
+/// A write permit for the simulator (always), or for real hardware when
+/// the owner has unlocked writing.
+pub fn write_permit(simulated: bool) -> Result<WritePermit, String> {
+    if simulated || permit_file().is_some_and(|p| hw(&p).eeprom_writes) {
+        Ok(WritePermit { _private: () })
+    } else {
+        Err(write_locked_message())
     }
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|t| toml::from_str::<Hw>(&t).ok())
-        .is_some_and(|h| h.ecm_commands)
+}
+
+#[cfg(test)]
+pub(crate) fn test_write_permit() -> WritePermit {
+    WritePermit { _private: () }
 }
 
 #[cfg(test)]
@@ -427,6 +464,10 @@ mod tests {
         assert!(unlocked(&unlocked_file));
         std::fs::write(&unlocked_file, "ecm_commands = false\n").unwrap();
         assert!(!unlocked(&unlocked_file));
+        std::fs::write(&unlocked_file, "ecm_commands = true\neeprom_writes = true\n").unwrap();
+        assert!(hw(&unlocked_file).eeprom_writes);
+        std::fs::write(&unlocked_file, "ecm_commands = true\n").unwrap();
+        assert!(!hw(&unlocked_file).eeprom_writes, "writes need their own key");
         std::fs::write(&unlocked_file, "garbage =").unwrap();
         assert!(!unlocked(&unlocked_file));
         let _ = std::fs::remove_file(&unlocked_file);

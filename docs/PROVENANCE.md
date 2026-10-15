@@ -167,6 +167,20 @@ known-good source:**
 | Grid ops, clipboard, undo/redo as byte patches, front/rear partner by name | XB |
 | Live point on maps: axes named "...RPM..." follow the `RPM` channel, "...Load..." the `Load` channel | XB reading, still shown as "approx.". Owner's BUEIB at warm idle (2026-10-14): circle in the load-20 row between 1350 and 1000 RPM, as expected |
 
+## Burn (`crates/xbtune-core/src/burn.rs`, session PrepareBurn/Burn)
+
+| Detail | Source |
+|---|---|
+| SET = `[CMD_SET, offset, page, data...]`, ACK required | ED `PDU.setRequest()`, `ECM.sendPDU()` |
+| Pages 1..N written as 16-byte SETs at in-page offsets 0, 16, 32, ... | ED `ECM.writeEEPromPage()` |
+| Page 0: only `LFuel1`, `KBaro`, one SET each at wire offset `0xFF + offset + 1` | ED `ECM.writeEEPromPage()`, `PAGE_ZERO_VARS_TO_WRITE` |
+| Connected ECM version must start with the image ID | ED `BurnTask.doInBackground()` |
+| Burn warning wording ("might impair your vehicle") | ED `strings.xml` `burn_warning` (paraphrased) |
+| Only differing chunks sent; chosen variables over the ECM's current bytes; fresh verified backup; read-back verify (3 re-reads); link test (20 pings, <=1 failure, <=300 ms); engine stopped; ECM unchanged since backup; history | XB (KICKOFF §6) |
+| AFV variables `LFuel` (BUEIB: "AFV Rear", page 1) and `LFuel1` (some DDFI-3, page 0); reset value 100% | ED-DB names; 100% = no correction (XB; public tuning guides call AFV reset "Clear") |
+| DDFI-3 keep-alive warning | Public ECMSpy guide (feature list only, see PARITY.md) |
+| Ignition cycle after a burn | XB advice (the ECM keeps learned values like AFV in RAM and stores them periodically, `KLFuel_EEP_Sec`) |
+
 ## App assets (`crates/xbtune-app/assets`)
 
 | File | Source |

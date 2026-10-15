@@ -182,6 +182,26 @@ fn toolbar(app: &mut XbApp, ui: &mut Ui) {
             app.send(Command::ReadEeprom);
         }
         let has = app.tune.is_some();
+        let can_burn = has && live && app.writes_permitted() && !app.burn.is_open();
+        let burn_btn =
+            egui::Button::new(RichText::new("Burn to ECM…").color(if can_burn { p.bad } else { p.muted }));
+        let r = ui.add_enabled(can_burn, burn_btn);
+        let r = if !app.writes_permitted() {
+            r.on_disabled_hover_text(xbtune_core::diag::write_locked_message())
+        } else {
+            r.on_disabled_hover_text("Connect to the ECM and open a tune first").on_hover_text(
+                "Backup, review the differences, confirm, write only what changed, read it back",
+            )
+        };
+        if r.clicked()
+            && let Some(t) = &app.tune
+        {
+            let mode = crate::burn_view::Mode::Tune {
+                tune: Box::new(t.image.clone()),
+                opened: t.opened_bytes().to_vec(),
+            };
+            crate::burn_view::start(app, mode);
+        }
         if ui.add_enabled(has, egui::Button::new("Save")).clicked() {
             save(app, false);
         }

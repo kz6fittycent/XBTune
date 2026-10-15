@@ -102,6 +102,11 @@ pub struct XbApp {
     pub tune: Option<xbtune_core::tune::Tune>,
     pub compare: Option<(PathBuf, xbtune_core::image::Image)>,
     pub tune_ui: crate::tune_view::TuneUi,
+    pub burn: crate::burn_view::BurnUi,
+    /// Variables to write again on a retry.
+    pub pending_chosen: std::collections::BTreeSet<String>,
+    /// EEPROM writes allowed for the current session.
+    write_permitted: bool,
     /// The demo ECM, to start and stop its engine.
     demo_sim: Option<xbtune_sim::SharedSim>,
     /// ECM commands allowed for the current session.
@@ -169,6 +174,9 @@ impl XbApp {
             tune: None,
             compare: None,
             tune_ui: Default::default(),
+            burn: Default::default(),
+            pending_chosen: Default::default(),
+            write_permitted: false,
             demo_sim: None,
             permitted: false,
             egui_ctx: cc.egui_ctx.clone(),
@@ -252,6 +260,8 @@ impl XbApp {
         let mut cfg = SessionConfig::new(label, EcmAddress::Stock);
         cfg.permit = xbtune_core::diag::permit(target == SavedTarget::Demo).ok();
         self.permitted = cfg.permit.is_some();
+        cfg.write_permit = xbtune_core::diag::write_permit(target == SavedTarget::Demo).ok();
+        self.write_permitted = cfg.write_permit.is_some();
         if target != SavedTarget::Demo {
             self.demo_sim = None;
         }
@@ -326,6 +336,10 @@ impl XbApp {
         if let Err(e) = t.save(&path, &catalog) {
             tracing::warn!(error = %e, "could not save recovery file");
         }
+    }
+
+    pub fn writes_permitted(&self) -> bool {
+        self.write_permitted
     }
 
     pub fn session_permitted(&self) -> bool {
@@ -413,7 +427,16 @@ impl XbApp {
                     self.diag.running = None;
                     self.diag.last = Some((function, result));
                 }
-                Event::ReadProgress(p) => self.tune_ui.read_progress = Some((p.done, p.total)),
+                Event::ReadProgress(p) => {
+                    if !crate::burn_view::on_read_progress(self, p.done, p.total) {
+                        self.tune_ui.read_progress = Some((p.done, p.total));
+                    }
+                }
+                Event::BurnPrepared { backup, path, link } => {
+                    crate::burn_view::on_prepared(self, *backup, path, link)
+                }
+                Event::BurnProgress(s) => crate::burn_view::on_progress(self, s),
+                Event::BurnDone(r) => crate::burn_view::on_done(self, r),
                 Event::ReadFailed(e) => {
                     self.tune_ui.read_progress = None;
                     self.say(format!("EEPROM read failed: {e}"), true);
@@ -545,7 +568,7 @@ impl XbApp {
         ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
             ui.add_space(6.0);
             ui.label(RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).small().weak());
-            ui.label(RichText::new("Never writes the EEPROM").small().weak());
+            ui.label(RichText::new("EEPROM writes only via Burn").small().weak());
         });
     }
 
@@ -591,6 +614,27 @@ impl XbApp {
             self.set_demo_engine_running(false);
             self.diag.running = Some((f, None));
             self.send(Command::Function(f));
+        }
+        // XBTUNE_SHOT_BURN=NAME=VALUE: edit the open tune, start a burn;
+        // XBTUNE_SHOT_BURN_GO=1 also confirms it.
+        if self.link.live()
+            && !self.burn.is_open()
+            && self.tune.as_ref().is_some_and(|t| !t.is_modified())
+            && let Ok(spec) = std::env::var("XBTUNE_SHOT_BURN")
+            && let Some((name, v)) = spec.split_once('=')
+            && let Ok(v) = v.parse::<f64>()
+            && let Some(t) = &mut self.tune
+        {
+            let _ = t.set("shot", &[(name.to_string(), 0, v)]);
+            let mode = crate::burn_view::Mode::Tune {
+                tune: Box::new(t.image.clone()),
+                opened: t.opened_bytes().to_vec(),
+            };
+            self.set_demo_engine_running(false);
+            crate::burn_view::start(self, mode);
+        }
+        if std::env::var_os("XBTUNE_SHOT_BURN_GO").is_some() {
+            crate::burn_view::auto_confirm(self);
         }
         if self.link.live()
             && std::env::var_os("XBTUNE_SHOT_READ").is_some()
@@ -678,6 +722,7 @@ impl eframe::App for XbApp {
                     View::Tune => crate::tune_view::show(self, ui),
                 }
             });
+        crate::burn_view::show(self, ui);
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

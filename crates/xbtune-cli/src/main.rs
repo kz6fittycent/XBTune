@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! `xbtune-cli`: headless XBTune. It identifies the ECM, measures the link,
 //! reads and saves the EEPROM, decodes images, and shows and logs live data.
-//! The only commands that change the ECM are `codes --clear`, `test` and
-//! `tps-reset` (see `diag.rs`); they are locked on real hardware until the
-//! owner unlocks them. Nothing writes the EEPROM.
+//! Commands that change the ECM: `codes --clear`, `test`, `tps-reset`
+//! (`diag.rs`) and `burn`, `restore`, `afv-reset` (`burn.rs`, the only ones
+//! that write the EEPROM). Each group is locked on real hardware until the
+//! owner unlocks it in hardware.toml.
 
+mod burn;
 mod diag;
 mod edit;
 mod live;
@@ -84,6 +86,12 @@ enum Cmd {
     TpsReset(diag::TpsArgs),
     /// Record live data to a CSV log (read-only).
     Log(live::LogArgs),
+    /// Write a tune's changes to the ECM: backup, review, write, verify. Locked until unlocked.
+    Burn(burn::BurnArgs),
+    /// Put a backup image back onto the ECM (same checks as burn).
+    Restore(burn::RestoreArgs),
+    /// Reset the adaptive fuel value (AFV) to 100% (same checks as burn).
+    AfvReset(burn::AfvArgs),
     /// Change values or map cells in an image file (offline; never the ECM).
     Set(edit::SetArgs),
     /// Copy variables (maps, tables, values) from one image into another (offline).
@@ -262,6 +270,9 @@ async fn run(cmd: Cmd) -> Result<()> {
         Cmd::Defs { id, list } => defs(&id, list),
         Cmd::Live(a) => live::live(a).await,
         Cmd::Set(a) => edit::set(a),
+        Cmd::Burn(a) => burn::burn(a).await,
+        Cmd::Restore(a) => burn::restore(a).await,
+        Cmd::AfvReset(a) => burn::afv_reset(a).await,
         Cmd::CopyTable(a) => edit::copy_table(a),
         Cmd::Codes(a) => diag::codes(a).await,
         Cmd::Test(a) => diag::test(a).await,

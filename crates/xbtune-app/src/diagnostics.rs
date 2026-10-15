@@ -166,11 +166,18 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             ui.label(RichText::new("AFV reset").font(theme::strong_font(16.0)));
             ui.label(
                 RichText::new(
-                    "AFV is stored in EEPROM page 0, so resetting it is an EEPROM write. It comes with the \
-                     verified write path (burn, phase 6).",
+                    "Sets the adaptive fuel value back to 100% through the verified write path (backup, \
+                     review, write, read back). Turn the ignition off and on afterwards.",
                 )
                 .color(p.muted),
             );
+            let can = app.link.live() && app.writes_permitted() && !app.burn.is_open();
+            let r = ui.add_enabled(can, egui::Button::new("AFV reset…"));
+            if !app.writes_permitted() {
+                r.on_disabled_hover_text(xbtune_core::diag::write_locked_message());
+            } else if r.clicked() {
+                crate::burn_view::start(app, crate::burn_view::Mode::Afv);
+            }
         });
 
     });

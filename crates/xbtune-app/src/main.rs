@@ -4,6 +4,7 @@
 //! TPS reset are locked on real hardware until the owner unlocks them.
 
 mod app;
+mod burn_view;
 mod charts;
 mod connect;
 mod dashboard;

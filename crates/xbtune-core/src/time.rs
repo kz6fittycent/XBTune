@@ -35,6 +35,16 @@ pub fn file_stamp(t: SystemTime) -> String {
     format!("{y:04}{m:02}{d:02}-{hh:02}{mm:02}{ss:02}")
 }
 
+/// `dir/<stem><ext>`, or `dir/<stem>-2<ext>`, `-3`, ... if taken, so two
+/// files made in the same second never overwrite each other.
+pub fn unique_path(dir: &std::path::Path, stem: &str, ext: &str) -> std::path::PathBuf {
+    let first = dir.join(format!("{stem}{ext}"));
+    if !first.exists() {
+        return first;
+    }
+    (2..).map(|n| dir.join(format!("{stem}-{n}{ext}"))).find(|p| !p.exists()).expect("a free name")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -48,5 +58,16 @@ mod tests {
         assert_eq!(file_stamp(t), "20261014-200005");
         let leap = UNIX_EPOCH + Duration::from_secs(951_782_400); // 2000-02-29
         assert_eq!(rfc3339(leap), "2000-02-29T00:00:00Z");
+    }
+
+    #[test]
+    fn unique_paths() {
+        let d = std::env::temp_dir().join(format!("xbtune-uniq-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        let a = unique_path(&d, "x", ".xbt");
+        std::fs::write(&a, "").unwrap();
+        let b = unique_path(&d, "x", ".xbt");
+        assert_eq!(b, d.join("x-2.xbt"));
+        let _ = std::fs::remove_dir_all(&d);
     }
 }

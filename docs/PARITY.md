@@ -47,7 +47,7 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 | **NEW** LED-style input/output pin state indicators on the tests page | 🟡 DOut/DIn chips on the dashboard | 4 |
 | **NEW** Static timing check aid | ⬜ protocol unknown; investigate | 4 |
 | TPS reset (DDFI-2) with stored zero voltage / range shown | 🟡 reset done (`tps-reset`, app); stored values shown with the EEPROM view (5) | 4/5 |
-| AFV reset ("Clear") | ⬜ page-0 EEPROM write (`LFuel1`); needs the burn path | 6 |
+| AFV reset ("Clear") | ✅ `afv-reset`, Diagnostics "AFV reset…": `LFuel` (and `LFuel1` where defined) to 100% via the burn path | 6 |
 
 ## EEPROM and maps
 
@@ -60,11 +60,11 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 | **NEW** Load/save individual maps to files | 🟡 copy/paste as TSV (spreadsheets), `copy-table` / "copy from other image" | 5 |
 | **NEW** Linked front/rear editing: unlocked, same difference, same value, same % | ✅ "Link front/rear" applies the same operation to the twin map | 5 |
 | Scalars and flags (system, limits, corrections, O2 setup pages) | ✅ every value, table and flag byte in the definition; `set` in the CLI | 5 |
-| Burn full image or only changed cells; each write read back and compared | ⬜ changed pages only, always verified | 6 |
+| Burn full image or only changed cells; each write read back and compared | ✅ only differing 16-byte chunks of chosen variables (or everything for Restore); every touched page read back | 6 |
 | Quick Burn of a single cell on Set (experimental there) | ❌ every burn goes through the §6 path | 6 |
 | **NEW** Calibration string (8 chars) set before burn/save | ⬜ (`Cal_ID` exists on DDFI-3 IDs) | 5/6 |
 | Compare edited copy against the fetched original | ✅ edited cells outlined; compare with any image (side by side or difference heatmap), `diff` | 5 |
-| **NEW** Warn that DDFI-3 ECMs can lose changes if keep-alive power is faulty | ⬜ burn screen text | 6 |
+| **NEW** Warn that DDFI-3 ECMs can lose changes if keep-alive power is faulty | ✅ burn review text for DDFI-3 | 6 |
 
 ## Tuning
 

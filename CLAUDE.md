@@ -29,6 +29,11 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   EcmDroid also shows stored 15 (codes cross-checked). `codes --clear`
   on the bike cleared it. TPS reset deliberately not run (owner's choice).
   Phase 4 done.
+- **Phase 6 (burn): built 2026-10-14, sim-tested; NOT used on the bike.**
+  EEPROM writes are LOCKED on real hardware by their own key
+  (`eeprom_writes = true` in hardware.toml), separate from `ecm_commands`.
+  The owner adds it only after signing off on the simulator results.
+  Never create or edit that file ourselves.
 - **Phase 5 (offline map editing): built 2026-10-14; owner tested
   2026-10-14** ("quite good"): edited a backup copy, set KRPM_Hard_Hi to
   7450 in it, and "Read from ECM" in the app worked on the bike. Feedback:
@@ -51,6 +56,29 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 - Repo is private, with no remote. Don't add a remote or push without asking.
   Don't publish to the store. The snap name `xbtune` is registered (owner,
   2026-10-14); registration only, nothing uploaded.
+
+### Phase 6 contents
+
+- `xbtune-core::burn`: `changes` (per-variable, human units, edited vs
+  ECM-owned, blocked), `build_target` (ECM bytes + chosen vars), `plan`
+  (differing 16-byte chunks; page 0 only LFuel1/KBaro), `check_link` +
+  `LinkLimits`, `engine_stopped`, `still_matches`, `execute` (writes then
+  read-back, mismatch re-read 3x), `afv_reset`, `check_identity`.
+- Session: `PrepareBurn` (permit, engine, link, verified full read ->
+  `<data>/backups/<ID>_<time>_before-burn.xbt`) -> `BurnPrepared`;
+  `Burn{target,note}` (needs fresh prepare; version/ID, engine, link
+  re-checked; ECM unchanged since backup; write + verify; history in
+  `<data>/history/<ID>_<time>/{before,after}.xbt, burn.txt`) -> `BurnDone`.
+- CLI: `burn TUNE --vars a,b|--all [--note] [--yes]` (lists and stops
+  without a choice), `restore BACKUP`, `afv-reset`; typed confirmations
+  "burn"/"restore"/"reset".
+- App: Tune "Burn to ECM…", Diagnostics "AFV reset…", burn dialog
+  (`burn_view.rs`): prepare -> review (edits pre-ticked, note, confirm)
+  -> progress -> done / failed (exact pages; Retry, Restore backup).
+- Sim: `WriteFault::{Ignore, FlipBit}`, `cut_power_after_writes`, `poke`.
+- Tests: 12 burn + 2 session + CLI; XBTUNE_HOME keeps test files out of
+  the user's folders (CLI tests set it).
+- Hooks: `XBTUNE_SHOT_BURN=NAME=VALUE [XBTUNE_SHOT_BURN_GO=1]`.
 
 ### Phase 5 contents
 
@@ -227,10 +255,27 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 
 ## Next steps
 
-1. Owner runs the phase 5 checklist below.
+1. Owner reviews the phase 6 sim results (demo burn in the app), then
+   decides whether to unlock writes and do the first real burn (checklist
+   below). Suggested first real burn: a harmless, reversible change.
 2. Optional: btsnoop capture of EcmDroid reading the EEPROM / live data, to
    confirm frames byte for byte.
-3. Phase 6 (only after the owner says go): burn (KICKOFF §6), sim first.
+3. Phase 7 (only after the owner says go): log viewer + auto-tune.
+
+## Phase 6 checklist
+
+Sim first (no unlock needed): app -> Connect -> Start demo -> Diagnostics ->
+untick Demo engine "running" -> Tune -> open a tune, change a value ->
+"Burn to ECM…" -> review -> tick -> Write. Also try AFV reset, and the
+engine-running refusal. CLI: `xbtune.cli burn --sim <tune> --vars X --yes`.
+Real bike, only after the owner signs off and adds `eeprom_writes = true`:
+1. Engine OFF, ignition ON, laptop close to the bike (or USB cable).
+2. `xbtune.cli dump --bt ... -o ~/before.xbt` (extra copy).
+3. First burn: one small reversible value, e.g. KRPM_Hard_Hi 7450 (stock
+   7500): `xbtune.cli set ~/before.xbt KRPM_Hard_Hi=7450 -o ~/t1.xbt`,
+   `xbtune.cli burn --bt ... ~/t1.xbt --vars KRPM_Hard_Hi --note "first burn"`.
+4. Ignition off/on; `xbtune.cli show` a fresh dump: 7450. EcmDroid shows it too.
+5. Put it back: `xbtune.cli restore --bt ... <backup path printed in step 3>`.
 
 ## Phase 5 checklist (no ECM writes; editing files only)
 
