@@ -16,6 +16,7 @@ pub mod diag;
 pub mod env;
 pub mod image;
 pub mod live;
+pub mod logfile;
 pub mod read;
 pub mod session;
 pub mod time;
