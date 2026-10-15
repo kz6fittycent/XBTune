@@ -29,7 +29,13 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   EcmDroid also shows stored 15 (codes cross-checked). `codes --clear`
   on the bike cleared it. TPS reset deliberately not run (owner's choice).
   Phase 4 done.
-- **Phase 6 (burn): built 2026-10-14, sim-tested; NOT used on the bike.**
+- **Phase 6 (burn): built 2026-10-14; FIRST REAL BURN 2026-10-15** (laptop,
+  snap 31eeddf, writes unlocked by the owner in Settings): KRPM_Hard_Hi
+  7500 -> 7450. The two auto backups (16:39:49 / 16:41:38 UTC, both
+  verified) differ in exactly 1 byte (0x01d2). A second burn followed
+  (probably back to 7500): not yet confirmed; asked for the history/
+  folders and app.log. Top bar showed 11 reconnects that session, 0% errors:
+  check when they happened. AFV reset not yet tried on the bike.
   EEPROM writes are LOCKED on real hardware by their own key
   (`eeprom_writes = true` in hardware.toml), separate from `ecm_commands`.
   The owner unlocks it only after signing off on the simulator results:
