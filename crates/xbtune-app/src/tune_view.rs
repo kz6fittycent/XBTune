@@ -215,7 +215,7 @@ fn toolbar(app: &mut XbApp, ui: &mut Ui) {
                 RichText::new(format!("vs {}", path.file_name().unwrap_or_default().to_string_lossy()))
                     .color(p.muted),
             );
-            if ui.small_button("✕").on_hover_text("Stop comparing").clicked() {
+            if ui.small_button("Stop comparing").clicked() {
                 app.compare = None;
                 app.tune_ui.mode = CellMode::Values;
             }
@@ -423,7 +423,7 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         }
     });
     if other.is_some() {
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label("Show:");
             ui.selectable_value(&mut app.tune_ui.mode, CellMode::Values, "This tune");
             ui.selectable_value(&mut app.tune_ui.mode, CellMode::Other, "Other image");
@@ -438,6 +438,34 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         });
     }
 
+    // How-to line and shortcuts help.
+    ui.horizontal_wrapped(|ui| {
+        ui.label(
+            RichText::new(
+                "1. Select cells: click; drag or Shift-click for a block; Ctrl-click to add; click a row or column heading for the whole line.   2. Type a number.   3. Press an action.",
+            )
+            .small()
+            .color(p.muted),
+        );
+        ui.menu_button(RichText::new("Shortcuts").small(), |ui| {
+            egui::Grid::new("keys").num_columns(2).spacing([16.0, 4.0]).show(ui, |ui| {
+                for (k, what) in [
+                    ("Enter (in the value box)", "Set the selected cells to the value"),
+                    ("Arrow keys", "Move the selection"),
+                    ("Ctrl+C / Ctrl+V", "Copy / paste cells (works with spreadsheets)"),
+                    ("Ctrl+Z", "Undo"),
+                    ("Ctrl+Y or Ctrl+Shift+Z", "Redo"),
+                    ("Ctrl+S", "Save (asks for a new name for an ECM backup)"),
+                    ("Drag in 3D", "Rotate the surface"),
+                ] {
+                    ui.label(RichText::new(k).strong());
+                    ui.label(what);
+                    ui.end_row();
+                }
+            });
+        });
+    });
+
     // Operations toolbar.
     let mut op: Option<Op> = None;
     let mut copy = false;
@@ -449,7 +477,7 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
                 .color(p.muted),
         );
         let resp = ui.add(
-            egui::TextEdit::singleline(&mut app.tune_ui.value_text).hint_text("value").desired_width(70.0),
+            egui::TextEdit::singleline(&mut app.tune_ui.value_text).hint_text("number").desired_width(70.0),
         );
         let num: Option<f64> = app.tune_ui.value_text.trim().parse().ok();
         let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
@@ -460,28 +488,28 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
             op = Some(Op::Set(x));
         }
         if ui
-            .add_enabled(can && num.is_some(), egui::Button::new("+"))
+            .add_enabled(can && num.is_some(), egui::Button::new("+ Add"))
             .on_hover_text("Add the value")
             .clicked()
         {
             op = num.map(Op::Add);
         }
         if ui
-            .add_enabled(can && num.is_some(), egui::Button::new("−"))
+            .add_enabled(can && num.is_some(), egui::Button::new("− Subtract"))
             .on_hover_text("Subtract the value")
             .clicked()
         {
             op = num.map(|x| Op::Add(-x));
         }
         if ui
-            .add_enabled(can && num.is_some(), egui::Button::new("×"))
+            .add_enabled(can && num.is_some(), egui::Button::new("× Multiply"))
             .on_hover_text("Multiply by the value")
             .clicked()
         {
             op = num.map(Op::Multiply);
         }
         if ui
-            .add_enabled(can && num.is_some(), egui::Button::new("%"))
+            .add_enabled(can && num.is_some(), egui::Button::new("% Change"))
             .on_hover_text("Change by the value in percent (5 = +5%)")
             .clicked()
         {
@@ -495,14 +523,14 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
             op = Some(Op::Smooth);
         }
         if ui
-            .add_enabled(can, egui::Button::new("Interp ↔"))
+            .add_enabled(can, egui::Button::new("Fill across ↔"))
             .on_hover_text("Straight line across each selected row")
             .clicked()
         {
             op = Some(Op::InterpolateRows);
         }
         if ui
-            .add_enabled(can, egui::Button::new("Interp ↕"))
+            .add_enabled(can, egui::Button::new("Fill down ↕"))
             .on_hover_text("Straight line down each selected column")
             .clicked()
         {
@@ -889,7 +917,7 @@ fn file_dialog(app: &mut XbApp, ui: &mut Ui) {
             }
             for (is_dir, path) in &entries {
                 let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
-                let label = if *is_dir { format!("📁 {name}") } else { name.clone() };
+                let label = if *is_dir { format!("{name}/") } else { name.clone() };
                 if ui.selectable_label(false, label).clicked() {
                     if *is_dir {
                         app.tune_ui.dir = path.clone();
