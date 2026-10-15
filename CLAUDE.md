@@ -533,18 +533,22 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 ## Next steps
 
-Paused 2026-10-14 at the owner's request (HEAD 8a55efa, tree clean; laptop
-snap: xbtune_0.1.0+git8a55efa_amd64.snap). Resume here.
+Paused 2026-10-15 evening at the owner's request. Resume here.
 
+Done today: phase 7 tested by the owner (auto-tune works), factory race
+ECMs (retested on the bike), tube-frame DDFI ECMs, phase 8 remote tuning
+R1-R5 (passed on the owner's laptop + desktop, remote AFV reset took).
+Laptop snap: xbtune_0.1.0+git62bd467 (later commits are docs only).
 
-1. Owner reviews the phase 6 sim results (demo burn in the app), then
-   decides whether to unlock writes and do the first real burn (checklist
-   below). Suggested first real burn: a harmless, reversible change.
-2. Optional: btsnoop capture of EcmDroid reading the EEPROM / live data, to
-   confirm frames byte for byte.
-3. Phase 7 built 2026-10-15: owner tests it (Phase 7 checklist). Then
-   phase 8 remote tuning (see "Phase plan"; write docs/REMOTE.md first),
-   only on the owner's go; then phase 9 polish + release.
+1. Phase 9 (polish + release): waits for the owner's go. Items in
+   "Phase plan" above; the owner may pick leftovers (wideband/lambda,
+   "fold AFV into the maps" helper, binary/.msl logs, burn.txt listing
+   changed variables).
+2. Licence: waiting for the EcmDroid maintainer's email reply about the
+   ecmdroid.db permission (PROVENANCE). Data stays restricted; no public
+   repo or release until the owner says so.
+3. Untracked `app.log` / `fatal.log` in the repo root are the owner's
+   copies from the laptop; not committed.
 
 ## Remote tuning checklist (R2-R5; laptop = bike owner, desktop = tuner)
 
