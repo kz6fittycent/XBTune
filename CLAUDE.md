@@ -508,6 +508,10 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
    checks, CI promotion workflows). Left: store listing + auto-connect
    request (docs/STORE.md), docs, and the ecmdroid.toml licence question
    (blocks distribution, and remote tuning needs other people to install).
+     2026-10-15: EcmDroid issue #24 statement recorded in PROVENANCE; the
+     owner emailed the EcmDroid maintainer asking whether the ECMSpy
+     permission covers downstream GPLv3 projects. Waiting for his reply;
+     data stays restricted until then.
    Added by the owner 2026-10-15:
    - **Native title bar on GNOME Wayland**: eframe is built without
      winit's `wayland-csd-adwaita`, so GNOME shows the bare fallback

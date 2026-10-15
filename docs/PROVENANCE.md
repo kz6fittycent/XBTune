@@ -30,7 +30,9 @@ initial db dump in 2012, plus an updated version in 2019. He also gave me
 permissions to use it in ecmdroid under the GPLv3 license", that he won't
 share that maintainer's contact details publicly, and to contact him by
 email. The owner commented on the issue on 2026-10-14/15 (XBTune announced
-there as GPL-3.0, Linux, private for now). Read 2026-10-15.
+there as GPL-3.0, Linux, private for now). Read 2026-10-15. On 2026-10-15 the owner emailed
+the EcmDroid maintainer (as he invited), asking whether that permission
+covers other GPLv3 projects such as XBTune; waiting for the answer.
 
 **Until the owner confirms that permission covers XBTune:**
 
