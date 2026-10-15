@@ -407,7 +407,9 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 "Polish + release" becomes phase 9:
 7. Log viewer + auto-tune (built 2026-10-15; owner testing).
-8. **Remote tuning** (owner's idea, 2026-10-15). Decisions made:
+8. **Remote tuning** (owner's idea, 2026-10-15; owner said go
+   2026-10-15). `docs/REMOTE.md` written and WAITING FOR APPROVAL (its
+   section 1 lists 5 open decisions). No code before approval. Decisions made:
    - Bike owner = host (has the bike); tuner = guest. Host shows a 6-digit
      code, reads it to the tuner, who types it in: PAKE (SPAKE2), then an
      end-to-end encrypted channel (X25519/HKDF/ChaCha20-Poly1305). The relay
