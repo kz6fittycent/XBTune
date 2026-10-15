@@ -51,8 +51,10 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the
-  garage). Build the snap here, then hand the user the `.snap` file to install
-  on the laptop with `sudo snap install --dangerous`. Interfaces must be
+  garage). Build the snap here, or (since 2026-10-15) take it from the
+  "🧪 Snap Builds" run for the pushed commit: artifact named after the
+  `.snap`, kept 14 days (`gh run download <run> -R kz6fittycent/XBTune`).
+  The user installs it on the laptop with `sudo snap install --dangerous`. Interfaces must be
   connected on the laptop too. Can't run commands on the laptop: give the
   user exact commands and ask for the output.
 - Phase 1 hardware result (laptop, snap git b5fa645): `info` OK, 23/23
