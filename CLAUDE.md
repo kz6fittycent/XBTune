@@ -53,7 +53,8 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 - Phase 1 hardware result (laptop, snap git b5fa645): `info` OK, 23/23
   requests, 0 retries, RTT avg 65 ms (min 50, max 147).
 - Snap confinement checks on this PC: see "Snap notes" below.
-- Repo is private, with no remote. Don't add a remote or push without asking.
+- Remote: private GitHub repo `git@github.com:kz6fittycent/XBTune.git`
+  (origin, added 2026-10-15; owner OK'd pushing). Keep it private.
   Don't publish to the store. The snap name `xbtune` is registered (owner,
   2026-10-14); registration only, nothing uploaded.
 
