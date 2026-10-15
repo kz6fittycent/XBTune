@@ -21,7 +21,18 @@ files, map files or database (KICKOFF §2).
 
 EcmDroid's `README.db` says the database was converted from a dump from
 ecmspy.com. EcmDroid states that the ECMSpy maintainer gave permission to use
-it under GPLv3. **Until the owner confirms that permission covers XBTune:**
+it under GPLv3.
+
+EcmDroid issue #24 (https://github.com/ecmdroid/ecmdroid/issues/24), asked
+by another developer bundling the db: the EcmDroid maintainer (matoxp)
+answered on 2026-09-19 that the ECMSpy maintainer "provided me with the
+initial db dump in 2012, plus an updated version in 2019. He also gave me
+permissions to use it in ecmdroid under the GPLv3 license", that he won't
+share that maintainer's contact details publicly, and to contact him by
+email. The owner commented on the issue on 2026-10-14/15 (XBTune announced
+there as GPL-3.0, Linux, private for now). Read 2026-10-15.
+
+**Until the owner confirms that permission covers XBTune:**
 
 - `data/ecmdroid.toml` (the only file derived from it) is for private
   development and testing;
