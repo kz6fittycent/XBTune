@@ -11,12 +11,14 @@
 //! - [`tune`]: offline editing with undo/redo.
 //! - [`time`]: UTC timestamps without extra dependencies.
 
+pub mod autotune;
 pub mod burn;
 pub mod diag;
 pub mod env;
 pub mod image;
 pub mod live;
 pub mod logfile;
+pub mod logstats;
 pub mod read;
 pub mod session;
 pub mod time;
