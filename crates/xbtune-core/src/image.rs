@@ -49,6 +49,12 @@ pub struct Meta {
     pub vin: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub notes: String,
+    /// Last edited in XBTune (RFC 3339 UTC); empty if never edited.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub modified: String,
+    /// CRC-32 of the image this one was edited from.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub parent_crc32: String,
 }
 
 #[derive(Debug, thiserror::Error)]

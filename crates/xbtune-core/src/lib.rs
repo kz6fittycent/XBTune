@@ -7,6 +7,7 @@
 //! - [`read`]: reading the whole EEPROM, with resume and a verify pass.
 //! - [`live`]: runtime channels, samples, rate and CSV logs.
 //! - [`session`]: the live-data task (poll, reconnect, log).
+//! - [`tune`]: offline editing with undo/redo.
 //! - [`time`]: UTC timestamps without extra dependencies.
 
 pub mod diag;
@@ -16,3 +17,4 @@ pub mod live;
 pub mod read;
 pub mod session;
 pub mod time;
+pub mod tune;
