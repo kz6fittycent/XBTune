@@ -22,10 +22,12 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   the BuellTooth); with the old 1 s timeout each loss cost 1.3 s -> 3.7 Hz.
   Live timeout is now 400 ms and failures are logged as `# event:` lines;
   next owner log should show the new rate and the failure pattern.
-- **Phase 4 (diagnostics): built 2026-10-14, waiting for the owner's
-  hardware test.** ECM commands are LOCKED on real hardware until the owner
-  signs off on the simulator results and creates the unlock file (below).
-  Don't start phase 5 until the owner says so.
+- **Phase 4 (diagnostics): built 2026-10-14; on-bike 2026-10-14** (snap
+  9e6470a): `codes` read (no current; stored 15 "IAT high"); lock refused
+  `test fan` until the OWNER created the unlock file on the laptop; then
+  `test tachometer` (done after 4.4 s) and `test fan` (5.4 s) ran fine.
+  Clear codes and TPS reset not run on the bike yet. Owner had no codes to
+  compare in EcmDroid. Don't start phase 5 until the owner says so.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the

@@ -194,8 +194,10 @@ Nothing outside tests may rely on them.
   written through the definition's offsets and scaling. Its values are
   plausible only; they are not reference data for anything.
 - Missing page 0 bytes in an image are served as zeros.
-- After an active test or TPS reset the busy state reads 1 for
-  `test_duration` (default 3 s). Real durations are unknown.
+- After an active test or TPS reset the busy state reads 1 (the real
+  non-zero value is unknown) for `busy_time()`: tachometer 4.2 s and fan
+  5.2 s are MEASURED on the owner's BUEIB (done after 4.4 s / 5.4 s with
+  500 ms polling, 2026-10-14); other functions 4.5 s ASSUMED.
 - Clear codes zeroes the runtime `HDiag<n>_LD` bytes immediately; current
   codes (`CDiag`) stay. What the real ECM does to `RDiag`/EEPROM `HDiag` is
   unknown.

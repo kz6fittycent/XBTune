@@ -571,7 +571,7 @@ mod tests {
         for seed in 1..=40u64 {
             let mut cfg = xbtune_sim::SimConfig::bueib();
             cfg.seed = seed * 0x9E37_79B9;
-            cfg.test_duration = Duration::from_millis(120);
+            cfg.test_duration = Some(Duration::from_millis(120));
             cfg.rates = xbtune_sim::FaultRates { drop: 0.25, corrupt: 0.15, ..Default::default() };
             let mut sm = Simulator::new(cfg, xbtune_sim::BUEIB_EEPROM).with_engine(d.clone());
             sm.set_engine_running(false);

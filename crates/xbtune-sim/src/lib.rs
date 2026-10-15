@@ -36,6 +36,17 @@ pub const BUEIB_RUNTIME: &[u8] = include_bytes!("../../../tests/fixtures/RT_BUEI
 /// BUEIB EEPROM image from EcmDroid's tests (1206 bytes, no page 0).
 pub const BUEIB_EEPROM: &[u8] = include_bytes!("../../../tests/fixtures/BUEIB.eeprom");
 
+/// How long a function keeps the ECM busy. Tachometer and fan were
+/// measured on the owner's BUEIB (2026-10-14, 500 ms polling: tachometer
+/// done after 4.4 s, fan after 5.4 s); the rest are ASSUMED.
+pub fn busy_time(code: u8) -> Duration {
+    match code {
+        c if c == Function::Tachometer.code() => Duration::from_millis(4200),
+        c if c == Function::Fan.code() => Duration::from_millis(5200),
+        _ => Duration::from_millis(4500),
+    }
+}
+
 /// A fault to apply to one reply.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Fault {
@@ -96,9 +107,9 @@ pub struct SimConfig {
     /// Model the K-line: each reply takes 10 bits per byte at this rate to
     /// arrive (a real 107-byte runtime frame is ~111 ms at 9600 baud).
     pub wire_baud: Option<u32>,
-    /// How long the ECM reports busy after an active test or TPS reset.
-    /// ASSUMED: real durations are not documented in EcmDroid.
-    pub test_duration: Duration,
+    /// How long the ECM reports busy after an active test or TPS reset, for
+    /// every function. `None` uses [`busy_time`].
+    pub test_duration: Option<Duration>,
 }
 
 impl SimConfig {
@@ -113,7 +124,7 @@ impl SimConfig {
             rates: FaultRates::default(),
             seed: 0x5EED_B0E1,
             wire_baud: None,
-            test_duration: Duration::from_secs(3),
+            test_duration: None,
         }
     }
 
@@ -213,7 +224,7 @@ impl Simulator {
 
     /// How long tests keep the ECM busy.
     pub fn set_test_duration(&mut self, d: Duration) {
-        self.cfg.test_duration = d;
+        self.cfg.test_duration = Some(d);
     }
 
     /// Freeze the engine at `t` seconds (tests), or let it run (`None`).
@@ -320,7 +331,8 @@ impl Simulator {
                     // codes stay while the fault exists.
                     self.clear_stored_codes();
                 } else {
-                    self.busy_until = Some(Instant::now() + self.cfg.test_duration);
+                    let d = self.cfg.test_duration.unwrap_or_else(|| busy_time(*code));
+                    self.busy_until = Some(Instant::now() + d);
                 }
                 self.reply(ACK, &[])
             }
