@@ -26,8 +26,9 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   9e6470a): `codes` read (no current; stored 15 "IAT high"); lock refused
   `test fan` until the OWNER created the unlock file on the laptop; then
   `test tachometer` (done after 4.4 s) and `test fan` (5.4 s) ran fine.
-  Clear codes and TPS reset not run on the bike yet. Owner had no codes to
-  compare in EcmDroid. Don't start phase 5 until the owner says so.
+  EcmDroid also shows stored 15 (codes cross-checked). `codes --clear`
+  on the bike cleared it. TPS reset deliberately not run (owner's choice).
+  Phase 4 done. Don't start phase 5 until the owner says so.
 - Owner's bike: **2005 Buell XB9SX**, ECM **BUEIB** (DDFI-2), version string
   `BUEIB310 12-11-03`, BuellTooth `00:11:22:33:44:55` (RFCOMM channel 1).
 - **Hardware tests run on a separate laptop** (the desktop can't reach the

@@ -199,6 +199,7 @@ Nothing outside tests may rely on them.
   5.2 s are MEASURED on the owner's BUEIB (done after 4.4 s / 5.4 s with
   500 ms polling, 2026-10-14); other functions 4.5 s ASSUMED.
 - Clear codes zeroes the runtime `HDiag<n>_LD` bytes immediately; current
-  codes (`CDiag`) stay. What the real ECM does to `RDiag`/EEPROM `HDiag` is
+  codes (`CDiag`) stay. (On the owner's BUEIB, 2026-10-14, clearing stored
+  code 15 worked and the re-read showed none.) What the real ECM does to `RDiag`/EEPROM `HDiag` is
   unknown.
 - Runtime data is answered normally while busy.
