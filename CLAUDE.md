@@ -389,6 +389,23 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
    checks, CI promotion workflows). Left: store listing + auto-connect
    request (docs/STORE.md), docs, and the ecmdroid.toml licence question
    (blocks distribution, and remote tuning needs other people to install).
+   Added by the owner 2026-10-15:
+   - **Native title bar on GNOME Wayland**: eframe is built without
+     winit's `wayland-csd-adwaita`, so GNOME shows the bare fallback
+     frame. Turn it on (sctk-adwaita 0.12, MIT; check cargo-deny). It
+     reads button-layout (left/right) and color-scheme from the settings
+     portal by running `dbus-send`, and the title font via `gsettings`:
+     make sure both exist in the snap (stage them if not) and test with
+     buttons on the left. KDE/X11 draw their own frames already.
+   - **Tube-frame DDFI ECMs** (BUEGC, BUEIA, BUEJA, BUEKA; 1999-2002),
+     which KICKOFF §1 had out of scope: EcmDroid supports them. Needs
+     EcmDroid's ecmdroid.db again (not in the repo) to re-run
+     tools/extract_ecmdroid_db.py with DDFI in IN_SCOPE; check EcmDroid's
+     Java for every DDFI difference (protocol, pages, runtime frame) before
+     assuming DDFI-2 behaviour; simulator + image tests; writes only after
+     sim tests (§6.7) and stay unverified on hardware until someone has one.
+   - No artwork/logo (owner's call; the Pegasus logo is a Buell trademark).
+     Race ECMs stay recognised-but-hidden.
 
 ## Next steps
 
