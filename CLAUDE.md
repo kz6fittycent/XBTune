@@ -513,13 +513,19 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
      permission covers downstream GPLv3 projects. Waiting for his reply;
      data stays restricted until then.
    Added by the owner 2026-10-15:
-   - **Native title bar on GNOME Wayland**: eframe is built without
-     winit's `wayland-csd-adwaita`, so GNOME shows the bare fallback
-     frame. Turn it on (sctk-adwaita 0.12, MIT; check cargo-deny). It
-     reads button-layout (left/right) and color-scheme from the settings
-     portal by running `dbus-send`, and the title font via `gsettings`:
-     make sure both exist in the snap (stage them if not) and test with
-     buttons on the left. KDE/X11 draw their own frames already.
+   - **Native title bar on GNOME Wayland**: BUILT 2026-10-16. Direct
+     `winit` dep (0.30, default features off) with
+     `wayland-csd-adwaita-crossfont` -> sctk-adwaita **0.10** (what winit
+     0.30 uses; not 0.12). Not `wayland-csd-adwaita`: its ab_glyph (and
+     sctk-adwaita's skrifa) embed Cantarell, OFL, not allowed in deps by
+     KICKOFF §2. crossfont links system fontconfig + FreeType; build needs
+     `libfreetype-dev libfontconfig-dev` (snap build-packages, CI), or
+     freetype-sys silently compiles its bundled FreeType. At run time it
+     calls `dbus-send` (core24; portal button-layout + color-scheme),
+     `gsettings` and `fc-match` (gnome-46-2404). Its "unknown button type"
+     warning (empty side of the layout) is filtered in `report.rs`.
+     KDE/X11 draw their own frames already. Owner's desktop has buttons on
+     the left (`close,minimize,maximize:`).
    - **Tube-frame DDFI ECMs**: DONE early (2026-10-15, see Status).
      Original note: (BUEGC, BUEIA, BUEJA, BUEKA; 1999-2002),
      which KICKOFF §1 had out of scope: EcmDroid supports them. Needs
@@ -530,6 +536,26 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
      sim tests (§6.7) and stay unverified on hardware until someone has one.
    - No artwork/logo (owner's call; the Pegasus logo is a Buell trademark).
      Race ECMs: supported since 2026-10-15 (owner's request; see Status).
+   Added by the owner 2026-10-16 (go for phase 9, leftovers included):
+   - Wideband input + lambda maps. Owner has NO wideband (2026-10-16):
+     build on stated assumptions (analog 0-5 V linear AFR and Innovate
+     serial, both public), sim-tested only, marked unverified on hardware.
+   - "Fold AFV into the maps, then AFV reset" helper (via the burn path).
+   - Binary / .msl log formats (EcmDroid `Bin2MslConverter` as reference).
+   - burn.txt lists the changed variables (old -> new) and "verified: yes".
+     BUILT 2026-10-16: `burn::history_lines` + `ecm:` version line in
+     `Worker::save_history` (only verified burns get a history folder).
+10. **AI-assisted tuning** (owner slated it 2026-10-16). Ground rules
+   agreed when slating it: the AI is an advisor, never an actor. Its
+   suggestions arrive as proposals through the same path as a remote
+   tuner's (R3 review: Accept/Reject, one undo step), bounded by the
+   deterministic auto-tune limits (cap, min hits, CLT filter); it never
+   burns, runs tests or resets (KICKOFF §6 unchanged). Network feature ->
+   needs the owner's OK per KICKOFF §9; nothing sent without a click,
+   with a "What gets sent" preview like bug reports. Write docs/AI.md
+   (provider/API key/cost, what data leaves the machine, prompts, how
+   numbers are checked, tests) for approval before code. Wideband
+   (phase 9) makes it far more useful.
 
 ## Next steps
 
@@ -540,10 +566,11 @@ ECMs (retested on the bike), tube-frame DDFI ECMs, phase 8 remote tuning
 R1-R5 (passed on the owner's laptop + desktop, remote AFV reset took).
 Laptop snap: xbtune_0.1.0+git62bd467 (later commits are docs only).
 
-1. Phase 9 (polish + release): waits for the owner's go. Items in
-   "Phase plan" above; the owner may pick leftovers (wideband/lambda,
-   "fold AFV into the maps" helper, binary/.msl logs, burn.txt listing
-   changed variables).
+1. Phase 9 (polish + release): GO given 2026-10-16, leftovers included.
+   Items in "Phase plan" above. Proposed order: GNOME title bar, burn.txt
+   listing, AFV-fold helper, binary/.msl logs, wideband/lambda (ask the
+   owner which wideband first), then store listing + docs. Phase 10
+   (AI-assisted tuning) after that; design doc first.
 2. Licence: waiting for the EcmDroid maintainer's email reply about the
    ecmdroid.db permission (PROVENANCE). Data stays restricted; no public
    repo or release until the owner says so.
