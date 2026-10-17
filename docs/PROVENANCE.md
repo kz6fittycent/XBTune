@@ -203,6 +203,7 @@ known-good source:**
 | Only differing chunks sent; chosen variables over the ECM's current bytes; fresh verified backup; read-back verify (3 re-reads); link test (20 pings, <=1 failure, <=300 ms); engine stopped; ECM unchanged since backup; history | XB (KICKOFF §6) |
 | AFV variables `LFuel` (BUEIB: "AFV Rear", page 1) and `LFuel1` (some DDFI-3, page 0); reset value 100% | ED-DB names; 100% = no correction (XB; public tuning guides call AFV reset "Clear") |
 | DDFI-3 keep-alive warning | Public ECMSpy guide (feature list only, see PARITY.md) |
+| Fold AFV into the maps: each fuel map × its AFV ÷ 100, then that AFV = 100%. Rear map uses `LFuel` ("AFV Rear"); front map uses `LFuel1` ("AFV Front") only where it exists and `KCL_Fuel_Config` bit 0 ("Enable front closed loop") is set, else `LFuel`. Assumes AFV scales the whole map multiplicatively | XB (ASSUMED from ED-DB labels/descriptions; not checked on a bike). Public tuning guides describe AFV as a learned overall fuel multiplier |
 | Ignition cycle after a burn | XB advice (the ECM keeps learned values like AFV in RAM and stores them periodically, `KLFuel_EEP_Sec`) |
 
 ## App assets (`crates/xbtune-app/assets`)

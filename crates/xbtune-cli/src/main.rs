@@ -98,6 +98,8 @@ enum Cmd {
     Set(edit::SetArgs),
     /// Copy variables (maps, tables, values) from one image into another (offline).
     CopyTable(edit::CopyArgs),
+    /// Multiply the fuel maps by AFV and set AFV to 100% in an image file (offline).
+    FoldAfv(edit::FoldArgs),
     /// Summarise logs: duration, rate, narrowband O2 statistics, anomalies.
     Logstats(logs::StatsArgs),
     /// Propose fuel map corrections from logs (EGO-based); -o saves a new tune (never the ECM).
@@ -300,6 +302,7 @@ async fn run(cmd: Cmd) -> Result<()> {
         Cmd::Restore(a) => burn::restore(a).await,
         Cmd::AfvReset(a) => burn::afv_reset(a).await,
         Cmd::CopyTable(a) => edit::copy_table(a),
+        Cmd::FoldAfv(a) => edit::fold_afv(a),
         Cmd::Logstats(a) => logs::logstats(a),
         Cmd::Autotune(a) => logs::autotune(a),
         Cmd::Codes(a) => diag::codes(a).await,

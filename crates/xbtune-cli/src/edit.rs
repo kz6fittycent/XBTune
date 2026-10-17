@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! `set` and `copy-table`: offline edits of image files (`xbtune_core::tune`).
+//! `set`, `copy-table` and `fold-afv`: offline edits of image files (`xbtune_core::tune`).
 //! They never touch the ECM, and write a new file unless --in-place.
 
 use std::path::{Path, PathBuf};
@@ -35,6 +35,17 @@ pub struct CopyArgs {
     /// Variables to copy (e.g. Tab_Fuel_Front Tab_Fuel_Rear).
     #[arg(required = true)]
     vars: Vec<String>,
+    #[arg(short, long)]
+    output: Option<PathBuf>,
+    #[arg(long)]
+    in_place: bool,
+}
+
+#[derive(Args)]
+pub struct FoldArgs {
+    /// Image to edit: a fresh read of the ECM, made after switching the
+    /// ignition off (the ECM stores AFV now and then, not at every change).
+    file: PathBuf,
     #[arg(short, long)]
     output: Option<PathBuf>,
     #[arg(long)]
@@ -118,5 +129,27 @@ pub fn copy_table(a: CopyArgs) -> Result<()> {
     }
     t.save(&out, &catalog)?;
     println!("{}; saved {}", summary(total), out.display());
+    Ok(())
+}
+
+pub fn fold_afv(a: FoldArgs) -> Result<()> {
+    let catalog = Catalog::builtin()?;
+    let out = out_path(&a.file, &a.output, a.in_place)?;
+    let mut t = Tune::open(&a.file, &catalog).with_context(|| format!("opening {}", a.file.display()))?;
+    let plan = xbtune_core::autotune::afv_fold_plan(&t).map_err(anyhow::Error::msg)?;
+    for f in &plan {
+        println!("{}: x {:.3} ({} {:.1}%)", f.map, f.afv / 100.0, f.afv_var, f.afv);
+    }
+    let applied = xbtune_core::autotune::fold_afv(&mut t, &plan).map_err(anyhow::Error::msg)?;
+    t.save(&out, &catalog)?;
+    println!("{}; AFV set to 100%; saved {}", summary(applied), out.display());
+    let mut vars: Vec<&str> = plan.iter().flat_map(|f| [f.afv_var.as_str(), f.map.as_str()]).collect();
+    vars.sort_unstable();
+    vars.dedup();
+    println!(
+        "Nothing was written to the ECM. Burn the maps and AFV together: burn {} --vars {}",
+        out.display(),
+        vars.join(",")
+    );
     Ok(())
 }

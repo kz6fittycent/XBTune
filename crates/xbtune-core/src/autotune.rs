@@ -315,11 +315,21 @@ pub fn propose(a: &Analysis, tune: &Tune, s: &Settings) -> Result<Vec<Proposal>,
     Ok(out)
 }
 
+/// Start of the undo label of an applied auto-tune.
+pub const AUTOTUNE_STEP: &str = "auto-tune: ";
+
+/// Whether the tune holds auto-tune corrections that haven't been undone.
+/// They already include AFV (EGO starts from it), so folding AFV in as well
+/// would count it twice: reset AFV instead.
+pub fn has_autotune_step(tune: &Tune) -> bool {
+    tune.undo_labels().any(|l| l.starts_with(AUTOTUNE_STEP))
+}
+
 /// Apply the chosen proposals to the tune as one undoable step.
 pub fn apply(tune: &mut Tune, chosen: &[Proposal]) -> Result<usize, String> {
     let changes: Vec<(String, usize, f64)> = chosen.iter().map(|p| (p.map.clone(), p.index, p.new)).collect();
     let applied =
-        tune.set(format!("auto-tune: {} cell(s)", chosen.len()), &changes).map_err(|e| e.to_string())?;
+        tune.set(format!("{AUTOTUNE_STEP}{} cell(s)", chosen.len()), &changes).map_err(|e| e.to_string())?;
     Ok(applied.changed)
 }
 
@@ -332,12 +342,144 @@ pub fn fuel_maps(tune: &Tune) -> Vec<String> {
         .collect()
 }
 
+/// One fuel map and the AFV that applies to it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AfvFold {
+    pub map: String,
+    /// `LFuel` ("AFV Rear") or `LFuel1` ("AFV Front").
+    pub afv_var: String,
+    /// Percent, as stored in the tune.
+    pub afv: f64,
+}
+
+/// Which AFV applies to which fuel map (XBTune's reading, see PROVENANCE):
+/// the rear map uses `LFuel`; the front map uses `LFuel1` where the ECM has
+/// it and `KCL_Fuel_Config` bit 0 ("Enable front closed loop") is set (or
+/// the config byte isn't defined), otherwise `LFuel` too.
+pub fn afv_fold_plan(tune: &Tune) -> Result<Vec<AfvFold>, String> {
+    let number = |name: &str| match tune.value(name) {
+        Ok(xbtune_defs::Value::Number(x)) => Ok(x),
+        Ok(_) => Err(format!("{name} isn't a single value")),
+        Err(e) => Err(e.to_string()),
+    };
+    let rear = crate::burn::AFV_VARS[0];
+    if tune.var(rear).is_err() {
+        return Err(format!("{} has no AFV ({rear})", tune.ecm.id));
+    }
+    let front_own = tune.var("LFuel1").is_ok()
+        && match tune.value("KCL_Fuel_Config") {
+            Ok(xbtune_defs::Value::Bits(b)) => b & 1 != 0,
+            _ => true,
+        };
+    let mut out = Vec::new();
+    for map in fuel_maps(tune) {
+        let afv_var = if map.contains("Front") && front_own { "LFuel1" } else { rear };
+        tune.editable(afv_var).map_err(|e| e.to_string())?;
+        tune.editable(&map).map_err(|e| e.to_string())?;
+        out.push(AfvFold { afv: number(afv_var)?, afv_var: afv_var.to_string(), map });
+    }
+    if out.is_empty() {
+        return Err(format!("{} has no fuel maps", tune.ecm.id));
+    }
+    Ok(out)
+}
+
+/// Multiply each fuel map by its AFV / 100 and set those AFVs to 100%, as
+/// one undoable step. The ECM then fuels the same with nothing learned.
+pub fn fold_afv(tune: &mut Tune, plan: &[AfvFold]) -> Result<crate::tune::Applied, String> {
+    if plan.iter().all(|f| (f.afv - crate::burn::AFV_NEUTRAL).abs() < 1e-9) {
+        return Err("AFV is already 100%: nothing to fold into the maps".into());
+    }
+    let mut changes = Vec::new();
+    for f in plan {
+        let factor = f.afv / crate::burn::AFV_NEUTRAL;
+        let cells = tune.elements(&f.map).map_err(|e| e.to_string())?;
+        changes.extend(cells.iter().enumerate().map(|(i, v)| (f.map.clone(), i, v * factor)));
+    }
+    let mut vars: Vec<&str> = plan.iter().map(|f| f.afv_var.as_str()).collect();
+    vars.sort_unstable();
+    vars.dedup();
+    changes.extend(vars.iter().map(|v| (v.to_string(), 0, crate::burn::AFV_NEUTRAL)));
+    let mut label: Vec<String> = plan.iter().map(|f| format!("{} {:.1}%", f.afv_var, f.afv)).collect();
+    label.dedup();
+    tune.set(format!("fold AFV into fuel maps ({})", label.join(", ")), &changes).map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::live::Sample;
     use std::path::Path;
     use xbtune_defs::Catalog;
+
+    #[test]
+    fn afv_folds_into_both_maps_on_ddfi2() {
+        let c = Catalog::builtin().unwrap();
+        let img =
+            crate::image::Image::from_raw(c.lookup("BUEIB").unwrap(), xbtune_sim::BUEIB_EEPROM).unwrap();
+        let mut t = Tune::new(img, &c).unwrap();
+        t.set("afv", &[("LFuel".into(), 0, 100.0)]).unwrap();
+        let plan = afv_fold_plan(&t).unwrap();
+        assert!(fold_afv(&mut t, &plan).unwrap_err().contains("already 100%"));
+        t.set("afv", &[("LFuel".into(), 0, 95.0)]).unwrap();
+        let plan = afv_fold_plan(&t).unwrap();
+        let maps: Vec<_> = plan.iter().map(|f| (f.map.as_str(), f.afv_var.as_str(), f.afv)).collect();
+        assert_eq!(maps, [("Tab_Fuel_Front", "LFuel", 95.0), ("Tab_Fuel_Rear", "LFuel", 95.0)]);
+        let before: Vec<_> = plan.iter().map(|f| t.elements(&f.map).unwrap()).collect();
+        let applied = fold_afv(&mut t, &plan).unwrap();
+        assert!(applied.changed > 0 && applied.clamped == 0, "{applied:?}");
+        assert_eq!(t.elements("LFuel").unwrap(), [100.0]);
+        for (f, old) in plan.iter().zip(&before) {
+            let v = t.var(&f.map).unwrap().clone();
+            let new = t.elements(&f.map).unwrap();
+            for (i, (o, n)) in old.iter().zip(&new).enumerate() {
+                // Stored at the map's resolution.
+                let step = crate::tune::element_value(&v, i, 1) - crate::tune::element_value(&v, i, 0);
+                assert!((o * 0.95 - n).abs() <= step / 2.0 + 1e-9, "{} [{i}]: {o} -> {n}", f.map);
+            }
+        }
+        assert_eq!(t.undo_label(), Some("fold AFV into fuel maps (LFuel 95.0%)"));
+        assert!(!has_autotune_step(&t));
+        let p = Proposal {
+            map: "Tab_Fuel_Front".into(),
+            index: 0,
+            row: 0,
+            col: 0,
+            old: 0.0,
+            new: 0.0,
+            ego: 100.0,
+            hits: 0.0,
+            limited: false,
+        };
+        apply(&mut t, &[p]).unwrap();
+        assert!(has_autotune_step(&t));
+        t.undo();
+        t.undo();
+        assert_eq!(t.elements("LFuel").unwrap(), [95.0]);
+        assert_eq!(t.elements("Tab_Fuel_Front").unwrap(), before[0]);
+    }
+
+    #[test]
+    fn front_afv_used_only_with_independent_front_loop() {
+        let c = Catalog::builtin().unwrap();
+        let ecm = c.lookup("BUE2D").unwrap();
+        let mut img =
+            crate::image::Image::from_raw(ecm, include_bytes!("../../../tests/fixtures/BUE2D.eeprom"))
+                .unwrap();
+        img.page_zero = true; // LFuel1 lives in page 0
+        let mut t = Tune::new(img, &c).unwrap();
+        t.set("afv", &[("LFuel".into(), 0, 97.0), ("LFuel1".into(), 0, 104.0)]).unwrap();
+        let Ok(xbtune_defs::Value::Bits(cfg)) = t.value("KCL_Fuel_Config") else { panic!() };
+        let vars = |t: &Tune| afv_fold_plan(t).unwrap().into_iter().map(|f| f.afv_var).collect::<Vec<_>>();
+        t.set_bits("KCL_Fuel_Config", cfg | 1).unwrap();
+        assert_eq!(vars(&t), ["LFuel1", "LFuel"]);
+        t.set_bits("KCL_Fuel_Config", cfg & !1).unwrap();
+        assert_eq!(vars(&t), ["LFuel", "LFuel"]);
+        // Folding with the shared AFV leaves LFuel1 alone.
+        let plan = afv_fold_plan(&t).unwrap();
+        fold_afv(&mut t, &plan).unwrap();
+        assert_eq!((t.elements("LFuel").unwrap()[0], t.elements("LFuel1").unwrap()[0]), (100.0, 104.0));
+    }
 
     #[test]
     fn weights_add_up_and_follow_the_point() {

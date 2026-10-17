@@ -363,3 +363,31 @@ fn logstats_and_autotune_on_owner_logs() {
     ]);
     assert!(!ok && out.contains("--in-place"), "{out}");
 }
+
+#[test]
+fn fold_afv_then_burn_on_sim() {
+    let fast = ["--sim", "--sim-latency-ms", "0", "--sim-baud", "0"];
+    let base = tmp("fold_base.xbt");
+    let (ok, out) = cli(&["dump", "--sim", "-o", base.to_str().unwrap()]);
+    assert!(ok, "{out}");
+    let learned = tmp("fold_learned.xbt");
+    let (ok, out) = cli(&["set", base.to_str().unwrap(), "LFuel=95", "-o", learned.to_str().unwrap()]);
+    assert!(ok, "{out}");
+    let folded = tmp("fold_folded.xbt");
+    let (ok, out) = cli(&["fold-afv", learned.to_str().unwrap(), "-o", folded.to_str().unwrap()]);
+    assert!(ok, "{out}");
+    assert!(out.contains("Tab_Fuel_Front: x 0.950 (LFuel 95.0%)"), "{out}");
+    assert!(out.contains("--vars LFuel,Tab_Fuel_Front,Tab_Fuel_Rear"), "{out}");
+    let (ok, out) = cli(&["show", folded.to_str().unwrap(), "LFuel"]);
+    assert!(ok && out.contains("100"), "{out}");
+    // Already 100%: nothing to do, nothing saved.
+    let again = tmp("fold_again.xbt");
+    let (ok, out) = cli(&["fold-afv", folded.to_str().unwrap(), "-o", again.to_str().unwrap()]);
+    assert!(!ok && out.contains("already 100%") && !again.exists(), "{out}");
+    // The normal burn path writes it.
+    let mut a = vec!["burn"];
+    a.extend(fast);
+    a.extend([folded.to_str().unwrap(), "--vars", "LFuel,Tab_Fuel_Front,Tab_Fuel_Rear", "--yes"]);
+    let (ok, out) = cli(&a);
+    assert!(ok && out.contains("Written and verified"), "{out}");
+}

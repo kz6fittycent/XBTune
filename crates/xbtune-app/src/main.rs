@@ -4,6 +4,7 @@
 //! codes and TPS reset, and writes to the ECM, are each locked on real
 //! hardware until the owner unlocks them in Settings.
 
+mod afv_fold_view;
 mod app;
 mod autotune_view;
 mod burn_view;

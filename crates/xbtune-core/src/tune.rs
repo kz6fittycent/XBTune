@@ -261,6 +261,11 @@ impl Tune {
     }
 
     /// Label of the step `undo` would revert.
+    /// Labels of the undoable steps, oldest first.
+    pub fn undo_labels(&self) -> impl Iterator<Item = &str> {
+        self.undo.iter().map(|e| e.label.as_str())
+    }
+
     pub fn undo_label(&self) -> Option<&str> {
         self.undo.last().map(|e| e.label.as_str())
     }

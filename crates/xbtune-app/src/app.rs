@@ -113,6 +113,7 @@ pub struct XbApp {
     pub settings_ui: crate::settings_view::SettingsUi,
     pub logs: crate::logs_view::LogsUi,
     pub autotune: crate::autotune_view::AutotuneUi,
+    pub afv_fold: crate::afv_fold_view::FoldUi,
     pub report: crate::report_view::ReportUi,
     pub remote: crate::remote_view::RemoteUi,
     /// Variables to write again on a retry.
@@ -191,6 +192,7 @@ impl XbApp {
             settings_ui: Default::default(),
             logs: Default::default(),
             autotune: Default::default(),
+            afv_fold: Default::default(),
             report: Default::default(),
             remote: Default::default(),
             pending_chosen: Default::default(),
@@ -307,6 +309,10 @@ impl XbApp {
                     crate::autotune_view::open(&mut app);
                     crate::autotune_view::analyse_now(&mut app);
                 }
+            }
+            // XBTUNE_SHOT_FOLD=1: the "fold AFV into the maps" dialog.
+            if std::env::var_os("XBTUNE_SHOT_FOLD").is_some() {
+                app.afv_fold.open = true;
             }
             // XBTUNE_SHOT_FOLDER=<dir>: the files-folder picker there.
             if let Some(dir) = std::env::var_os("XBTUNE_SHOT_FOLDER") {
@@ -1050,6 +1056,7 @@ impl eframe::App for XbApp {
             });
         crate::burn_view::show(self, ui);
         crate::autotune_view::show(self, ui);
+        crate::afv_fold_view::show(self, ui);
         crate::remote_view::dialogs(self, ui);
         // One dialog at a time: a report (or crash offer) before the guide.
         if self.report.is_open() {

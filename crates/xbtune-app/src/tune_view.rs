@@ -462,6 +462,16 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
     });
     // Log overlays and auto-tune, on the fuel maps once logs are open.
     let is_fuel = xbtune_core::autotune::fuel_maps(t).contains(&v.name);
+    if is_fuel
+        && ui
+            .button("Fold AFV into the maps…")
+            .on_hover_text(
+                "Multiply the fuel maps by the learned AFV and set AFV to 100% (edits the tune only)",
+            )
+            .clicked()
+    {
+        app.afv_fold.open = true;
+    }
     let log_stats = if is_fuel && !app.logs.logs.is_empty() {
         ui.horizontal_wrapped(|ui| {
             use crate::autotune_view::Overlay;
