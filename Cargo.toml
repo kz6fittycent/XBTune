@@ -26,6 +26,12 @@ directories = "6"
 eframe = { version = "0.36", default-features = false, features = ["accesskit", "glow", "wayland", "x11"] }
 egui = { version = "0.36", default-features = false }
 egui_plot = "0.37"
+# GNOME Wayland title bar (GNOME doesn't draw server-side frames): winit's
+# Adwaita-style client-side frame (sctk-adwaita 0.10, what winit 0.30 uses).
+# winit's `wayland-csd-adwaita` renders the title with ab_glyph, which embeds
+# Cantarell (OFL-1.1, not allowed in dependencies by KICKOFF section 2), so
+# the title uses crossfont instead: system fonts via fontconfig + FreeType.
+winit = { version = "0.30", default-features = false, features = ["wayland-csd-adwaita-crossfont"] }
 futures = "0.3"
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }

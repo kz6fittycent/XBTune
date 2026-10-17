@@ -40,9 +40,11 @@ const PENDING_MAX_FILES: usize = 5;
 const PENDING_MAX_AGE: Duration = Duration::from_secs(30 * 86_400);
 
 /// What the default filter writes to the log file (RUST_LOG still sets
-/// the terminal's).
+/// the terminal's). sctk-adwaita (the GNOME Wayland title bar) warns at
+/// every start when one side of the button layout is empty (buttons on the
+/// left: "close,minimize,maximize:"); harmless.
 const FILE_FILTER: &str = "info,zbus=error,eframe=warn,egui=warn,egui_glow=warn,winit=warn,\
-                           calloop=warn,sctk=warn,ureq=warn,rustls=warn";
+                           calloop=warn,sctk=warn,sctk_adwaita::buttons=error,ureq=warn,rustls=warn";
 
 pub fn log_dir() -> Option<PathBuf> {
     xbtune_core::env::Dirs::detect().map(|d| d.data.join("app-log"))
@@ -155,7 +157,7 @@ pub fn init() -> Option<Crash> {
     let term_layer = fmt::layer().with_writer(std::io::stderr).with_filter(
         EnvFilter::try_from_default_env()
             // zbus warns when confinement blocks the accessibility bus; harmless.
-            .unwrap_or_else(|_| EnvFilter::new("warn,zbus=error")),
+            .unwrap_or_else(|_| EnvFilter::new("warn,zbus=error,sctk_adwaita::buttons=error")),
     );
     tracing_subscriber::registry().with(term_layer).with(file_layer).init();
     tracing::info!("=== XBTune {} starting · {}", version(), platform());

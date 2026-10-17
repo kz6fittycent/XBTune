@@ -16,6 +16,7 @@ anyhow.workspace = true
 eframe.workspace = true
 egui.workspace = true
 egui_plot.workspace = true
+winit.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

@@ -91,6 +91,11 @@ parts:
       - pkg-config
       - libdbus-1-dev
       - libudev-dev
+      # Wayland title bar (winit/sctk-adwaita via crossfont). Without them
+      # freetype-sys silently builds its bundled FreeType instead of linking
+      # the system one (the gnome extension's runtime provides both libs).
+      - libfreetype-dev
+      - libfontconfig-dev
     stage-packages:
       - libdbus-1-3
       - libudev1
