@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! Reading XBTune live logs (`xbtune-log 1`, docs/FILE_FORMATS.md) back in.
+//! `Log::open` also reads EcmDroid's binary logs and `.msl` logs
+//! (`crate::logformats`).
 //!
 //! Only `time_s` and the raw `frame` of each row are used: the frame is
 //! decoded again with the current definition, so a log reads the same as
@@ -22,8 +24,32 @@ pub enum LogError {
     NotALog(PathBuf),
     #[error("{0}: unknown ECM version '{1}', so the frames can't be decoded")]
     UnknownEcm(PathBuf, String),
-    #[error("{0}: no column row with time_s and frame")]
+    #[error("{0}: no column row with time_s and frame (or Time, in an .msl log)")]
     NoColumns(PathBuf),
+    #[error("{0}: the log doesn't say which ECM it's from, so it can't be decoded")]
+    NoEcmId(PathBuf),
+}
+
+/// Which kind of file a log came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LogSource {
+    /// XBTune's CSV (`xbtune-log 1`): raw frames.
+    #[default]
+    Xbtune,
+    /// EcmDroid's binary log: raw frames.
+    EcmDroidBin,
+    /// MegaLogViewer text: values only; frames rebuilt from the columns.
+    Msl,
+}
+
+impl LogSource {
+    pub fn describe(self) -> &'static str {
+        match self {
+            Self::Xbtune => "XBTune log",
+            Self::EcmDroidBin => "EcmDroid binary log",
+            Self::Msl => "MegaLogViewer .msl log (values only)",
+        }
+    }
 }
 
 /// A `# event:` line.
@@ -45,13 +71,23 @@ pub struct Log {
     pub note: Option<String>,
     pub samples: Vec<Sample>,
     pub events: Vec<LogEvent>,
-    /// Rows that couldn't be read (bad hex, wrong frame length).
+    /// Rows that couldn't be read (bad hex, wrong frame length, bad checksum).
     pub skipped: usize,
+    pub source: LogSource,
 }
 
 impl Log {
+    /// Open an XBTune CSV log, an EcmDroid binary log or an `.msl` log
+    /// (told apart by their content).
     pub fn open(path: &Path, catalog: &Catalog) -> Result<Self, LogError> {
-        let text = std::fs::read_to_string(path).map_err(|e| LogError::Io(path.to_path_buf(), e))?;
+        let bytes = std::fs::read(path).map_err(|e| LogError::Io(path.to_path_buf(), e))?;
+        if crate::logformats::looks_like_bin(&bytes) {
+            return crate::logformats::parse_bin(path, &bytes, catalog);
+        }
+        let text = String::from_utf8_lossy(&bytes);
+        if crate::logformats::looks_like_msl(&text) {
+            return crate::logformats::parse_msl(path, &text, catalog);
+        }
         Self::parse(path, &text, catalog)
     }
 
@@ -128,7 +164,19 @@ impl Log {
             }
         }
         let channels = channels(&definition);
-        Ok(Self { path: p(), ecm, version, definition, channels, started, note, samples, events, skipped })
+        Ok(Self {
+            path: p(),
+            ecm,
+            version,
+            definition,
+            channels,
+            started,
+            note,
+            samples,
+            events,
+            skipped,
+            source: LogSource::Xbtune,
+        })
     }
 
     pub fn channel(&self, name: &str) -> Option<&RtVar> {

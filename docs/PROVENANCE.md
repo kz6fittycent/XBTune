@@ -206,6 +206,17 @@ known-good source:**
 | Fold AFV into the maps: each fuel map × its AFV ÷ 100, then that AFV = 100%. Rear map uses `LFuel` ("AFV Rear"); front map uses `LFuel1` ("AFV Front") only where it exists and `KCL_Fuel_Config` bit 0 ("Enable front closed loop") is set, else `LFuel`. Assumes AFV scales the whole map multiplicatively | XB (ASSUMED from ED-DB labels/descriptions; not checked on a bike). Public tuning guides describe AFV as a learned overall fuel multiplier |
 | Ignition cycle after a burn | XB advice (the ECM keeps learned values like AFV in RAM and stores them periodically, `KLFuel_EEP_Sec`) |
 
+## EcmDroid log formats and test logs
+
+| Fact / file | Source |
+|---|---|
+| Binary log layout: 5-byte ECM ID (`UNKWN` if unknown), records of big-endian `int` time in 1/100 s + raw runtime frame; checksum check skips bad records | ED `EcmDroidService.startRecording()`, `logPacket()`; `util/Bin2MslConverter.convert()` |
+| `.msl` layout: quoted title, tab-separated names, CRLF, no units row; title `"EcmDroid/Bin2Msl <type>"` | ED `util/Bin2MslConverter.convert()` |
+| `.msl` column names = runtime channel names | ED `runtime1/2/3.tab` column 17 match ED-DB `origname` (checked: BUE2D test log, every shared column agrees with the frame) |
+| `tests/fixtures/ecmdroid/BUE2D_log.bin`, `BUE2D_log.msl` | ED `app/src/androidTest/resources/` at 2f17d29f, unchanged (sha256 `321dfad2…3cb4`, `8cdc9028…029a`). GPL-3.0 |
+| `tests/fixtures/ecmdroid/BUEIB_log_2000.bin` | First 5 + 2000×111 bytes of ED `androidTest/resources/BUEIB_log.bin` at 2f17d29f (sha256 of the whole file `854acfe4…56bc`). GPL-3.0 |
+| ED's test `.msl` is its converter's output for the first 176 records of `BUE2D_log.bin`, with times 1/10 of the current converter's (an older version) | XB (compared in `logformats::tests`) |
+
 ## App assets (`crates/xbtune-app/assets`)
 
 | File | Source |

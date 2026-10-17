@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! `logstats` and `autotune`: offline work on recorded logs. Neither talks
-//! to the ECM; `autotune` writes a new tune file only when asked (-o).
+//! `logstats`, `autotune` and `log-convert`: offline work on recorded logs
+//! (XBTune .csv, EcmDroid .bin, .msl). None talks to the ECM; `autotune`
+//! writes a new tune file only when asked (-o).
 
 use std::path::PathBuf;
 
@@ -14,7 +15,7 @@ use xbtune_defs::Catalog;
 
 #[derive(Args)]
 pub struct StatsArgs {
-    /// Log files (.csv from `log` or the app's Record).
+    /// Log files: .csv from `log` or the app's Record, EcmDroid .bin, .msl.
     #[arg(required = true)]
     logs: Vec<PathBuf>,
     /// O2 target voltage that splits rich from lean.
@@ -51,6 +52,15 @@ pub struct AutotuneArgs {
     min_clt: f64,
 }
 
+#[derive(Args)]
+pub struct ConvertArgs {
+    /// Log to convert: XBTune .csv, EcmDroid .bin or .msl.
+    input: PathBuf,
+    /// Output: .msl (MegaLogViewer) or .csv (XBTune log).
+    #[arg(short, long)]
+    output: PathBuf,
+}
+
 fn open_logs(paths: &[PathBuf], catalog: &Catalog) -> Result<Vec<Log>> {
     paths.iter().map(|p| Log::open(p, catalog).map_err(anyhow::Error::from)).collect()
 }
@@ -58,7 +68,7 @@ fn open_logs(paths: &[PathBuf], catalog: &Catalog) -> Result<Vec<Log>> {
 pub fn logstats(a: StatsArgs) -> Result<()> {
     let catalog = Catalog::builtin()?;
     for log in open_logs(&a.logs, &catalog)? {
-        println!("{}", log.name());
+        println!("{} ({})", log.name(), log.source.describe());
         println!("  ECM:       {} ({})", log.version, log.ecm.family);
         if let Some(s) = &log.started {
             println!("  Started:   {s}");
@@ -174,6 +184,60 @@ pub fn autotune(a: AutotuneArgs) -> Result<()> {
             tune.save(&path, &catalog)?;
             println!("{n} cell(s) changed; saved {}. Nothing was written to the ECM.", path.display());
         }
+    }
+    Ok(())
+}
+
+pub fn log_convert(a: ConvertArgs) -> Result<()> {
+    use xbtune_core::live::{CsvLogger, LogMeta};
+    use xbtune_core::logfile::LogSource;
+    let catalog = Catalog::builtin()?;
+    if a.output == a.input {
+        bail!("-o is the input file");
+    }
+    let ext = a.output.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase);
+    if !matches!(ext.as_deref(), Some("msl" | "csv")) {
+        bail!("say .msl or .csv for the output file");
+    }
+    let log = Log::open(&a.input, &catalog).with_context(|| format!("opening {}", a.input.display()))?;
+    let file =
+        std::fs::File::create(&a.output).with_context(|| format!("creating {}", a.output.display()))?;
+    let out = std::io::BufWriter::new(file);
+    match ext.as_deref() {
+        Some("msl") => xbtune_core::logformats::write_msl(&log, out)?,
+        Some("csv") => {
+            let meta = LogMeta {
+                ecm_id: log.ecm.id.clone(),
+                version: log.version.clone(),
+                target: format!("converted from {} ({})", log.name(), log.source.describe()),
+                started: std::time::SystemTime::now(),
+                note: log.note.clone(),
+            };
+            let mut w = CsvLogger::new(out, &meta, log.channels.clone())?;
+            for s in &log.samples {
+                w.write(s)?;
+            }
+            for e in &log.events {
+                w.event(e.t, &e.text)?;
+            }
+            w.flush()?;
+        }
+        _ => bail!("say .msl or .csv for the output file"),
+    }
+    println!(
+        "{}: {} sample(s) from a {}{}; saved {}",
+        log.name(),
+        log.samples.len(),
+        log.source.describe(),
+        if log.skipped > 0 {
+            format!(", {} unreadable record(s) left out", log.skipped)
+        } else {
+            String::new()
+        },
+        a.output.display()
+    );
+    if log.source == LogSource::Msl && ext.as_deref() == Some("csv") {
+        println!("The .msl held values, not frames: the CSV's frames are rebuilt from them (rounded).");
     }
     Ok(())
 }

@@ -549,6 +549,13 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
      step: those corrections already include AFV). Hook
      `XBTUNE_SHOT_FOLD=1`. Owner's dump: AFV 101.8% -> 276 values change.
    - Binary / .msl log formats (EcmDroid `Bin2MslConverter` as reference).
+     BUILT 2026-10-16: `xbtune-core::logformats` (EcmDroid .bin read, .msl
+     read + write; `Log::open` sniffs the content; `Log.source`). .msl
+     rebuilds frames from columns named like runtime channels; log keeps
+     only the channels found. CLI `log-convert IN -o OUT.msl|.csv`;
+     logstats/autotune take .bin/.msl. Logs view lists .bin/.msl, shows
+     the source, "Export .msl" (Logs folder). Fixtures from ED tests in
+     `tests/fixtures/ecmdroid/` (PROVENANCE). docs/FILE_FORMATS.md.
    - burn.txt lists the changed variables (old -> new) and "verified: yes".
      BUILT 2026-10-16: `burn::history_lines` + `ecm:` version line in
      `Worker::save_history` (only verified burns get a history folder).

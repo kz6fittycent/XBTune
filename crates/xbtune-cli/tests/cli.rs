@@ -391,3 +391,21 @@ fn fold_afv_then_burn_on_sim() {
     let (ok, out) = cli(&a);
     assert!(ok && out.contains("Written and verified"), "{out}");
 }
+
+#[test]
+fn ecmdroid_logs_convert_and_feed_logstats() {
+    let bin = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/ecmdroid/BUEIB_log_2000.bin");
+    let (ok, out) = cli(&["logstats", bin]);
+    assert!(ok && out.contains("EcmDroid binary log") && out.contains("Samples:   2000"), "{out}");
+    let msl = tmp("conv.msl");
+    let (ok, out) = cli(&["log-convert", bin, "-o", msl.to_str().unwrap()]);
+    assert!(ok && out.contains("2000 sample(s)"), "{out}");
+    let csv = tmp("conv.csv");
+    let (ok, out) = cli(&["log-convert", msl.to_str().unwrap(), "-o", csv.to_str().unwrap()]);
+    assert!(ok && out.contains("rebuilt"), "{out}");
+    let (ok, out) = cli(&["logstats", csv.to_str().unwrap()]);
+    assert!(ok && out.contains("Samples:   2000") && out.contains("XBTune log"), "{out}");
+    let txt = tmp("conv.txt");
+    let (ok, out) = cli(&["log-convert", bin, "-o", txt.to_str().unwrap()]);
+    assert!(!ok && out.contains(".msl or .csv") && !txt.exists(), "{out}");
+}

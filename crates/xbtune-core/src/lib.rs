@@ -18,6 +18,7 @@ pub mod env;
 pub mod image;
 pub mod live;
 pub mod logfile;
+pub mod logformats;
 pub mod logstats;
 pub mod read;
 pub mod session;

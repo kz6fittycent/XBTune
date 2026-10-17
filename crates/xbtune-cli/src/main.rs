@@ -104,6 +104,8 @@ enum Cmd {
     Logstats(logs::StatsArgs),
     /// Propose fuel map corrections from logs (EGO-based); -o saves a new tune (never the ECM).
     Autotune(logs::AutotuneArgs),
+    /// Convert a log: XBTune .csv, EcmDroid .bin or .msl in; .msl or .csv out.
+    LogConvert(logs::ConvertArgs),
     /// Remote tuning: host a session for a tuner, or join one (docs/REMOTE.md).
     #[command(subcommand)]
     Remote(remote::RemoteCmd),
@@ -305,6 +307,7 @@ async fn run(cmd: Cmd) -> Result<()> {
         Cmd::FoldAfv(a) => edit::fold_afv(a),
         Cmd::Logstats(a) => logs::logstats(a),
         Cmd::Autotune(a) => logs::autotune(a),
+        Cmd::LogConvert(a) => logs::log_convert(a),
         Cmd::Codes(a) => diag::codes(a).await,
         Cmd::Test(a) => diag::test(a).await,
         Cmd::TpsReset(a) => diag::tps_reset(a).await,

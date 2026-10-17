@@ -75,6 +75,24 @@ fn logs_dir() -> PathBuf {
     xbtune_core::env::Dirs::detect().map(|d| d.logs()).unwrap_or_else(|| PathBuf::from("."))
 }
 
+/// Write log `i` as an .msl next to the other logs (never over a file).
+fn export_msl(app: &mut XbApp, i: usize) {
+    let log = app.logs.logs[i].log.clone();
+    let dir = logs_dir();
+    let stem = log.path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "log".into());
+    let path = xbtune_core::time::unique_path(&dir, &stem, ".msl");
+    let r = std::fs::create_dir_all(&dir)
+        .and_then(|_| std::fs::File::create(&path))
+        .and_then(|f| xbtune_core::logformats::write_msl(&log, std::io::BufWriter::new(f)));
+    match r {
+        Ok(()) => {
+            tracing::info!(path = %path.display(), "log exported as .msl");
+            app.say(format!("Saved {}", path.display()), false);
+        }
+        Err(e) => app.say(format!("Couldn't save {}: {e}", path.display()), true),
+    }
+}
+
 /// Open a log file and add it (once).
 pub fn add(app: &mut XbApp, path: &Path) {
     if app.logs.logs.iter().any(|l| l.log.path == path) {
@@ -198,6 +216,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     let mut close = None;
     let mut play = None;
     let mut share: Option<PathBuf> = None;
+    let mut export = None;
     theme::card(ui).show(ui, |ui| {
         ui.set_width(ui.available_width());
         egui::Grid::new("logs").num_columns(5).spacing([14.0, 4.0]).show(ui, |ui| {
@@ -223,6 +242,13 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 {
                     share = Some(l.log.path.clone());
                 }
+                if ui
+                    .small_button("Export .msl")
+                    .on_hover_text("Save a copy for MegaLogViewer in the Logs folder")
+                    .clicked()
+                {
+                    export = Some(i);
+                }
                 if ui.small_button("Close").clicked() {
                     close = Some(i);
                 }
@@ -235,6 +261,9 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     }
     if let Some(p) = share {
         crate::remote_sync::share_log(app, &p);
+    }
+    if let Some(i) = export {
+        export_msl(app, i);
     }
     if let Some(i) = close {
         if app.logs.play.as_ref().is_some_and(|pb| pb.log == i) {
@@ -274,6 +303,16 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 line = format!("Started {s} · {line}");
             }
             ui.label(RichText::new(line).color(p.muted));
+            if log.source != xbtune_core::logfile::LogSource::Xbtune || log.skipped > 0 {
+                let mut s = log.source.describe().to_string();
+                if log.skipped > 0 {
+                    s.push_str(&format!(" · {} unreadable record(s) left out", log.skipped));
+                }
+                if log.source == xbtune_core::logfile::LogSource::Msl {
+                    s.push_str(&format!(" · {} of the ECM's channels in the file", log.channels.len()));
+                }
+                ui.label(RichText::new(s).color(p.muted));
+            }
             if let Some(n) = &log.note {
                 ui.label(format!("Note: {n}"));
             }
@@ -489,7 +528,12 @@ fn picker(app: &mut XbApp, ui: &mut Ui) {
                 rd.filter_map(|e| e.ok())
                     .map(|e| e.path())
                     .filter(|p| !p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.')))
-                    .filter(|p| p.is_dir() || p.extension().is_some_and(|e| e.eq_ignore_ascii_case("csv")))
+                    .filter(|p| {
+                        p.is_dir()
+                            || p.extension().is_some_and(|e| {
+                                ["csv", "bin", "msl"].iter().any(|x| e.eq_ignore_ascii_case(x))
+                            })
+                    })
                     .map(|p| (p.is_dir(), p))
                     .collect()
             })
@@ -498,7 +542,9 @@ fn picker(app: &mut XbApp, ui: &mut Ui) {
         entries.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
         egui::ScrollArea::vertical().max_height(320.0).show(ui, |ui| {
             if entries.is_empty() {
-                ui.label(RichText::new("No folders or .csv logs here.").color(p.muted));
+                ui.label(
+                    RichText::new("No folders or logs (.csv, EcmDroid .bin, .msl) here.").color(p.muted),
+                );
             }
             for (is_dir, path) in &entries {
                 let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();

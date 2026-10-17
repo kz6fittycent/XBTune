@@ -102,3 +102,38 @@ time_s,SysConfig,MilliSec,Seconds,RPM,spark1,...,frame
   ("1 failed attempt(s) (timeout 1)"), requests that gave up, reconnects.
   `t` uses the same clock as `time_s`. Readers skip every `#` line.
 - The file is flushed about once a second and when logging stops.
+
+## `.bin`: EcmDroid binary log (read only)
+
+Written by EcmDroid's log recorder (`EcmDroidService.startRecording` /
+`logPacket`, commit 2f17d29f). XBTune reads it (`xbtune_core::logformats`);
+it never writes it.
+
+- 5 ASCII bytes: the ECM ID from the EEPROM (e.g. `BUEIB`), or `UNKWN` if
+  EcmDroid hadn't read the EEPROM (XBTune then can't decode the log).
+- Records, back to back: a big-endian signed 32-bit time in 1/100 s since
+  recording started, then the whole runtime reply frame (the ECM's runtime
+  length: 107 bytes on DDFI-2, 135 on DDFI-3), SOH first and the XOR
+  checksum of bytes 1..len-1 last.
+- Records whose checksum fails are skipped (as EcmDroid's converter does);
+  a cut-off last record counts as unreadable.
+
+## `.msl`: MegaLogViewer text log (read and write)
+
+Tab-separated, CRLF line ends. Line 1 is a quoted title, line 2 the column
+names, then one row of numbers per sample. EcmDroid's converter writes no
+units row; XBTune skips one if present.
+
+- Reading: the ECM ID must appear as a word in the title (EcmDroid writes
+  `"EcmDroid/Bin2Msl BUE2D"`). `Time` (seconds) is required. Columns named
+  like the definition's runtime channels (the database names EcmDroid uses
+  too: `RPM`, `Batt. Voltg.`, `EGO Corr.`, ...) are encoded back into a
+  frame; other columns (EcmDroid's `Number`, `Gego`, `Engine`, ...) are
+  ignored. Values are rounded in the file, so rebuilt frames match only to
+  each column's precision. Where channels share bytes, the one with the
+  largest scale (the raw count) wins. The log's channel list holds only
+  the channels found, so missing ones read as missing, not 0.
+- Writing (`xbtune.cli log-convert LOG -o OUT.msl`, Logs view "Export
+  .msl"): title `"XBTune <ID> <version>"`, then `Time` (seconds from the
+  first sample) and every channel of the log; numbers with up to 3
+  decimals, flag bytes as integers.

@@ -627,6 +627,7 @@ mod tests {
             samples,
             events: Vec::new(),
             skipped: 0,
+            source: Default::default(),
         };
         let a = analyze(std::slice::from_ref(&log), &tune, "Tab_Fuel_Front", &Filters::default()).unwrap();
         assert_eq!(a.used, 199, "{:?}", a.rejected);
