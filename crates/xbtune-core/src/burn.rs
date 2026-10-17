@@ -128,6 +128,18 @@ pub fn changes(
     out
 }
 
+/// The "changed" lines of a burn's burn.txt: one per variable, ECM value
+/// before -> after (tables say how many elements differ).
+pub fn history_lines(changes: &[VarChange]) -> String {
+    let width = changes.iter().map(|c| c.name.len()).max().unwrap_or(0);
+    let mut out = format!("changed: {} variable(s)\n", changes.len());
+    for c in changes {
+        let value = if c.ecm.is_empty() { c.tune.clone() } else { format!("{} -> {}", c.ecm, c.tune) };
+        out.push_str(&format!("  {:width$}  {}: {value}\n", c.name, c.label));
+    }
+    out
+}
+
 /// The ECM's bytes with the chosen variables taken from the tune.
 pub fn build_target(
     def: &Definition,

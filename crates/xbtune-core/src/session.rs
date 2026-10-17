@@ -703,14 +703,18 @@ impl Worker {
         let r = before
             .save(&dir.join("before.xbt"), &self.catalog)
             .and_then(|_| after.save(&dir.join("after.xbt"), &self.catalog));
-        let text = format!(
-            "burned: {}\ntarget: {}\nwrites: {} ({} bytes), pages {:?}\nnote: {note}\n",
-            crate::time::rfc3339(now),
-            self.cfg.target,
-            report.writes,
-            report.bytes,
-            report.pages
-        );
+        // Only a burn that was read back and matched gets here.
+        let mut text = format!("burned: {}\ntarget: {}\n", crate::time::rfc3339(now), self.cfg.target);
+        if let Some(id) = &self.identity {
+            let page_zero = before.page_zero && after.page_zero;
+            let changes = crate::burn::changes(&id.definition, &before.bytes, &after.bytes, None, page_zero);
+            text.push_str(&format!("ecm: {}\n", id.version));
+            text.push_str(&crate::burn::history_lines(&changes));
+        }
+        text.push_str(&format!(
+            "writes: {} ({} bytes), pages {:?}\nverified: yes (read back, matches)\nnote: {note}\n",
+            report.writes, report.bytes, report.pages
+        ));
         match r
             .map_err(|e| e.to_string())
             .and_then(|_| std::fs::write(dir.join("burn.txt"), text).map_err(|e| e.to_string()))
@@ -1246,7 +1250,10 @@ mod tests {
         assert_eq!(sim.lock().unwrap().image(), &t.image.bytes[..]);
         let h = sum.history.clone().unwrap();
         assert!(h.join("before.xbt").exists() && h.join("after.xbt").exists());
-        assert!(std::fs::read_to_string(h.join("burn.txt")).unwrap().contains("note: test burn"));
+        let txt = std::fs::read_to_string(h.join("burn.txt")).unwrap();
+        assert!(txt.contains("note: test burn") && txt.contains("verified: yes"), "{txt}");
+        assert!(txt.contains("changed: 1 variable(s)\n  KRPM_Hard_Hi  "), "{txt}");
+        assert!(txt.contains("RPM -> 7000 RPM"), "{txt}");
         // A second burn needs a fresh preparation.
         s.send(Command::Burn { target: Box::new(t.image.clone()), note: String::new() });
         let ev = collect_until(&mut s, |e| matches!(e, Event::BurnDone(_))).await;
