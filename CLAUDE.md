@@ -540,6 +540,19 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
    - Wideband input + lambda maps. Owner has NO wideband (2026-10-16):
      build on stated assumptions (analog 0-5 V linear AFR and Innovate
      serial, both public), sim-tested only, marked unverified on hardware.
+     NOT STARTED; paused 2026-10-16 while the owner asks a friend about
+     his wideband setup (which controller, how it's wired/connected).
+     Findings so far: the owner's BUEIB (category 8) runtime frame has
+     no air-fuel ADC channel (only ABAS "BAS ADC" at offset 65, AFP at
+     96). DDFI-3 (e.g. category 50) has "AF1 ADC" (offset 63) and
+     "AF ADC" (offset 65, same bytes as BAS ADC). EcmDroid's runtime .tab
+     files have no lambda/WB-AFR columns. Options put to the owner:
+     A) controller's 0-5 V into an ECM ADC (DDFI-3 only; not the BUEIB),
+     B) RECOMMENDED: read the controller's own serial/USB stream beside
+     the ECM and merge it into the log by time (any ECM, no harness
+     wiring); start with Innovate LC-1/LC-2 and AEM X-Series (public
+     formats). Then lambda/AFR maps and auto-tune toward a target AFR.
+     Waiting for the owner's choice (and the friend's hardware) before code.
    - "Fold AFV into the maps, then AFV reset" helper (via the burn path).
      BUILT 2026-10-16: `autotune::{afv_fold_plan, fold_afv,
      has_autotune_step}` (one undo step; front uses LFuel1 only with
@@ -581,10 +594,14 @@ R1-R5 (passed on the owner's laptop + desktop, remote AFV reset took).
 Laptop snap: xbtune_0.1.0+git62bd467 (later commits are docs only).
 
 1. Phase 9 (polish + release): GO given 2026-10-16, leftovers included.
-   Items in "Phase plan" above. Proposed order: GNOME title bar, burn.txt
-   listing, AFV-fold helper, binary/.msl logs, wideband/lambda (ask the
-   owner which wideband first), then store listing + docs. Phase 10
-   (AI-assisted tuning) after that; design doc first.
+   Done 2026-10-16 (pushed, 98d2e63): GNOME title bar, burn.txt listing,
+   AFV-fold helper, binary/.msl logs. None tried on the laptop yet (CI
+   snap for 98d2e63 or later has them all).
+   PAUSED 2026-10-16 at wideband: owner is asking a friend about his
+   wideband setup; resume with his answer (option A/B and which
+   controller, see the wideband note in "Phase plan"). Then store
+   listing + docs. Phase 10 (AI-assisted tuning) after that; docs/AI.md
+   first.
 2. Licence: waiting for the EcmDroid maintainer's email reply about the
    ecmdroid.db permission (PROVENANCE). Data stays restricted; no public
    repo or release until the owner says so.
