@@ -244,6 +244,27 @@ axes, cell statistics, deterministic proposals, log summary, targets).
 - **A3**: `ai eval` and the measured model table here; guide text from it.
 - **A4**: the bug-report helper (§6a).
 
+## 9a. Added by the owner 2026-10-19 (after A1)
+
+- **Memory** (BUILT): a bike profile per ECM ID (`<files>/AI/bikes.toml`):
+  model chosen from the models the ECM fits (or typed), year, mods from a
+  menu (big bore cc, wideband, exhaust, intake, cams, ported heads, final
+  drive pulleys, octane, ECM/tune, altitude, other), notes. Sent with every
+  question, with a recap of the last 3 conversations about the same ECM
+  (questions + the advisor's last answer, from the journals). The advisor
+  suggests facts as "Remember: ..." lines (<= 160 chars); the user adds
+  them with a click. Prompt v3. CLI `ai bike`.
+- **The AI may apply changes directly** (A2): opt-in per session, still
+  only changes the checker passed; never burns.
+- **±15% total drift cap**: no AI change may take a cell more than 15%
+  from the last ECM read (A2).
+- **Setup like Desktop Scriptures** (local server scan, cards, pick a
+  model) and **drag and drop / import anything** (Wayland via
+  `wayland-client` + `smithay-client-toolkit`, approved).
+- Ideas not designed yet: location for local pressure and elevation;
+  EcmDroid's named Setup screen (incl. the airbox pressure / baro
+  settings), see CLAUDE.md.
+
 ## 10. Owner decisions (answered 2026-10-19)
 
 1. Spark maps: **included**, with the rules in §3.2.

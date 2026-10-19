@@ -9,8 +9,10 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result, anyhow, bail};
 use clap::{Args, Subcommand};
+use xbtune_ai::bike::{self, Bikes};
 use xbtune_ai::client::{self, Role, Turn};
 use xbtune_ai::config::{self, Adapter, AiConfig};
+use xbtune_ai::memory;
 use xbtune_ai::{context, journal::Journal};
 use xbtune_core::logfile::Log;
 use xbtune_core::tune::Tune;
@@ -28,6 +30,62 @@ pub enum AiCmd {
     Test,
     /// Ask a question about a tune (and logs). Answers in words; changes nothing.
     Ask(AskArgs),
+    /// Show or change your bike's profile (model, mods, notes), sent with every question.
+    Bike(BikeArgs),
+}
+
+#[derive(Args)]
+pub struct BikeArgs {
+    /// ECM ID of the bike, e.g. BUEIB (see `xbtune.cli ecms`).
+    #[arg(long)]
+    ecm: String,
+    /// List the models this ECM fits.
+    #[arg(long)]
+    models: bool,
+    /// Model, e.g. XB9SX (any text works).
+    #[arg(long)]
+    model: Option<String>,
+    #[arg(long)]
+    year: Option<u16>,
+    /// Displacement after a big bore kit, cc (0: stock).
+    #[arg(long)]
+    big_bore_cc: Option<u32>,
+    /// Wideband controller, e.g. "Innovate LC-2" ("" removes it).
+    #[arg(long)]
+    wideband: Option<String>,
+    #[arg(long)]
+    exhaust: Option<String>,
+    /// Intake / air filter.
+    #[arg(long)]
+    intake: Option<String>,
+    #[arg(long)]
+    cams: Option<String>,
+    #[arg(long)]
+    ported_heads: Option<bool>,
+    /// Final drive pulley teeth, front/rear, e.g. 27/64 ("" removes it).
+    #[arg(long)]
+    final_drive: Option<String>,
+    /// Usual fuel octane (0: not set).
+    #[arg(long)]
+    octane: Option<u32>,
+    /// Race ECM, someone else's tune, ...
+    #[arg(long)]
+    ecm_tune: Option<String>,
+    /// Usual riding altitude, metres (0: not set).
+    #[arg(long)]
+    altitude_m: Option<u32>,
+    /// Add another mod (repeatable).
+    #[arg(long)]
+    add_mod: Vec<String>,
+    /// Remove a mod added with --add-mod.
+    #[arg(long)]
+    remove_mod: Vec<String>,
+    /// Add a line to the notes (e.g. a suggestion the advisor made).
+    #[arg(long)]
+    note: Vec<String>,
+    /// Replace the notes ("" removes them).
+    #[arg(long)]
+    set_notes: Option<String>,
 }
 
 #[derive(Args)]
@@ -140,6 +198,7 @@ pub fn ai(cmd: AiCmd) -> Result<()> {
             Ok(())
         }
         AiCmd::Ask(a) => ask(a),
+        AiCmd::Bike(a) => bike(a),
     }
 }
 
@@ -188,6 +247,97 @@ fn setup(a: SetupArgs) -> Result<()> {
     Ok(())
 }
 
+fn files_dir() -> Result<PathBuf> {
+    xbtune_core::env::Dirs::detect()
+        .map(|d| d.files)
+        .ok_or_else(|| anyhow!("no files folder (HOME not set?)"))
+}
+
+fn bike(a: BikeArgs) -> Result<()> {
+    let catalog = Catalog::builtin()?;
+    let id = a.ecm.trim().to_ascii_uppercase();
+    let ecm =
+        catalog.lookup(&id).ok_or_else(|| anyhow!("unknown ECM ID {id} (see `xbtune.cli ecms`)"))?.clone();
+    if a.models {
+        println!("{id} fits: {}", ecm.bikes.as_deref().unwrap_or("unknown"));
+        for m in bike::models_for(&ecm) {
+            println!("  {:<28} {} cc stock", m.name, m.cc);
+        }
+        return Ok(());
+    }
+    let files = files_dir()?;
+    let mut all = Bikes::load(&files);
+    let before = all.get(&ecm);
+    let mut p = before.clone();
+    let text = |v: &Option<String>, f: &mut String| {
+        if let Some(v) = v {
+            *f = v.trim().to_string();
+        }
+    };
+    if let Some(m) = &a.model {
+        p.model = bike::model(m.trim()).map_or_else(|| m.trim().to_string(), |m| m.name.to_string());
+    }
+    if let Some(y) = a.year {
+        p.year = (y > 0).then_some(y);
+    }
+    if let Some(cc) = a.big_bore_cc {
+        p.mods.big_bore_cc = (cc > 0).then_some(cc);
+    }
+    text(&a.wideband, &mut p.mods.wideband);
+    text(&a.exhaust, &mut p.mods.exhaust);
+    text(&a.intake, &mut p.mods.intake);
+    text(&a.cams, &mut p.mods.cams);
+    text(&a.ecm_tune, &mut p.mods.ecm_tune);
+    if let Some(h) = a.ported_heads {
+        p.mods.ported_heads = h;
+    }
+    if let Some(fd) = &a.final_drive {
+        let parts: Vec<Option<u32>> = fd.split('/').map(|x| x.trim().parse().ok()).collect();
+        (p.mods.front_pulley, p.mods.rear_pulley) = match parts.as_slice() {
+            [Some(f), Some(r)] => (Some(*f), Some(*r)),
+            _ if fd.trim().is_empty() => (None, None),
+            _ => bail!("--final-drive is FRONT/REAR teeth, e.g. 27/64"),
+        };
+    }
+    if let Some(o) = a.octane {
+        p.mods.fuel_octane = (o > 0).then_some(o);
+    }
+    if let Some(alt) = a.altitude_m {
+        p.altitude_m = (alt > 0).then_some(alt);
+    }
+    p.mods.other.extend(a.add_mod.iter().map(|m| m.trim().to_string()).filter(|m| !m.is_empty()));
+    p.mods.other.retain(|m| !a.remove_mod.iter().any(|r| r.trim().eq_ignore_ascii_case(m)));
+    if let Some(n) = &a.set_notes {
+        p.notes = n.trim().to_string();
+    }
+    for n in &a.note {
+        p.add_note(n);
+    }
+    if p != before {
+        all.set(&id, p.clone());
+        all.save(&files)?;
+        eprintln!("Saved {}", Bikes::path(&files).display());
+    }
+    let title = p.title();
+    println!("Bike:   {}", if title.is_empty() { "not set (--model, --year)".to_string() } else { title });
+    println!("ECM:    {id}, fits {}", ecm.bikes.as_deref().unwrap_or("?"));
+    let mods = p.mod_lines();
+    if mods.is_empty() {
+        println!("Mods:   none (stock)");
+    } else {
+        for (i, m) in mods.iter().enumerate() {
+            println!("{}{m}", if i == 0 { "Mods:   " } else { "        " });
+        }
+    }
+    if let Some(alt) = p.altitude_m {
+        println!("Usually rides at {alt} m");
+    }
+    if !p.notes.trim().is_empty() {
+        println!("Notes:\n{}", p.notes.trim());
+    }
+    Ok(())
+}
+
 fn ask(a: AskArgs) -> Result<()> {
     let c = load()?;
     let catalog = Catalog::builtin()?;
@@ -195,7 +345,11 @@ fn ask(a: AskArgs) -> Result<()> {
     tune.var(&a.map).map_err(|e| anyhow!("{e}"))?;
     let logs: Vec<Log> =
         a.logs.iter().map(|p| Log::open(p, &catalog).map_err(anyhow::Error::from)).collect::<Result<_>>()?;
-    let data = context::data_block(&tune, &a.map, &logs);
+    let mut data = context::data_block(&tune, &a.map, &logs);
+    let files = files_dir()?;
+    let profile = Bikes::load(&files).get(&tune.ecm);
+    let recent = memory::recent(&files, &tune.ecm.id, None);
+    data["memory"] = memory::block(profile.to_json(&tune.ecm), &recent);
     let turns = [Turn { role: Role::User, text: context::user_message(&a.question, &data) }];
     let p = client::prepare(&c, context::SYSTEM_PROMPT, &turns)?;
     if a.show_request {
@@ -209,8 +363,9 @@ fn ask(a: AskArgs) -> Result<()> {
         p.model
     );
     eprintln!(
-        "It holds your question, the {} map and its axes, AFV, and log statistics (no VIN, names or paths).",
-        a.map
+        "It holds your question, the {} map and its axes, AFV, log statistics, your bike profile and {} earlier conversation(s) (no VIN, names or paths).",
+        a.map,
+        recent.len()
     );
     if !a.yes {
         eprint!("Type 'send' to send it, anything else cancels: ");
@@ -246,6 +401,13 @@ fn ask(a: AskArgs) -> Result<()> {
     println!("-- {} · {usage}", r.model.as_deref().unwrap_or(&p.model));
     if let Some(j) = &journal {
         println!("-- saved in {}", j.path.display());
+    }
+    for s in context::suggested_notes(&r.text) {
+        println!(
+            "-- suggested note: xbtune.cli ai bike --ecm {} --note \"{}\"",
+            tune.ecm.id,
+            s.replace('"', "'")
+        );
     }
     println!("-- {}", xbtune_core::disclaimer::SHORT);
     Ok(())

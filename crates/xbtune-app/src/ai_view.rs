@@ -9,9 +9,12 @@ use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::time::Instant;
 
 use egui::{RichText, Ui};
+use xbtune_ai::bike::{self, Bikes, Profile};
 use xbtune_ai::client::{self, AiError, Prepared, Reply, Role, Turn};
 use xbtune_ai::config::{self, Adapter, AiConfig};
+use xbtune_ai::memory;
 use xbtune_ai::{context, journal::Journal};
+use xbtune_defs::EcmDef;
 
 use crate::app::XbApp;
 use crate::theme::{self, Palette};
@@ -19,7 +22,7 @@ use crate::theme::{self, Palette};
 /// One line of the conversation as shown.
 enum Entry {
     You(String),
-    Ai { text: String, footer: String, warnings: Vec<String> },
+    Ai { text: String, footer: String, warnings: Vec<String>, suggestions: Vec<String> },
     Error(String),
 }
 
@@ -53,6 +56,184 @@ pub struct AiUi {
     preview: Option<(Prepared, Turn, String)>,
     pending: Option<Pending>,
     journal: Option<Journal>,
+    /// The bike profile for the open tune's ECM: (ECM, as edited).
+    bike: Option<(EcmDef, Profile)>,
+    bike_saved: Profile,
+    bike_open: bool,
+    /// The "other mod" being typed.
+    new_mod: String,
+}
+
+fn files_dir() -> std::path::PathBuf {
+    xbtune_core::env::Dirs::detect().map(|d| d.files).unwrap_or_default()
+}
+
+/// Load the profile for `ecm` if another bike's (or none) is loaded.
+fn ensure_bike(a: &mut AiUi, ecm: &EcmDef) {
+    if a.bike.as_ref().is_some_and(|(e, _)| e.id == ecm.id) {
+        return;
+    }
+    let all = Bikes::load(&files_dir());
+    let p = all.get(ecm);
+    // Open the editor until the bike has been described once.
+    a.bike_open = !all.bikes.contains_key(&ecm.id);
+    a.bike_saved = if a.bike_open { Profile::default() } else { p.clone() };
+    a.bike = Some((ecm.clone(), p));
+}
+
+fn save_bike(a: &mut AiUi) -> Result<(), String> {
+    let Some((ecm, p)) = &a.bike else { return Ok(()) };
+    let files = files_dir();
+    let mut all = Bikes::load(&files);
+    all.set(&ecm.id, p.clone());
+    all.save(&files).map_err(|e| e.to_string())?;
+    a.bike_saved = p.clone();
+    Ok(())
+}
+
+/// "Your bike": model (from the models the ECM fits, or typed), year, mods
+/// and notes. Returns true when Save was clicked.
+fn bike_editor(
+    ui: &mut Ui,
+    p: &Palette,
+    ecm: &EcmDef,
+    b: &mut Profile,
+    new_mod: &mut String,
+    dirty: bool,
+) -> bool {
+    let mut save = false;
+    egui::Grid::new("ai-bike").num_columns(2).spacing([12.0, 5.0]).show(ui, |ui| {
+        ui.label("Model");
+        ui.horizontal(|ui| {
+            let fits = bike::models_for(ecm);
+            egui::ComboBox::from_id_salt("ai-bike-model")
+                .selected_text(if b.model.is_empty() { "Choose…" } else { b.model.as_str() })
+                .width(240.0)
+                .show_ui(ui, |ui| {
+                    for m in &fits {
+                        ui.selectable_value(
+                            &mut b.model,
+                            m.name.to_string(),
+                            format!("{} ({} cc)", m.name, m.cc),
+                        );
+                    }
+                    ui.separator();
+                    for m in bike::MODELS.iter().filter(|m| !fits.contains(m)) {
+                        ui.selectable_value(
+                            &mut b.model,
+                            m.name.to_string(),
+                            format!("{} ({} cc, ECM swapped)", m.name, m.cc),
+                        );
+                    }
+                });
+            ui.add(egui::TextEdit::singleline(&mut b.model).desired_width(160.0).hint_text("or type it"));
+        });
+        ui.end_row();
+        ui.label("Year");
+        ui.horizontal(|ui| {
+            let (lo, hi) = bike::years_for(ecm).unwrap_or((1999, 2010));
+            egui::ComboBox::from_id_salt("ai-bike-year")
+                .selected_text(b.year.map_or("Choose…".to_string(), |y| y.to_string()))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut b.year, None, "not set");
+                    for y in (1999..=2010).rev() {
+                        let hint = if (lo..=hi).contains(&y) { "" } else { " (outside this ECM's years)" };
+                        ui.selectable_value(&mut b.year, Some(y), format!("{y}{hint}"));
+                    }
+                });
+            ui.label(
+                RichText::new(format!("This {} fits {}", ecm.id, ecm.bikes.as_deref().unwrap_or("?")))
+                    .small()
+                    .color(p.muted),
+            );
+        });
+        ui.end_row();
+        let num = |ui: &mut Ui, v: &mut Option<u32>, on: &str, unit: &str, default: u32| {
+            let mut set = v.is_some();
+            ui.horizontal(|ui| {
+                if ui.checkbox(&mut set, on).changed() {
+                    *v = set.then_some(v.unwrap_or(default));
+                }
+                if let Some(x) = v {
+                    ui.add(egui::DragValue::new(x).range(1..=99_999).suffix(unit));
+                }
+            });
+        };
+        let stock_cc = bike::model(&b.model).map_or(1203, |m| m.cc);
+        ui.label("Engine");
+        num(ui, &mut b.mods.big_bore_cc, "Big bore kit", " cc", stock_cc + 100);
+        ui.end_row();
+        let text = |ui: &mut Ui, label: &str, v: &mut String, hint: &str| {
+            ui.label(label);
+            ui.add(egui::TextEdit::singleline(v).desired_width(320.0).hint_text(hint));
+            ui.end_row();
+        };
+        text(ui, "Wideband O2", &mut b.mods.wideband, "none (e.g. Innovate LC-2)");
+        text(ui, "Exhaust", &mut b.mods.exhaust, "stock (or brand / type)");
+        text(ui, "Intake / air filter", &mut b.mods.intake, "stock");
+        text(ui, "Cams", &mut b.mods.cams, "stock");
+        ui.label("Heads");
+        ui.checkbox(&mut b.mods.ported_heads, "Ported");
+        ui.end_row();
+        ui.label("Final drive");
+        ui.horizontal(|ui| {
+            num(ui, &mut b.mods.front_pulley, "Front pulley", " teeth", 27);
+            num(ui, &mut b.mods.rear_pulley, "Rear pulley", " teeth", 64);
+        });
+        ui.end_row();
+        ui.label("Fuel");
+        num(ui, &mut b.mods.fuel_octane, "Octane", "", 91);
+        ui.end_row();
+        text(ui, "ECM / tune", &mut b.mods.ecm_tune, "stock (or race ECM, someone's tune)");
+        ui.label("Usual altitude");
+        num(ui, &mut b.altitude_m, "Set", " m", 500);
+        ui.end_row();
+        ui.label("Other mods");
+        ui.vertical(|ui| {
+            let mut remove = None;
+            for (i, m) in b.mods.other.iter().enumerate() {
+                ui.horizontal(|ui| {
+                    ui.label(m);
+                    if ui.small_button("Remove").clicked() {
+                        remove = Some(i);
+                    }
+                });
+            }
+            if let Some(i) = remove {
+                b.mods.other.remove(i);
+            }
+            ui.horizontal(|ui| {
+                ui.add(
+                    egui::TextEdit::singleline(new_mod)
+                        .desired_width(240.0)
+                        .hint_text("e.g. velocity stacks, 10.5:1 pistons"),
+                );
+                if ui.add_enabled(!new_mod.trim().is_empty(), egui::Button::new("Add")).clicked() {
+                    b.mods.other.push(new_mod.trim().to_string());
+                    new_mod.clear();
+                }
+            });
+        });
+        ui.end_row();
+    });
+    ui.label("Notes");
+    ui.add(
+        egui::TextEdit::multiline(&mut b.notes)
+            .hint_text("Anything else the advisor should always know (how you ride, goals, quirks)")
+            .desired_rows(2)
+            .desired_width(f32::INFINITY),
+    );
+    ui.horizontal(|ui| {
+        if ui.add_enabled(dirty, egui::Button::new("Save bike")).clicked() {
+            save = true;
+        }
+        ui.label(
+            RichText::new("Sent with every question; kept in the AI folder (bikes.toml).")
+                .small()
+                .color(p.muted),
+        );
+    });
+    save
 }
 
 fn load_config() -> AiConfig {
@@ -107,6 +288,7 @@ pub fn shot(app: &mut XbApp, which: &str, map: &str) {
                             .into(),
                     footer: format!("{} · 3,900 tokens in, 120 out", p.model),
                     warnings: Vec::new(),
+                    suggestions: vec!["Rear cylinder runs hotter (air-cooled)".into()],
                 });
             }
         }
@@ -125,7 +307,14 @@ fn prepare(app: &mut XbApp, cfg: &AiConfig) {
         } else {
             Vec::new()
         };
-        context::user_message(&question, &context::data_block(tune, &map, &logs))
+        let mut data = context::data_block(tune, &map, &logs);
+        let profile = match &app.ai.bike {
+            Some((e, b)) if e.id == tune.ecm.id => b.clone(),
+            _ => Bikes::load(&files_dir()).get(&tune.ecm),
+        };
+        let recent = memory::recent(&files_dir(), &tune.ecm.id, None);
+        data["memory"] = memory::block(profile.to_json(&tune.ecm), &recent);
+        context::user_message(&question, &data)
     } else {
         question.clone()
     };
@@ -217,10 +406,12 @@ fn poll(app: &mut XbApp) {
             let secs = pending.started.elapsed().as_secs_f64();
             a.turns.push(pending.turn);
             a.turns.push(Turn { role: Role::Assistant, text: reply.text.clone() });
+            let suggestions = context::suggested_notes(&reply.text);
             a.shown.push(Entry::Ai {
                 text: reply.text,
                 footer: format!("{model} · {usage} · {secs:.0} s"),
                 warnings,
+                suggestions,
             });
         }
         Err(e) => a.shown.push(Entry::Error(e.to_string())),
@@ -240,6 +431,11 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     let map_label =
         app.tune.as_ref().and_then(|t| t.var(&map).ok()).map_or(map.clone(), |v| v.label().to_string());
     let logs_n = app.logs.logs.len();
+    if let Some(e) = app.tune.as_ref().map(|t| t.ecm.clone()) {
+        ensure_bike(&mut app.ai, &e);
+    }
+    let mut add_note: Option<String> = None;
+    let mut save_bike_now = false;
     let mut close = false;
     let mut ask = false;
     let mut do_send = false;
@@ -318,11 +514,20 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                         ui.label(RichText::new("You").strong());
                         ui.label(q);
                     }
-                    Entry::Ai { text, footer, warnings } => {
+                    Entry::Ai { text, footer, warnings, suggestions } => {
                         ui.label(RichText::new("Advisor").strong().color(p.accent));
                         ui.add(egui::Label::new(text.as_str()).wrap().selectable(true));
                         for w in warnings {
                             ui.colored_label(p.warn, w);
+                        }
+                        let have = a.bike.as_ref().map_or("", |(_, b)| b.notes.as_str());
+                        for s in suggestions.iter().filter(|s| !have.contains(s.as_str())) {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label(RichText::new(format!("Suggested note: {s}")).small());
+                                if ui.small_button("Add to your bike's notes").clicked() {
+                                    add_note = Some(s.clone());
+                                }
+                            });
                         }
                         ui.label(RichText::new(footer).small().color(p.muted));
                     }
@@ -344,6 +549,25 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 return;
             }
             ui.separator();
+            let dirty = a.bike.as_ref().is_some_and(|(_, b)| *b != a.bike_saved);
+            if let Some((ecm, b)) = &mut a.bike {
+                let title = b.title();
+                let header = if title.is_empty() {
+                    "Your bike: not described yet (the advisor uses this every time)".to_string()
+                } else {
+                    let mods = b.mod_lines().len();
+                    format!("Your bike: {title}{}", if mods > 0 { format!(", {mods} mod(s)") } else { ", stock".into() })
+                };
+                let open = std::mem::take(&mut a.bike_open);
+                egui::CollapsingHeader::new(header)
+                    .id_salt("ai-bike")
+                    .open(open.then_some(true))
+                    .show(ui, |ui| {
+                        if bike_editor(ui, &p, ecm, b, &mut a.new_mod, dirty) {
+                            save_bike_now = true;
+                        }
+                    });
+            }
             if a.turns.is_empty() {
                 ui.add_enabled_ui(logs_n > 0, |ui| {
                     ui.checkbox(&mut a.include_logs, format!("Include statistics from the open logs ({logs_n})"))
@@ -379,6 +603,15 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             close = true;
         }
     });
+    if let Some(line) = add_note
+        && let Some((_, b)) = &mut app.ai.bike
+    {
+        b.add_note(&line);
+        save_bike_now = true;
+    }
+    if save_bike_now && let Err(e) = save_bike(&mut app.ai) {
+        app.say(format!("Couldn't save your bike: {e}"), true);
+    }
     if guide_done {
         app.settings.ai_guide_seen = true;
         app.save_settings();

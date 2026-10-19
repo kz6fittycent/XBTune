@@ -301,6 +301,11 @@ XBTune choices (not from a source; no real controller tested yet):
   preset says to check it). Local servers' ports are their defaults.
 - Ollama's 2048-token default context: observed on this machine
   (2026-10-19), reported `prompt_tokens` 2050 for a ~4k request.
+- Bike models (`crates/xbtune-ai/src/bike.rs`): the in-scope models of
+  KICKOFF §1 (owner's list) and the tube-frame DDFI bikes; stock
+  displacement XB9 984 cc, XB12 and tube-frame 1203 cc (Buell's published
+  figures, general knowledge). Which models an ECM fits comes from
+  `data/ecm_models.toml` (a hint, see there).
 - The tuning notes in the system prompt are XBTune's own text (KICKOFF
   §2: no ECMSpy material).
 

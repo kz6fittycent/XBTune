@@ -7,11 +7,15 @@
 //! - [`client`]: building, sending and reading requests (blocking).
 //! - [`context`]: the system prompt and the data block sent with a question.
 //! - [`journal`]: the user's record of each conversation.
+//! - [`bike`]: the bike profile (model from the ECM, mods, notes).
+//! - [`memory`]: the profile and recent conversations, sent with requests.
 
+pub mod bike;
 pub mod client;
 pub mod config;
 pub mod context;
 pub mod journal;
+pub mod memory;
 
 pub use client::{AiError, Prepared, Reply, Role, Turn};
 pub use config::{Adapter, AiConfig, PRESETS, Preset};

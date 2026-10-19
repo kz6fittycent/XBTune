@@ -16,7 +16,7 @@ use xbtune_core::tune::Tune;
 use xbtune_defs::{Shape, Value as DefValue};
 
 /// Bump when the prompt changes in substance (it's in every journal entry).
-pub const PROMPT_VERSION: u32 = 2;
+pub const PROMPT_VERSION: u32 = 3;
 
 /// The fixed system prompt.
 pub const SYSTEM_PROMPT: &str = "\
@@ -57,6 +57,14 @@ AFR numbers: don't invent any; say what to log instead.
 - Use the 'means' and 'direction' fields as given; they are computed by XBTune. Percent changes: \
 new = old x (1 + pct/100).
 - Engine speeds above the rev limit in the data never occur; ignore those columns.
+- 'memory.bike' is the owner's bike: model, year, stock displacement, mods (big bore, wideband, \
+exhaust, cams, final drive, fuel, ...) and notes. Take it as known and don't ask again; account \
+for the mods (a bigger engine or freer exhaust needs more fuel than stock maps assume). 'memory.earlier_conversations' recaps recent \
+conversations about this bike: build on them, but answer the new question from the current data \
+and don't repeat earlier answers.
+- If you learn a lasting fact about the bike (a modification, sensor, rev limit, goal) that \
+isn't in memory.bike, end your answer with one line per fact starting 'Remember: '. The owner \
+decides whether to keep it. Keep each to one short sentence of fact, not advice.
 - Base suggestions on the data. Say 'not enough data' rather than guessing, and suggest what to \
 log next (steady riding in the cells concerned, engine warm).
 - Prefer small changes (a few percent fuel, a degree or two of spark) and say why. Never suggest \
@@ -297,6 +305,22 @@ fn reading(pct: f64, wideband: bool) -> String {
     }
 }
 
+/// Longest line accepted as a note suggestion.
+pub const NOTE_MAX_CHARS: usize = 160;
+
+/// Lines of an answer that suggest a note (`Remember: ...`), without the prefix.
+pub fn suggested_notes(answer: &str) -> Vec<String> {
+    answer
+        .lines()
+        .filter_map(|l| {
+            let l = l.trim().trim_start_matches(['-', '*', ' ']).trim_matches('*').trim();
+            l.strip_prefix("Remember:").map(|r| r.trim().trim_matches('*').trim().to_string())
+        })
+        // A fact is a short sentence; longer is advice the model mislabelled.
+        .filter(|r| !r.is_empty() && r.chars().count() <= NOTE_MAX_CHARS)
+        .collect()
+}
+
 /// The user message: the data, then the question (last, so it survives a
 /// server that cuts long requests from the front).
 pub fn user_message(question: &str, data: &Value) -> String {
@@ -360,6 +384,14 @@ mod tests {
         let o = at(2, 6);
         assert_eq!(o["load"], json!(loads[2]));
         assert_eq!(o["rpm"], json!(rpms[6]));
+    }
+
+    #[test]
+    fn note_suggestions() {
+        let a = "Lower it 3%.\n\nRemember: rear cylinder runs hotter (air-cooled)\n**Remember:** Redline 7500\n- Remember:  ";
+        assert_eq!(suggested_notes(a), vec!["rear cylinder runs hotter (air-cooled)", "Redline 7500"]);
+        let long = format!("Remember: {}", "x".repeat(200));
+        assert!(suggested_notes(&long).is_empty());
     }
 
     #[test]
