@@ -563,7 +563,15 @@ pub fn mask(text: &str) -> String {
         rest = &after[end..];
     }
     out.push_str(rest);
-    mask_mac(&out)
+    let out = mask_mac(&out);
+    // The AI advisor's API key, should it ever appear in a log.
+    match xbtune_ai::AiConfig::path()
+        .and_then(|p| xbtune_ai::AiConfig::load(&p).ok())
+        .and_then(|c| c.secret())
+    {
+        Some(k) => out.replace(&k, "[API key]"),
+        None => out,
+    }
 }
 
 fn mask_mac(text: &str) -> String {

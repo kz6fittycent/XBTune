@@ -278,6 +278,32 @@ XBTune choices (not from a source; no real controller tested yet):
   for the owner to adjust, not Buell data.
 - Lean warning: average AFR above 14.0 in a cell at load 80 or more.
 
+## AI advisor (`crates/xbtune-ai`)
+
+- Anthropic Messages API: `POST /v1/messages`, headers `x-api-key` and
+  `anthropic-version: 2023-06-01`, body `model`/`max_tokens`/`system`/
+  `messages`, text in `content[].text`, usage `input_tokens`/
+  `output_tokens`, `stop_reason: "refusal"` with `stop_details.category`,
+  error body `{"type":"error","error":{"type","message"}}`, `GET
+  /v1/models` -> `data[].id`, server-side fallback (`fallbacks: "default"`
+  + beta `server-side-fallback-2026-07-01`) on claude-fable-5-1,
+  claude-opus-5-5, claude-opus-5, claude-sonnet-5-5: Anthropic's API
+  reference (Claude API skill, cURL examples and error-code reference,
+  read 2026-10-19). Raw HTTP because there is no official Rust SDK.
+- OpenAI-compatible: `POST {base}/chat/completions` with `messages`
+  (system first), `choices[0].message.content`, `usage.prompt_tokens`/
+  `completion_tokens`, `GET {base}/models` -> `data[].id`: the de-facto
+  format those servers document.
+- Preset URLs: Gemini, Fireworks, Perplexity, Cerebras and Together
+  checked against their own OpenAI-compatibility pages (2026-10-19;
+  Together is `api.together.ai`, not `.xyz`). The others are the
+  providers' well-known defaults; Jan's port (1337) is unconfirmed (the
+  preset says to check it). Local servers' ports are their defaults.
+- Ollama's 2048-token default context: observed on this machine
+  (2026-10-19), reported `prompt_tokens` 2050 for a ~4k request.
+- The tuning notes in the system prompt are XBTune's own text (KICKOFF
+  §2: no ECMSpy material).
+
 ## Simulator assumptions (ASSUMED, sim only)
 
 These are made up for the simulator and are **not** known ECM behaviour.

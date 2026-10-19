@@ -6,6 +6,7 @@
 //! that write the EEPROM). Each group is locked on real hardware until the
 //! owner unlocks it in hardware.toml.
 
+mod ai;
 mod burn;
 mod diag;
 mod edit;
@@ -111,6 +112,9 @@ enum Cmd {
     /// Remote tuning: host a session for a tuner, or join one (docs/REMOTE.md).
     #[command(subcommand)]
     Remote(remote::RemoteCmd),
+    /// AI tuning advisor (any model, local or hosted; docs/AI.md). Answers only.
+    #[command(subcommand)]
+    Ai(ai::AiCmd),
     /// Show what XBTune knows about an ECM ID's definition, and data issues.
     Defs {
         /// ECM ID, e.g. BUEIB.
@@ -315,6 +319,7 @@ async fn run(cmd: Cmd) -> Result<()> {
         Cmd::TpsReset(a) => diag::tps_reset(a).await,
         Cmd::Log(a) => live::log(a).await,
         Cmd::Remote(c) => remote::remote(c).await,
+        Cmd::Ai(c) => ai::ai(c),
     }
 }
 

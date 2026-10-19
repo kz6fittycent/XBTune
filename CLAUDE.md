@@ -375,6 +375,7 @@ crates/xbtune-sim    simulated ECM + fault injection + made-up engine; in-proces
 crates/xbtune-cli    xbtune-cli: info, ports, scan, ecms, doctor, dump, show, diff, convert, defs, live, log
 crates/xbtune-app    egui app, binary xbtune (connect, dashboard, live data, charts); assets/fonts (Inter)
 crates/xbtune-remote remote tuning: code, SPAKE2/HKDF/ChaCha20 crypto, relay client, local relay, session
+crates/xbtune-ai     AI advisor: provider presets, ai.toml, OpenAI-compatible + Anthropic clients, prompt, journal
 relay/bug-report/    Cloudflare Worker: app reports -> GitHub issues (not in the snap)
 relay/remote/        Cloudflare Worker + Durable Object: remote-tuning relay (not in the snap)
 data/                ecmdroid.toml (ED-DB derived, RESTRICTED), ecm_models.toml (ours)
@@ -594,16 +595,31 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
    `XBTUNE_SHOT_DISCLAIMER=1`), short line in burn/auto-tune/fold dialogs
    and CLI burn/autotune/fold-afv/--help. README, snap description and
    docs/STORE.md listing updated.
-   Phase 10: owner wants any LLM incl. local. docs/AI.md DRAFTED
-   2026-10-19 (OpenAI-compatible + Anthropic adapters, Rust checker
-   decides what's allowed, no RAG to start, eval harness to find which
-   models are good enough); waiting for approval + its §10 decisions.
+   Phase 10: docs/AI.md APPROVED 2026-10-19 (spark maps in, 0600 key, all
+   providers, no default model until A3, hosted OK, bug-report helper
+   = A4). A1 BUILT 2026-10-19: `crates/xbtune-ai` (`config` presets +
+   ai.toml 0600 + XBTUNE_AI_KEY, `client` prepare/send/list/test for
+   OpenAI-compatible and Anthropic raw HTTP (fallbacks on current Claude
+   models), `context` SYSTEM_PROMPT v1 + data_block (map, partner map,
+   AFV, per-cell stats with load/rpm and a words reading, auto-tune
+   proposals, log summary; nothing personal), `journal` ~/XBTune/AI/
+   *.jsonl). CLI `ai presets|setup|models|test|ask` (typed "send" unless
+   --yes). App: Settings "AI advisor" card (`ai_view::settings_card`),
+   Tune "Ask the AI advisor…" on fuel/spark maps (`ai_view.rs`: guide
+   `settings.ai_guide_seen`, preview, thread, Cancel, warnings for cut
+   input/output). Disclaimer v2 (AI point; everyone sees it again).
+   Report masking hides the key. Hook `XBTUNE_SHOT_AI=guide|ask|preview|
+   answer[:MAP]`. Tested with mock servers (both adapters) and local
+   Ollama qwen3-coder (findings in AI.md). Next: A2 (structured
+   proposals + checker + review), A3 (eval), A4 (bug-report helper).
 
 ## Next steps
 
 Resume here (2026-10-19).
 
-1. Owner: read docs/AI.md and answer its §10 questions; then build A1-A3.
+1. Phase 10: A2 next (structured proposals, checker incl. spark rules,
+   review table, CLI apply). Owner can try A1 on the laptop (Settings ->
+   AI advisor; with Ollama set OLLAMA_CONTEXT_LENGTH=16384).
 2. Owner on the laptop: CI snap for c85405c or later has the disclaimer,
    wideband (Connect -> Wideband O2), GNOME title bar, burn.txt listing,
    AFV fold and .bin/.msl logs; none tried on the laptop yet. A real LC-2

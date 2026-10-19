@@ -17,6 +17,7 @@ clap.workspace = true
 tokio = { workspace = true, features = ["io-std"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
+xbtune-ai.workspace = true
 xbtune-core.workspace = true
 xbtune-defs.workspace = true
 xbtune-link.workspace = true

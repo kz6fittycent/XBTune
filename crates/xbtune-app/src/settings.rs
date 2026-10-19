@@ -102,6 +102,8 @@ pub struct Settings {
     pub disclaimer_accepted: u32,
     /// Read a wideband controller during live sessions.
     pub wideband: Option<WidebandPref>,
+    /// AI advisor: "Got it" on its first-use guide.
+    pub ai_guide_seen: bool,
 }
 
 impl Default for Settings {
@@ -121,6 +123,7 @@ impl Default for Settings {
             remote_guide_seen: false,
             disclaimer_accepted: 0,
             wideband: None,
+            ai_guide_seen: false,
         }
     }
 }

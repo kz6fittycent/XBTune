@@ -112,6 +112,7 @@ pub struct XbApp {
     pub tune_ui: crate::tune_view::TuneUi,
     pub burn: crate::burn_view::BurnUi,
     pub wizard: crate::wizard::WizardUi,
+    pub ai: crate::ai_view::AiUi,
     /// The engine-damage warning is waiting to be accepted, and its box.
     pub disclaimer_open: bool,
     pub disclaimer_ticked: bool,
@@ -199,6 +200,7 @@ impl XbApp {
             tune_ui: Default::default(),
             burn: Default::default(),
             wizard: Default::default(),
+            ai: Default::default(),
             disclaimer_open: false,
             disclaimer_ticked: false,
             settings_ui: Default::default(),
@@ -327,6 +329,12 @@ impl XbApp {
                     crate::autotune_view::open(&mut app);
                     crate::autotune_view::analyse_now(&mut app);
                 }
+            }
+            // XBTUNE_SHOT_AI=guide|ask|preview|answer[:MAP]: the AI advisor
+            // dialog (preview/answer need ai.toml set up under XBTUNE_HOME).
+            if let Ok(which) = std::env::var("XBTUNE_SHOT_AI") {
+                let (which, map) = which.split_once(':').unwrap_or((which.as_str(), "Tab_Fuel_Front"));
+                crate::ai_view::shot(&mut app, which, map);
             }
             // XBTUNE_SHOT_FOLD=1: the "fold AFV into the maps" dialog.
             if std::env::var_os("XBTUNE_SHOT_FOLD").is_some() {
@@ -1140,6 +1148,7 @@ impl eframe::App for XbApp {
         crate::burn_view::show(self, ui);
         crate::autotune_view::show(self, ui);
         crate::afv_fold_view::show(self, ui);
+        crate::ai_view::show(self, ui);
         crate::remote_view::dialogs(self, ui);
         // One dialog at a time: the warning, then a report (or crash offer),
         // then the guide.

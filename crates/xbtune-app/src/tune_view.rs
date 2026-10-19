@@ -460,6 +460,18 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
             );
         }
     });
+    // The AI advisor, on fuel and spark maps.
+    let advisable = v.name.starts_with("Tab_Fuel") || v.name.starts_with("Tab_Spark");
+    let ask_ai = advisable
+        && matches!(v.shape, Shape::Grid { .. })
+        && ui
+            .button("Ask the AI advisor…")
+            .on_hover_text("Ask a language model about this map (answers only; it changes nothing)")
+            .clicked();
+    if ask_ai {
+        // Opened by ai_view::show (the tune is borrowed here).
+        app.ai.request = Some(v.name.clone());
+    }
     // Log overlays and auto-tune, on the fuel maps once logs are open.
     let is_fuel = xbtune_core::autotune::fuel_maps(t).contains(&v.name);
     if is_fuel

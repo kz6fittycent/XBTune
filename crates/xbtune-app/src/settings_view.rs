@@ -130,6 +130,9 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         });
         ui.add_space(8.0);
 
+        crate::ai_view::settings_card(app, ui, &p);
+        ui.add_space(8.0);
+
         theme::card(ui).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.label(RichText::new("Startup").font(theme::strong_font(17.0)));

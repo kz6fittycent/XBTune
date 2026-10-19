@@ -147,3 +147,21 @@ units row; XBTune skips one if present.
   first sample) and every channel of the log (with `wb_afr`/`wb_lambda`
   for wideband logs; reading an .msl back ignores those); numbers with up to 3
   decimals, flag bytes as integers.
+
+## `ai.toml`: AI advisor settings
+
+`<config>/ai.toml`, written with mode 0600 (it may hold an API key; a
+temporary file is written, then renamed). Keys: `preset`, `adapter`
+(`openai` or `anthropic`), `base_url`, `model`, `api_key`, `header_name`,
+`header_value`, `timeout_s`, `max_tokens`. `XBTUNE_AI_KEY` overrides
+`api_key`. Unknown or missing keys take defaults.
+
+## `AI/<time>.jsonl`: AI advisor conversations
+
+In the files folder (`~/XBTune/AI/`), one file per conversation, one JSON
+object per line: `{"kind":"request","t","prompt_version","host","model",
+"body"}` (the exact request body sent; the API key travels in a header and
+is never in it), then `{"kind":"reply","t","model","text","input_tokens",
+"output_tokens","stop"}` or `{"kind":"error","t","error"}`. Yours to keep
+or delete.
+

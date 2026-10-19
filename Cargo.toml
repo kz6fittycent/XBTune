@@ -15,6 +15,7 @@ xbtune-link = { path = "crates/xbtune-link" }
 xbtune-defs = { path = "crates/xbtune-defs" }
 xbtune-core = { path = "crates/xbtune-core" }
 xbtune-sim = { path = "crates/xbtune-sim" }
+xbtune-ai = { path = "crates/xbtune-ai" }
 xbtune-remote = { path = "crates/xbtune-remote" }
 
 anyhow = "1"

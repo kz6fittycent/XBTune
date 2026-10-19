@@ -1,10 +1,24 @@
 # AI-assisted tuning (phase 10): design for approval
 
-Status: **DRAFT. Owner's answers to §10 recorded 2026-10-19** (spark maps
-in, 0600 key file, every provider listed, no default model until A3 has
-measured, hosted providers OK, plus a bug-report helper, §6a). Waiting
-for the owner to approve the whole document before code (CLAUDE.md,
-phase 10).
+Status: **APPROVED 2026-10-19** (owner's §10 answers below). **A1 built
+2026-10-19**: `crates/xbtune-ai` (config + presets, both adapters, prompt
+and data block, journal), CLI `ai presets|setup|models|test|ask`, app
+Settings "AI advisor" card and Tune "Ask the AI advisor…" (first-use
+guide, "What gets sent", answers in words). Tried against a local Ollama
+(qwen3-coder): works; see "A1 findings". A2 next.
+
+### A1 findings (2026-10-19, local Ollama, qwen3-coder, owner's logs)
+
+- Ollama's default context (2048 tokens) silently cut the ~4k-token
+  request: the model then ignored the question. Now the question comes
+  last in the message, XBTune warns when the reported input is at a
+  context-window size or far below what was sent, and the Ollama/LM Studio
+  presets and the guide say to set 16k context.
+- Given cells as row/col indices, the model mapped them to the wrong load
+  and RPM. Every cell now carries its load and rpm values.
+- It read EGO 95% as "lean" despite the prompt. Each cell now has a
+  plain-words reading from XBTune ("map RICH here: the ECM removed 4.7%
+  fuel"). The A2 checker and the A3 eval exist for this kind of error.
 
 ## 1. What it is
 
