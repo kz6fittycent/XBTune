@@ -624,6 +624,24 @@ Resume here (2026-10-19).
    him (install, connect the LC-2, log, send the log back). Don't build
    until the owner says so.
 
+## Phase 9 checklist (laptop; no ECM writes needed)
+
+1. Install the new snap. First start: the "Tuning can damage your engine"
+   warning; Continue stays grey until the box is ticked; Quit closes.
+   After Continue the Getting started guide opens. Restart: no warning.
+2. GNOME: native title bar with your buttons on the left.
+3. Connect -> Wideband O2 -> "Simulated LC-2", then connect to the bike:
+   header shows a dot + "AFR 12.x" after ~6 s (warming first); dashboard
+   has a Wideband AFR gauge. Record 1-2 min, then Logs -> open it ->
+   Tune -> fuel map -> "Average AFR (wideband)" overlay -> Auto-tune...
+   shows the Wideband mode (target AFR, sensor delay). Nothing is written.
+   Set Wideband back to None afterwards (the simulated values are made up).
+4. Logs -> Export .msl; `xbtune.cli log-convert <log> -o ~/x.msl`.
+5. Tune -> "Fold AFV into the maps..." on a backup copy: preview, Apply,
+   Undo. Don't burn it unless you want to.
+6. If you burn anything: the History folder's burn.txt lists the
+   variables old -> new and "verified: yes".
+
 ## Remote tuning checklist (R2-R5; laptop = bike owner, desktop = tuner)
 
 Both on the same snap. Laptop: connect to the BuellTooth, open a tune
