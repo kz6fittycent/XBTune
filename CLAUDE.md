@@ -618,14 +618,15 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 Resume here (2026-10-19).
 
 0. Owner tried snap dedb0f4 on this desktop 2026-10-19: "okay better"
-   (AI dialog without the review step). Drag and drop, Setup view and the
-   AI guide not reported on separately yet.
+   (AI dialog without the review step). Drag and drop WORKS on his GNOME
+   Wayland desktop (confirmed 2026-10-19). Setup view and the AI guide not
+   reported on separately yet.
 0. 2026-10-19 later: ALL BUILT and committed locally (not pushed, no snap
    built; owner asked to slow down): A2, location/air, Setup screen +
    baro, AI setup guide, import anything + drag and drop (X11 via egui,
    Wayland via `wayland_dnd.rs` on winit's connection, stoppable at exit;
-   CLI file args; desktop Exec %F, MimeType text/csv). Wayland drop is
-   untested with a real drag (owner: drag an .xpr/.csv onto the window).
+   CLI file args; desktop Exec %F, MimeType text/csv). Wayland drop
+   confirmed by the owner 2026-10-19.
    Then A3 (eval) and A4 (bug-report check) BUILT too (AI.md 9a). Phase
    10 complete except measuring more models (hosted ones cost money:
    owner's call; re-run qwen3-coder with OLLAMA_CONTEXT_LENGTH=16384).
