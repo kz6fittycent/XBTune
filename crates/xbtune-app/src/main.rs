@@ -6,6 +6,7 @@
 
 mod afv_fold_view;
 mod ai_view;
+mod ai_wizard;
 mod app;
 mod autotune_view;
 mod burn_view;

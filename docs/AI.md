@@ -268,9 +268,16 @@ axes, cell statistics, deterministic proposals, log summary, targets).
   and notes "includes AI-suggested changes". CLI `ai ask ... -o OUT`
   (never in place), `--allow-no-data`. Tried with gemma3-4b on the
   owner's evening ride: 3 changes, all matching auto-tune, all passed.
-- **Setup like Desktop Scriptures** (local server scan, cards, pick a
-  model) and **drag and drop / import anything** (Wayland via
-  `wayland-client` + `smithay-client-toolkit`, approved).
+- **Setup guide BUILT 2026-10-19** (after Desktop Scriptures):
+  `discover::scan` probes the local presets' default addresses at once
+  (localhost only, ~1.5 s; finds Ollama and the Ubuntu inference snap on
+  8328 on the owner's PC), cards for found servers / hosted providers /
+  another address, models from the server's own list (chat models,
+  general-purpose first; hosted after the key), a test, Finish saves.
+  Opens from Settings → AI advisor and from the advisor when not set up.
+  CLI `ai scan`.
+- **Drag and drop / import anything**: next (Wayland via `wayland-client`
+  + `smithay-client-toolkit`, approved).
 - **Location / air BUILT 2026-10-19** (owner OK'd the network use):
   standard pressure, temperature and air density from altitude (ISA,
   offline); home town lookup and current surface pressure/temperature from

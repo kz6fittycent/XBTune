@@ -65,6 +65,13 @@ pub const PRESETS: &[Preset] = &[
         "set OLLAMA_CONTEXT_LENGTH=16384 (the default is too small)",
     ),
     p(
+        "Ubuntu inference snap (llama.cpp)",
+        OpenAi,
+        "http://127.0.0.1:8328/v1",
+        true,
+        "e.g. the gemma3 snap; other inference snaps may use other ports",
+    ),
+    p(
         "LM Studio",
         OpenAi,
         "http://localhost:1234/v1",
@@ -299,7 +306,9 @@ mod tests {
             if p.name != "Custom" {
                 assert!(p.base_url.starts_with("http"), "{}", p.name);
                 assert!(!p.base_url.ends_with('/'), "{}", p.name);
-                assert_eq!(p.local, p.base_url.starts_with("http://localhost"), "{}", p.name);
+                let here =
+                    p.base_url.starts_with("http://localhost") || p.base_url.starts_with("http://127.0.0.1");
+                assert_eq!(p.local, here, "{}", p.name);
             }
         }
         assert_eq!(PRESETS.iter().filter(|p| p.adapter == Adapter::Anthropic).count(), 1);

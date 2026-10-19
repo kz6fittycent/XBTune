@@ -5,6 +5,7 @@
 //!
 //! - [`config`]: provider presets and `ai.toml` (mode 0600).
 //! - [`client`]: building, sending and reading requests (blocking).
+//! - [`discover`]: model servers running on this computer (setup wizard).
 //! - [`context`]: the system prompt and the data block sent with a question.
 //! - [`journal`]: the user's record of each conversation.
 //! - [`atmosphere`]: air pressure and density at altitude (Open-Meteo on a click).
@@ -17,6 +18,7 @@ pub mod checker;
 pub mod client;
 pub mod config;
 pub mod context;
+pub mod discover;
 pub mod journal;
 pub mod memory;
 

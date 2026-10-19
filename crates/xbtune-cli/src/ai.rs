@@ -22,6 +22,8 @@ use xbtune_defs::Catalog;
 pub enum AiCmd {
     /// List the provider presets.
     Presets,
+    /// Look for model servers running on this computer (default ports, localhost only).
+    Scan,
     /// Show or change the settings (saved in ai.toml, readable only by you).
     Setup(SetupArgs),
     /// List the models the server offers.
@@ -187,6 +189,22 @@ fn describe(c: &AiConfig) {
 
 pub fn ai(cmd: AiCmd) -> Result<()> {
     match cmd {
+        AiCmd::Scan => {
+            let found = xbtune_ai::discover::scan();
+            if found.is_empty() {
+                println!("No model server answered on this computer's usual ports.");
+            }
+            for f in found {
+                let chat = xbtune_ai::discover::chat_models(&f.models);
+                println!(
+                    "{} at {}: {}",
+                    f.name,
+                    f.base_url,
+                    if chat.is_empty() { "no chat models".into() } else { chat.join(", ") }
+                );
+            }
+            Ok(())
+        }
         AiCmd::Presets => {
             for p in config::PRESETS {
                 let place = if p.local { "local " } else { "hosted" };

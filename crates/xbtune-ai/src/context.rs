@@ -158,7 +158,8 @@ fn axis_values(tune: &Tune, map: &str) -> impl Fn(usize, usize) -> Value {
 /// (EcmDroid's names), e.g. whether baro correction is on.
 fn ecm_settings(tune: &Tune) -> Value {
     use xbtune_core::setup::{self, State};
-    const GROUPS: &[&str] = &["System", "Airbox Pressure Sensor", "Closed Loop Configuration", "EGO Correction Settings"];
+    const GROUPS: &[&str] =
+        &["System", "Airbox Pressure Sensor", "Closed Loop Configuration", "EGO Correction Settings"];
     let mut out = serde_json::Map::new();
     for g in setup::screen(tune) {
         let Some(name) = g.path.last().filter(|n| GROUPS.contains(&n.as_str())) else { continue };

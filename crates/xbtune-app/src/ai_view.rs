@@ -89,6 +89,15 @@ struct Geo {
     status: Option<(bool, String)>,
 }
 
+impl AiUi {
+    /// The settings changed elsewhere (the wizard): reload the card.
+    pub fn reload_settings(&mut self) {
+        self.edit = None;
+        self.saved = None;
+        self.status = None;
+    }
+}
+
 fn files_dir() -> std::path::PathBuf {
     xbtune_core::env::Dirs::detect().map(|d| d.files).unwrap_or_default()
 }
@@ -761,6 +770,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     let mut cancel = false;
     let mut fresh = false;
     let mut to_settings = false;
+    let mut to_wizard = false;
     let guide = !app.settings.ai_guide_seen;
     let mut guide_done = false;
     let modal = egui::Modal::new(egui::Id::new("ai-advisor")).show(ui.ctx(), |ui| {
@@ -789,9 +799,14 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             }
             if let Some(m) = cfg.missing() {
                 ui.colored_label(p.bad, format!("Set up the AI advisor first: {m}."));
-                if ui.button("Open Settings").clicked() {
-                    to_settings = true;
-                }
+                ui.horizontal(|ui| {
+                    if ui.button("Set up with the guide…").clicked() {
+                        to_wizard = true;
+                    }
+                    if ui.button("Open Settings").clicked() {
+                        to_settings = true;
+                    }
+                });
                 return;
             }
             if let Some((prep, _, _)) = &a.preview {
@@ -961,6 +976,9 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         app.settings.ai_guide_seen = true;
         app.save_settings();
     }
+    if to_wizard {
+        crate::ai_wizard::open(app);
+    }
     if to_settings {
         app.view = crate::app::View::Settings;
         close = true;
@@ -1060,6 +1078,7 @@ fn guide_text(ui: &mut Ui, p: &Palette) {
 /// The Settings card.
 pub fn settings_card(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
     poll(app);
+    let mut wizard = false;
     let a = &mut app.ai;
     if a.edit.is_none() {
         let c = load_config();
@@ -1079,6 +1098,14 @@ pub fn settings_card(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
             .color(p.muted),
         );
         ui.add_space(6.0);
+        if ui
+            .button("Set up with the guide…")
+            .on_hover_text("Finds model servers on this computer, or walks you through a hosted provider")
+            .clicked()
+        {
+            wizard = true;
+        }
+        ui.add_space(4.0);
         let Some(c) = a.edit.as_mut() else { return };
         egui::Grid::new("ai-settings").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
             ui.label("Provider");
@@ -1224,4 +1251,7 @@ pub fn settings_card(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
             ui.colored_label(if *good { p.good } else { p.bad }, s);
         }
     });
+    if wizard {
+        crate::ai_wizard::open(app);
+    }
 }
