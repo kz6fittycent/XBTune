@@ -61,7 +61,12 @@ pub struct AiUi {
     shown: Vec<Entry>,
     question: String,
     include_logs: bool,
+    /// The request about to be sent (between building and sending).
     preview: Option<(Prepared, Turn, String)>,
+    /// "What gets sent", when opened: (question it was built for, request).
+    peek: Option<(String, Prepared)>,
+    /// UI checks: open "What gets sent".
+    peek_open: bool,
     pending: Option<Pending>,
     journal: Option<Journal>,
     /// The bike profile for the open tune's ECM: (ECM, as edited).
@@ -385,7 +390,10 @@ pub fn shot(app: &mut XbApp, which: &str, map: &str) {
             app.settings.ai_guide_seen = true;
             app.ai.question =
                 "Where is the front map rich at cruise, and what would you change first?".into();
-            if which != "ask" {
+            if which == "preview" {
+                app.ai.peek_open = true;
+            }
+            if which == "answer" {
                 prepare(app, &load_config());
             }
             if which == "answer"
@@ -765,8 +773,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     let mut save_bike_now = false;
     let mut close = false;
     let mut ask = false;
-    let mut do_send = false;
-    let mut back = false;
+    let mut want_peek = false;
     let mut cancel = false;
     let mut fresh = false;
     let mut to_settings = false;
@@ -805,38 +812,6 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     }
                     if ui.button("Open Settings").clicked() {
                         to_settings = true;
-                    }
-                });
-                return;
-            }
-            if let Some((prep, _, _)) = &a.preview {
-                ui.label(RichText::new("What gets sent").font(theme::strong_font(16.0)));
-                let dest = if prep.local {
-                    "to this computer (the model runs here; nothing leaves it)".to_string()
-                } else {
-                    format!("to {} (a hosted provider: it leaves this computer)", prep.host)
-                };
-                ui.label(format!(
-                    "{} bytes, about {} tokens, {dest}. No VIN, names, file paths or Bluetooth addresses.",
-                    prep.body.len(),
-                    prep.approx_tokens
-                ));
-                let mut body = prep.body.clone();
-                egui::ScrollArea::vertical().id_salt("ai-body").max_height(300.0).show(ui, |ui| {
-                    ui.add(
-                        egui::TextEdit::multiline(&mut body)
-                            .font(egui::TextStyle::Monospace)
-                            .desired_width(f32::INFINITY)
-                            .interactive(true),
-                    );
-                });
-                ui.horizontal(|ui| {
-                    let b = egui::Button::new(RichText::new("Send").color(egui::Color32::WHITE)).fill(p.accent);
-                    if ui.add(b).clicked() {
-                        do_send = true;
-                    }
-                    if ui.button("Back").clicked() {
-                        back = true;
                     }
                 });
                 return;
@@ -941,7 +916,8 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     .desired_width(f32::INFINITY),
             );
             ui.horizontal(|ui| {
-                if ui.add_enabled(!a.question.trim().is_empty(), egui::Button::new("Review and send…")).clicked() {
+                let b = egui::Button::new(RichText::new("Send").color(egui::Color32::WHITE)).fill(p.accent);
+                if ui.add_enabled(!a.question.trim().is_empty(), b).clicked() {
                     ask = true;
                 }
                 if !a.shown.is_empty() && ui.button("New conversation").clicked() {
@@ -951,6 +927,40 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     ui.label(RichText::new(format!("Saved in {}", j.path.display())).small().color(p.muted));
                 }
             });
+            let dest = if cfg.is_local() {
+                "Goes to the model on this computer; nothing leaves it.".to_string()
+            } else {
+                format!("Goes to {} (hosted). No VIN, names, file paths or Bluetooth addresses.", cfg.host())
+            };
+            ui.label(RichText::new(dest).small().color(p.muted));
+            // The exact request, for those who want to look (collapsed).
+            let open_peek = std::mem::take(&mut a.peek_open);
+            let r = egui::CollapsingHeader::new(RichText::new("What gets sent").small())
+                .id_salt("ai-peek")
+                .open(open_peek.then_some(true))
+                .show(ui, |ui| match &a.peek {
+                    Some((q, prep)) if *q == a.question => {
+                        ui.label(
+                            RichText::new(format!("{} bytes, about {} tokens", prep.body.len(), prep.approx_tokens))
+                                .small()
+                                .color(p.muted),
+                        );
+                        let mut body = prep.body.clone();
+                        egui::ScrollArea::vertical().id_salt("ai-body").max_height(260.0).show(ui, |ui| {
+                            ui.add(
+                                egui::TextEdit::multiline(&mut body)
+                                    .font(egui::TextStyle::Monospace)
+                                    .desired_width(f32::INFINITY),
+                            );
+                        });
+                    }
+                    _ => {
+                        want_peek = true;
+                    }
+                });
+            if r.body_returned.is_none() {
+                a.peek = None;
+            }
         });
         ui.separator();
         if ui.button("Close").clicked() {
@@ -984,13 +994,15 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         close = true;
     }
     if ask {
+        // Sent at once; "What gets sent" shows the same request on demand.
         prepare(app, &cfg);
-    }
-    if back {
-        app.ai.preview = None;
-    }
-    if do_send {
         send(app, &ctx);
+        app.ai.peek = None;
+    } else if want_peek {
+        prepare(app, &cfg);
+        if let Some((p, _, q)) = app.ai.preview.take() {
+            app.ai.peek = Some((q, p));
+        }
     }
     if cancel {
         // The thread finishes on its own; its answer is dropped.
@@ -1001,7 +1013,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         app.ai.shown.clear();
         app.ai.journal = None;
     }
-    if close || (modal.should_close() && app.ai.preview.is_none()) {
+    if close || modal.should_close() {
         app.ai.open = None;
         app.ai.preview = None;
     }
@@ -1058,8 +1070,9 @@ fn guide_text(ui: &mut Ui, p: &Palette) {
          tune or writes to the ECM. You make any changes yourself, and they go through the normal Burn review.",
         "You choose the model in Settings: one on this computer (Ollama, LM Studio, ...), where nothing \
          leaves the machine, or a hosted one with your own API key, where you pay the provider.",
-        "Each question shows exactly what will be sent before anything goes: the map and its axes, AFV, \
-         and statistics from your open logs. No VIN, names, file paths or Bluetooth addresses.",
+        "Each question goes with the map and its axes, AFV, your bike profile and statistics from your \
+         open logs; no VIN, names, file paths or Bluetooth addresses. \"What gets sent\" under the question \
+         shows the exact request if you want to look.",
         "Models can be confidently wrong. Compare what it says with the numbers, change a little at a \
          time, and keep your backup.",
         "Conversations are saved in the AI folder next to your tunes, so you have a record.",

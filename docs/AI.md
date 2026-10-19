@@ -159,10 +159,12 @@ around the playhead" option can come later if useful.
 
 ## 5. What leaves the machine
 
-Before every request: "What gets sent" (like bug reports) shows the exact
-request body, its size and a token estimate, plus where it goes (host
-name; "this computer" for localhost). Nothing is sent without a click on
-Send. Sent: the items in §4 and your question. Never sent: VIN, Bluetooth
+Nothing is sent without a click on Send. Under the question a line says
+where it goes (host name; "this computer" for localhost), and a collapsed
+"What gets sent" shows the exact request body, its size and a token
+estimate for those who want to look. (Owner, 2026-10-19: the full review
+step before every question was tedious and looked like an error, so it
+is no longer in the way.) Sent: the items in §4 and your question. Never sent: VIN, Bluetooth
 addresses, file paths, user name, the rest of the EEPROM, app logs. The
 reply and the request are kept in `~/XBTune/AI/<time>.jsonl` (your record,
 like the remote journal; delete at will).
