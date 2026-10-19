@@ -6,8 +6,8 @@
 //! Nothing personal goes in: no VIN, file paths, file names or Bluetooth
 //! addresses (tests check it).
 //!
-//! A1 (this stage) answers in words only; structured proposals and the
-//! checker come in A2.
+//! Changes come back as a JSON block after the answer (A2); the checker
+//! (`crate::checker`) decides which of them the user gets to review.
 
 use serde_json::{Value, json};
 use xbtune_core::autotune::{self, Filters, Mode, Settings};
@@ -16,7 +16,7 @@ use xbtune_core::tune::Tune;
 use xbtune_defs::{Shape, Value as DefValue};
 
 /// Bump when the prompt changes in substance (it's in every journal entry).
-pub const PROMPT_VERSION: u32 = 3;
+pub const PROMPT_VERSION: u32 = 4;
 
 /// The fixed system prompt.
 pub const SYSTEM_PROMPT: &str = "\
@@ -71,7 +71,16 @@ log next (steady riding in the cells concerned, engine warm).
 leaning out high-load cells or adding spark advance at high load without strong data, and point \
 out the risk when you do.
 - Never say a change is safe. Remind the user to keep a backup and check changes before writing.
-- Do not output JSON or code; the user makes the edits in XBTune by hand at this stage.";
+- To suggest changes, end your answer with ONE fenced block, exactly like this, listing each \
+cell with the load and rpm values from the data and the new map value:
+```json
+{\"changes\": [{\"map\": \"<map name>\", \"load\": <load>, \"rpm\": <rpm>, \"value\": <new value>, \"why\": \"<short reason>\"}]}
+```
+- XBTune checks every change against 'change_rules' in the data and refuses the rest, so stay \
+inside them: small steps, only cells with enough data unless asked to smooth, never leaner at \
+high load than XBTune's auto-tune, no added spark advance at high load. The owner reviews what \
+passes before anything is applied; nothing is ever written to the ECM by you.
+- No changes needed or not enough data: give no block, and say what to log.";
 
 fn number(tune: &Tune, name: &str) -> Option<f64> {
     match tune.value(name) {
@@ -187,6 +196,17 @@ pub fn data_block(tune: &Tune, map: &str, logs: &[Log]) -> Value {
         .filter_map(|n| Some(json!({"name": n, "label": tune.var(n).ok()?.label(), "rpm": number(tune, n)?})))
         .collect();
     d["rev_limits"] = json!(limits);
+    let lim = crate::checker::Limits::default();
+    d["change_rules"] = json!({
+        "maps_allowed": "fuel maps (Tab_Fuel_*) and spark maps (Tab_Spark_*) only",
+        "fuel_max_change_pct_per_round": lim.fuel_round * 100.0,
+        "max_drift_pct_from_last_ecm_read": lim.drift * 100.0,
+        "spark_max_degrees_less_per_round": lim.spark_less,
+        "spark_max_degrees_more_per_round": lim.spark_more,
+        "min_hits_per_cell": lim.min_hits,
+        "high_load_from": lim.lean_load,
+        "high_load": "fuel never leaner than XBTune's auto-tune proposal; no added spark advance",
+    });
     let usable: Vec<Log> = logs.iter().filter(|l| l.ecm.id == tune.ecm.id).cloned().collect();
     let wideband = !usable.is_empty() && usable.iter().all(|l| l.wideband.is_some());
     d["sensors"] = json!(if wideband {
@@ -399,6 +419,19 @@ mod tests {
         assert_eq!(reading(95.3, false), "map RICH here: the ECM removed 4.7% fuel to hold 14.7");
         assert_eq!(reading(104.0, true), "map LEAN here: it needs 4.0% more fuel to reach the target AFR");
         assert_eq!(reading(100.2, false), "about right");
+    }
+
+    #[test]
+    fn the_example_block_parses() {
+        let i = SYSTEM_PROMPT.find("```json").unwrap();
+        let block = &SYSTEM_PROMPT[i..SYSTEM_PROMPT[i + 7..].find("```").unwrap() + i + 10];
+        let filled = block
+            .replace("<map name>", "Tab_Fuel_Front")
+            .replace("<load>", "30")
+            .replace("<rpm>", "2900")
+            .replace("<new value>", "54")
+            .replace("<short reason>", "rich");
+        assert_eq!(crate::checker::parse_changes(&filled).unwrap().len(), 1);
     }
 
     #[test]

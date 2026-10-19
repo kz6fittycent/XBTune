@@ -10,6 +10,7 @@ use std::time::Instant;
 
 use egui::{RichText, Ui};
 use xbtune_ai::bike::{self, Bikes, Profile};
+use xbtune_ai::checker::{self, Accepted, Refused};
 use xbtune_ai::client::{self, AiError, Prepared, Reply, Role, Turn};
 use xbtune_ai::config::{self, Adapter, AiConfig};
 use xbtune_ai::memory;
@@ -22,7 +23,13 @@ use crate::theme::{self, Palette};
 /// One line of the conversation as shown.
 enum Entry {
     You(String),
-    Ai { text: String, footer: String, warnings: Vec<String>, suggestions: Vec<String> },
+    Ai {
+        text: String,
+        footer: String,
+        warnings: Vec<String>,
+        suggestions: Vec<String>,
+        review: Option<Review>,
+    },
     Error(String),
 }
 
@@ -62,6 +69,12 @@ pub struct AiUi {
     bike_open: bool,
     /// The "other mod" being typed.
     new_mod: String,
+    /// This request may change cells without logged data (smoothing).
+    allow_no_data: bool,
+    /// Owner's choice for this session: apply checked changes at once.
+    apply_directly: bool,
+    /// The warning before turning `apply_directly` on is showing.
+    confirm_direct: bool,
 }
 
 fn files_dir() -> std::path::PathBuf {
@@ -281,16 +294,29 @@ pub fn shot(app: &mut XbApp, which: &str, map: &str) {
             {
                 app.ai.shown.push(Entry::You(q));
                 app.ai.turns.push(turn);
+                let text = "(made-up answer for a UI check) Load 30 at 2900-3400 rpm: the ECM removed about 5% \
+                            fuel there, so the map is rich. Lower those cells a little and log again.\n\n\
+                            Remember: Rear cylinder runs hotter (air-cooled)\n\n```json\n{\"changes\": [\
+                            {\"map\": \"Tab_Fuel_Front\", \"load\": 30, \"rpm\": 2900, \"value\": 54, \"why\": \"EGO 94%, rich\"},\
+                            {\"map\": \"Tab_Fuel_Front\", \"load\": 30, \"rpm\": 3400, \"value\": 49, \"why\": \"EGO 94%, rich\"},\
+                            {\"map\": \"Tab_Fuel_Front\", \"load\": 125, \"rpm\": 3400, \"value\": 100, \"why\": \"lean it out\"}]}\n```";
+                let reply = Reply { text: text.into(), model: Some(p.model.clone()), ..Default::default() };
+                let review = app.tune.as_ref().and_then(|t| {
+                    let logs: Vec<_> = app.logs.logs.iter().map(|l| (*l.log).clone()).collect();
+                    review_of(&reply, t, &logs, &app.catalog, false, &p.model)
+                });
                 app.ai.shown.push(Entry::Ai {
-                    text:
-                        "(made-up answer for a UI check) Load 30 at 2900-3400 rpm: the ECM removed about 5% \
-                           fuel there, so the map is rich. Lower those cells by 3-5% and log again."
-                            .into(),
+                    text: text.split("```json").next().unwrap_or_default().trim().into(),
                     footer: format!("{} · 3,900 tokens in, 120 out", p.model),
                     warnings: Vec::new(),
-                    suggestions: vec!["Rear cylinder runs hotter (air-cooled)".into()],
+                    suggestions: context::suggested_notes(text),
+                    review,
                 });
             }
+        }
+        "direct" => {
+            app.settings.ai_guide_seen = true;
+            app.ai.confirm_direct = true;
         }
         _ => {}
     }
@@ -388,6 +414,19 @@ fn poll(app: &mut XbApp) {
     if let Some(j) = &a.journal {
         j.reply(&r).ok();
     }
+    // The changes in the answer, through the checker (A2).
+    let review = match (&r, &app.tune) {
+        (Ok(reply), Some(tune)) => {
+            let logs: Vec<_> = if app.ai.include_logs {
+                app.logs.logs.iter().map(|l| (*l.log).clone()).collect()
+            } else {
+                Vec::new()
+            };
+            review_of(reply, tune, &logs, &app.catalog, app.ai.allow_no_data, &pending.prepared.model)
+        }
+        _ => None,
+    };
+    let a = &mut app.ai;
     a.shown.push(Entry::You(pending.question));
     match r {
         Ok(reply) => {
@@ -407,14 +446,166 @@ fn poll(app: &mut XbApp) {
             a.turns.push(pending.turn);
             a.turns.push(Turn { role: Role::Assistant, text: reply.text.clone() });
             let suggestions = context::suggested_notes(&reply.text);
+            // The JSON block shows as the review table, not as text.
+            let words = reply.text.split("```json").next().unwrap_or(&reply.text).trim().to_string();
             a.shown.push(Entry::Ai {
-                text: reply.text,
+                text: words,
                 footer: format!("{model} · {usage} · {secs:.0} s"),
                 warnings,
                 suggestions,
+                review,
             });
+            if a.apply_directly {
+                let i = a.shown.len() - 1;
+                apply_review(app, i, true);
+            }
         }
         Err(e) => a.shown.push(Entry::Error(e.to_string())),
+    }
+}
+
+/// The checked changes of an answer, ready for the review table.
+struct Review {
+    ok: Vec<(Accepted, bool)>,
+    refused: Vec<Refused>,
+    error: Option<String>,
+    base_from: String,
+    model: String,
+    applied: bool,
+}
+
+fn review_of(
+    reply: &Reply,
+    tune: &xbtune_core::tune::Tune,
+    logs: &[xbtune_core::logfile::Log],
+    catalog: &xbtune_defs::Catalog,
+    allow_no_data: bool,
+    model: &str,
+) -> Option<Review> {
+    let model = reply.model.clone().unwrap_or_else(|| model.to_string());
+    let suggestions = match checker::parse_changes(&reply.text) {
+        Ok(s) if s.is_empty() => return None,
+        Ok(s) => s,
+        Err(e) => {
+            return Some(Review {
+                ok: Vec::new(),
+                refused: Vec::new(),
+                error: Some(e),
+                base_from: String::new(),
+                model,
+                applied: false,
+            });
+        }
+    };
+    let (baseline, base_from) = checker::baseline(&files_dir(), tune, catalog);
+    let cx = checker::Context { tune, baseline: &baseline, logs, allow_no_data };
+    let (ok, refused) = checker::check(&suggestions, &cx, &checker::Limits::default());
+    Some(Review {
+        ok: ok.into_iter().map(|c| (c, true)).collect(),
+        refused,
+        error: None,
+        base_from,
+        model,
+        applied: false,
+    })
+}
+
+/// The review table under an answer. Returns true when Apply was clicked.
+fn review_table(ui: &mut Ui, p: &Palette, r: &mut Review, i: usize) -> bool {
+    let mut apply = false;
+    if let Some(e) = &r.error {
+        ui.colored_label(p.bad, format!("The suggested changes couldn't be read: {e}"));
+        return false;
+    }
+    ui.add_space(4.0);
+    ui.label(RichText::new(format!("Suggested changes that pass XBTune's checks ({})", r.ok.len())).strong());
+    if !r.ok.is_empty() {
+        egui::Grid::new(("ai-review", i)).num_columns(6).striped(true).spacing([10.0, 3.0]).show(ui, |ui| {
+            for h in ["", "Map", "Cell", "Change", "Why", ""] {
+                ui.label(RichText::new(h).small().strong());
+            }
+            ui.end_row();
+            for (c, on) in &mut r.ok {
+                ui.add_enabled_ui(!r.applied, |ui| ui.checkbox(on, ""));
+                let map = if c.map.contains("Front") { "Front" } else { "Rear" };
+                let kind = if c.map.starts_with("Tab_Spark") { "spark" } else { "fuel" };
+                ui.label(format!("{kind} {map}"));
+                ui.label(match (c.load, c.rpm) {
+                    (Some(l), Some(rpm)) => format!("load {l}, {rpm} rpm"),
+                    _ => format!("row {}, col {}", c.row, c.col),
+                });
+                let change = if kind == "spark" {
+                    format!("{} -> {} ({:+.1}°)", c.old, c.new, c.new - c.old)
+                } else {
+                    format!("{} -> {} ({:+.1}%)", c.old, c.new, (c.new / c.old - 1.0) * 100.0)
+                };
+                ui.label(RichText::new(change).color(if c.new < c.old { p.good } else { p.warn }));
+                ui.scope(|ui| {
+                    ui.set_min_width(200.0);
+                    ui.set_max_width(260.0);
+                    ui.add(egui::Label::new(RichText::new(&c.why).small()).wrap());
+                });
+                if c.flags.is_empty() {
+                    ui.label("");
+                } else {
+                    ui.colored_label(p.warn, "check").on_hover_text(c.flags.join("\n"));
+                }
+                ui.end_row();
+            }
+        });
+        let n = r.ok.iter().filter(|(_, on)| *on).count();
+        ui.horizontal(|ui| {
+            if r.applied {
+                ui.colored_label(p.good, "Applied to the tune (Undo reverts it).");
+            } else {
+                let b = egui::Button::new(
+                    RichText::new(format!("Apply {n} change(s) to the tune")).color(egui::Color32::WHITE),
+                )
+                .fill(p.accent);
+                if ui.add_enabled(n > 0, b).clicked() {
+                    apply = true;
+                }
+            }
+            ui.label(
+                RichText::new(format!("Drift is measured from {}.", r.base_from)).small().color(p.muted),
+            );
+        });
+    }
+    if !r.refused.is_empty() {
+        egui::CollapsingHeader::new(format!("Refused by XBTune's checks ({})", r.refused.len()))
+            .id_salt(("ai-refused", i))
+            .show(ui, |ui| {
+                for x in &r.refused {
+                    ui.label(RichText::new(format!("{}: {}", x.what, x.reason)).small());
+                }
+            });
+    }
+    apply
+}
+
+/// Apply the ticked changes of answer `i` as one undo step.
+fn apply_review(app: &mut XbApp, i: usize, direct: bool) {
+    let Some(Entry::Ai { review: Some(r), .. }) = app.ai.shown.get_mut(i) else { return };
+    if r.applied {
+        return;
+    }
+    let chosen: Vec<Accepted> = r.ok.iter().filter(|(_, on)| *on).map(|(c, _)| c.clone()).collect();
+    if chosen.is_empty() {
+        return;
+    }
+    let model = r.model.clone();
+    let Some(tune) = &mut app.tune else { return };
+    match checker::apply(tune, &chosen, &model) {
+        Ok(n) => {
+            r.applied = true;
+            tracing::info!(cells = n, direct, %model, "AI changes applied");
+            let how = if direct { "applied directly (your setting)" } else { "applied" };
+            app.say(
+                format!("AI changes {how}: {n} cell(s) in the tune (Undo reverts them). Nothing was written to the ECM."),
+                false,
+            );
+        }
+        Err(e) => app.say(format!("The AI changes couldn't be applied: {e}"), true),
     }
 }
 
@@ -435,6 +626,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         ensure_bike(&mut app.ai, &e);
     }
     let mut add_note: Option<String> = None;
+    let mut apply_now: Option<usize> = None;
     let mut save_bike_now = false;
     let mut close = false;
     let mut ask = false;
@@ -508,15 +700,20 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 });
                 return;
             }
-            for e in &a.shown {
+            for (i, e) in a.shown.iter_mut().enumerate() {
                 match e {
                     Entry::You(q) => {
                         ui.label(RichText::new("You").strong());
-                        ui.label(q);
+                        ui.label(q.as_str());
                     }
-                    Entry::Ai { text, footer, warnings, suggestions } => {
+                    Entry::Ai { text, footer, warnings, suggestions, review } => {
                         ui.label(RichText::new("Advisor").strong().color(p.accent));
                         ui.add(egui::Label::new(text.as_str()).wrap().selectable(true));
+                        if let Some(r) = review
+                            && review_table(ui, &p, r, i)
+                        {
+                            apply_now = Some(i);
+                        }
                         for w in warnings {
                             ui.colored_label(p.warn, w);
                         }
@@ -529,7 +726,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                                 }
                             });
                         }
-                        ui.label(RichText::new(footer).small().color(p.muted));
+                        ui.label(RichText::new(footer.as_str()).small().color(p.muted));
                     }
                     Entry::Error(e) => {
                         ui.colored_label(p.bad, e);
@@ -580,6 +777,22 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                         .color(p.muted),
                 );
             }
+            ui.horizontal_wrapped(|ui| {
+                ui.checkbox(&mut a.allow_no_data, "Allow changes to cells without logged data")
+                    .on_hover_text("For requests like smoothing; otherwise only cells with enough logged samples may change");
+                let mut direct = a.apply_directly;
+                if ui
+                    .checkbox(&mut direct, "Apply checked changes directly")
+                    .on_hover_text("This session only. Changes that pass XBTune's checks go into the tune without the Apply click. Never to the ECM.")
+                    .changed()
+                {
+                    if direct {
+                        a.confirm_direct = true;
+                    } else {
+                        a.apply_directly = false;
+                    }
+                }
+            });
             ui.add(
                 egui::TextEdit::multiline(&mut a.question)
                     .hint_text("Ask about this map, e.g. \"Where is it rich at cruise?\"")
@@ -603,6 +816,12 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             close = true;
         }
     });
+    if let Some(i) = apply_now {
+        apply_review(app, i, false);
+    }
+    if app.ai.confirm_direct {
+        direct_warning(app, ui, &p);
+    }
     if let Some(line) = add_note
         && let Some((_, b)) = &mut app.ai.bike
     {
@@ -641,6 +860,50 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     if close || (modal.should_close() && app.ai.preview.is_none()) {
         app.ai.open = None;
         app.ai.preview = None;
+    }
+}
+
+/// The warning before the AI may change the tune without a click.
+fn direct_warning(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
+    let mut yes = false;
+    let mut no = false;
+    egui::Modal::new(egui::Id::new("ai-direct")).show(ui.ctx(), |ui| {
+        ui.set_width(480.0);
+        ui.label(
+            RichText::new("Let the AI change the tune directly?").font(theme::strong_font(18.0)).color(p.bad),
+        );
+        for line in [
+            "Changes that pass XBTune's checks go into the open tune as soon as the answer arrives, without \
+             the Apply click. Each answer is one undo step (\"AI: ...\").",
+            "The checks stop the dangerous moves (big steps, leaning at high load, more spark at high load, \
+             more than 15% from your last ECM read). They can't make a wrong suggestion right: models are \
+             confidently wrong, and an allowed change can still be wrong for your engine.",
+            "Nothing is ever written to the ECM by the AI. Burning stays your step, with the normal review.",
+            "This lasts until you close XBTune.",
+        ] {
+            crate::wizard::bullet(ui, line);
+        }
+        ui.horizontal(|ui| {
+            if ui
+                .add(
+                    egui::Button::new(RichText::new("Allow for this session").color(egui::Color32::WHITE))
+                        .fill(p.warn),
+                )
+                .clicked()
+            {
+                yes = true;
+            }
+            if ui.button("Cancel").clicked() {
+                no = true;
+            }
+        });
+    });
+    if yes {
+        app.ai.apply_directly = true;
+        app.ai.confirm_direct = false;
+        tracing::info!("AI apply-directly allowed for this session");
+    } else if no {
+        app.ai.confirm_direct = false;
     }
 }
 

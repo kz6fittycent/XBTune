@@ -12,7 +12,7 @@ use clap::{Args, Subcommand};
 use xbtune_ai::bike::{self, Bikes};
 use xbtune_ai::client::{self, Role, Turn};
 use xbtune_ai::config::{self, Adapter, AiConfig};
-use xbtune_ai::memory;
+use xbtune_ai::{checker, memory};
 use xbtune_ai::{context, journal::Journal};
 use xbtune_core::logfile::Log;
 use xbtune_core::tune::Tune;
@@ -129,6 +129,13 @@ pub struct AskArgs {
     /// Print the whole request body before sending.
     #[arg(long)]
     show_request: bool,
+    /// Save the tune with the changes that pass XBTune's checks applied
+    /// (never the input file; never the ECM).
+    #[arg(short, long)]
+    output: Option<PathBuf>,
+    /// Allow changes to cells without logged data (smoothing requests).
+    #[arg(long)]
+    allow_no_data: bool,
 }
 
 fn config_path() -> Result<PathBuf> {
@@ -341,8 +348,11 @@ fn bike(a: BikeArgs) -> Result<()> {
 fn ask(a: AskArgs) -> Result<()> {
     let c = load()?;
     let catalog = Catalog::builtin()?;
-    let tune = Tune::open(&a.tune, &catalog).with_context(|| format!("opening {}", a.tune.display()))?;
+    let mut tune = Tune::open(&a.tune, &catalog).with_context(|| format!("opening {}", a.tune.display()))?;
     tune.var(&a.map).map_err(|e| anyhow!("{e}"))?;
+    if a.output.as_ref() == Some(&a.tune) {
+        bail!("-o is the input file; save the changes to a new file");
+    }
     let logs: Vec<Log> =
         a.logs.iter().map(|p| Log::open(p, &catalog).map_err(anyhow::Error::from)).collect::<Result<_>>()?;
     let mut data = context::data_block(&tune, &a.map, &logs);
@@ -386,7 +396,47 @@ fn ask(a: AskArgs) -> Result<()> {
         j.reply(&r).ok();
     }
     let r = r?;
-    println!("{}", r.text.trim());
+    // The answer without its JSON block (shown as a table below instead).
+    let words = r.text.split("```json").next().unwrap_or(&r.text).trim();
+    println!("{words}");
+    println!();
+    let (baseline, base_from) = checker::baseline(&files, &tune, &catalog);
+    let checked = checker::parse_changes(&r.text).map(|s| {
+        let cx = checker::Context {
+            tune: &tune,
+            baseline: &baseline,
+            logs: &logs,
+            allow_no_data: a.allow_no_data,
+        };
+        checker::check(&s, &cx, &checker::Limits::default())
+    });
+    let mut accepted = Vec::new();
+    match &checked {
+        Err(e) => println!("The suggested changes couldn't be read: {e}"),
+        Ok((ok, no)) if ok.is_empty() && no.is_empty() => {}
+        Ok((ok, no)) => {
+            println!("Changes that pass XBTune's checks (drift measured from {base_from}):");
+            for c in ok {
+                let at = match (c.load, c.rpm) {
+                    (Some(l), Some(r)) => format!("load {l:>4} rpm {r:>5}"),
+                    _ => format!("row {} col {}", c.row, c.col),
+                };
+                let flags =
+                    if c.flags.is_empty() { String::new() } else { format!("  [{}]", c.flags.join("; ")) };
+                println!("  {:<15} {at}: {:>6.1} -> {:>6.1}  {}{flags}", c.map, c.old, c.new, c.why);
+            }
+            if ok.is_empty() {
+                println!("  none");
+            }
+            if !no.is_empty() {
+                println!("Refused:");
+                for x in no {
+                    println!("  {}: {}", x.what, x.reason);
+                }
+            }
+            accepted = ok.clone();
+        }
+    }
     println!();
     if r.truncated() {
         println!("(The answer was cut off by the output limit.)");
@@ -408,6 +458,17 @@ fn ask(a: AskArgs) -> Result<()> {
             tune.ecm.id,
             s.replace('"', "'")
         );
+    }
+    match (&a.output, accepted.is_empty()) {
+        (Some(out), false) => {
+            let model = r.model.clone().unwrap_or_else(|| p.model.clone());
+            let n = checker::apply(&mut tune, &accepted, &model).map_err(|e| anyhow!(e))?;
+            tune.save(out, &catalog)?;
+            println!("-- {n} cell(s) changed; saved {}. Nothing was written to the ECM.", out.display());
+        }
+        (Some(_), true) => println!("-- no changes passed; nothing saved."),
+        (None, false) => println!("-- add -o FILE to save these changes into a new tune."),
+        (None, true) => {}
     }
     println!("-- {}", xbtune_core::disclaimer::SHORT);
     Ok(())

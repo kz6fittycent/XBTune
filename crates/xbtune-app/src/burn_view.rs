@@ -156,7 +156,12 @@ pub fn on_prepared(app: &mut XbApp, backup: Image, path: PathBuf, link: LinkChec
         link,
         changes,
         chosen,
-        note: String::new(),
+        // AI-made changes are recorded in the burn history.
+        note: if app.tune.as_ref().is_some_and(|t| !xbtune_ai::checker::ai_steps(t).is_empty()) {
+            "includes AI-suggested changes".into()
+        } else {
+            String::new()
+        },
         confirmed: false,
     };
     crate::remote_sync::on_burn_prepared(app);
@@ -266,6 +271,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     }
     let p = Palette::for_visuals(ui.visuals());
     let mut action: Option<Action> = None;
+    let ai_steps = app.tune.as_ref().map(xbtune_ai::checker::ai_steps).unwrap_or_default();
     let state = std::mem::take(&mut app.burn);
     let title = match &state {
         BurnUi::Preparing { mode, .. }
@@ -351,6 +357,16 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     });
                 });
                 ui.add_space(6.0);
+                if !ai_steps.is_empty() {
+                    ui.colored_label(
+                        p.warn,
+                        format!(
+                            "This tune holds {} AI change step(s) ({}). Check those cells above before writing.",
+                            ai_steps.len(),
+                            ai_steps.join("; ")
+                        ),
+                    );
+                }
                 ui.horizontal(|ui| {
                     ui.label("Note");
                     ui.add(egui::TextEdit::singleline(note).desired_width(400.0).hint_text("what changed and why (kept in the history)"));

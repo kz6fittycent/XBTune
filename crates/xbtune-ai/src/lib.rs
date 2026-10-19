@@ -11,6 +11,7 @@
 //! - [`memory`]: the profile and recent conversations, sent with requests.
 
 pub mod bike;
+pub mod checker;
 pub mod client;
 pub mod config;
 pub mod context;

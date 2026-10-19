@@ -254,10 +254,20 @@ axes, cell statistics, deterministic proposals, log summary, targets).
   (questions + the advisor's last answer, from the journals). The advisor
   suggests facts as "Remember: ..." lines (<= 160 chars); the user adds
   them with a click. Prompt v3. CLI `ai bike`.
-- **The AI may apply changes directly** (A2): opt-in per session, still
-  only changes the checker passed; never burns.
-- **±15% total drift cap**: no AI change may take a cell more than 15%
-  from the last ECM read (A2).
+- **A2 BUILT 2026-10-19**: the answer ends with a ```json block of
+  changes by map/load/rpm (prompt v4, with `change_rules` in the data);
+  `checker` (fuel/spark only, cell on the axes, no clamping, ±10%/round
+  fuel, spark -2°/+1°, ±15% drift from the newest ECM read in Tunes/ or
+  Backups/ (else the tune as opened), logged data unless "allow cells
+  without data", fuel at load >= 80 never leaner than auto-tune, wideband-
+  lean cells only richer, no added advance at load >= 80 or in lean cells;
+  flags: added advance, disagrees with auto-tune, no data). Review table
+  under the answer (tick/untick, Apply = one undo step "AI: N cell(s)
+  (model)"), refused list with reasons, opt-in "Apply checked changes
+  directly" (warning; this session only). Burn dialog warns about AI steps
+  and notes "includes AI-suggested changes". CLI `ai ask ... -o OUT`
+  (never in place), `--allow-no-data`. Tried with gemma3-4b on the
+  owner's evening ride: 3 changes, all matching auto-tune, all passed.
 - **Setup like Desktop Scriptures** (local server scan, cards, pick a
   model) and **drag and drop / import anything** (Wayland via
   `wayland-client` + `smithay-client-toolkit`, approved).

@@ -617,9 +617,17 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 Resume here (2026-10-19).
 
-1. Phase 10: A2 next (structured proposals, checker incl. spark rules,
-   review table, CLI apply). Owner can try A1 on the laptop (Settings ->
-   AI advisor; with Ollama set OLLAMA_CONTEXT_LENGTH=16384).
+1. Order agreed 2026-10-19: A2 (BUILT, see AI.md 9a) -> location
+   (offline standard pressure from altitude + Open-Meteo lookup by town on
+   a click; owner OK'd the network use) -> EcmDroid-style named Setup
+   screen incl. airbox pressure/baro (port ecm_setup.xml, GPL) + Baro ADC
+   on the dashboard ("no sensor" at 255; owner's bike reads 254-255) ->
+   AI setup wizard like Desktop Scriptures (scan localhost ports incl. the
+   inference snap on 8328, cards, pick model) -> import anything + drag
+   and drop (Wayland via wayland-client + smithay-client-toolkit, deps
+   APPROVED) + file associations -> A3 eval, A4 bug-report helper.
+   Owner asked to slow down snap builds and pushes: commit locally, build
+   only when asked.
 2. Owner on the laptop: CI snap for c85405c or later has the disclaimer,
    wideband (Connect -> Wideband O2), GNOME title bar, burn.txt listing,
    AFV fold and .bin/.msl logs; none tried on the laptop yet. A real LC-2
