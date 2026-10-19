@@ -3,6 +3,7 @@
 //!
 //! - [`burn`]: writing changes to the ECM, verified (KICKOFF §6).
 //! - [`diag`]: trouble codes, active tests, TPS reset (guarded by a permit).
+//! - [`disclaimer`]: the engine-damage warning (app and CLI).
 //! - [`env`]: snap detection, storage locations, plug checks.
 //! - [`image`]: EEPROM images and their file formats (`.xbt`, EcmDroid `.xpr`).
 //! - [`read`]: reading the whole EEPROM, with resume and a verify pass.
@@ -14,6 +15,7 @@
 pub mod autotune;
 pub mod burn;
 pub mod diag;
+pub mod disclaimer;
 pub mod env;
 pub mod image;
 pub mod live;

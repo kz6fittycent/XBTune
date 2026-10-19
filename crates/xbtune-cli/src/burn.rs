@@ -257,6 +257,7 @@ pub async fn burn(a: BurnArgs) -> Result<()> {
     let mut target = backup.clone();
     target.bytes = target_bytes;
     println!("\nWill write: {}", chosen.join(", "));
+    println!("{}", xbtune_core::disclaimer::SHORT);
     if !a.yes {
         confirm("burn")?;
     }

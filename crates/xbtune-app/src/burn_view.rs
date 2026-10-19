@@ -360,6 +360,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     p.warn,
                     "Engine OFF, ignition ON, battery healthy. Don't switch off or disconnect while writing.",
                 );
+                ui.colored_label(p.warn, xbtune_core::disclaimer::SHORT);
                 if app_family_ddfi3 {
                     ui.colored_label(
                         p.warn,

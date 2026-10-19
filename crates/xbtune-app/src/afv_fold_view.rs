@@ -41,6 +41,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             )
             .color(p.muted),
         );
+        ui.label(RichText::new(xbtune_core::disclaimer::SHORT).color(p.warn));
         ui.add_space(6.0);
         match &plan {
             Ok(plan) => {

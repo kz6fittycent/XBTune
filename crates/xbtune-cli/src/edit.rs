@@ -143,6 +143,7 @@ pub fn fold_afv(a: FoldArgs) -> Result<()> {
     let applied = xbtune_core::autotune::fold_afv(&mut t, &plan).map_err(anyhow::Error::msg)?;
     t.save(&out, &catalog)?;
     println!("{}; AFV set to 100%; saved {}", summary(applied), out.display());
+    println!("{}", xbtune_core::disclaimer::SHORT);
     let mut vars: Vec<&str> = plan.iter().flat_map(|f| [f.afv_var.as_str(), f.map.as_str()]).collect();
     vars.sort_unstable();
     vars.dedup();

@@ -110,6 +110,9 @@ pub struct XbApp {
     pub tune_ui: crate::tune_view::TuneUi,
     pub burn: crate::burn_view::BurnUi,
     pub wizard: crate::wizard::WizardUi,
+    /// The engine-damage warning is waiting to be accepted, and its box.
+    pub disclaimer_open: bool,
+    pub disclaimer_ticked: bool,
     pub settings_ui: crate::settings_view::SettingsUi,
     pub logs: crate::logs_view::LogsUi,
     pub autotune: crate::autotune_view::AutotuneUi,
@@ -189,6 +192,8 @@ impl XbApp {
             tune_ui: Default::default(),
             burn: Default::default(),
             wizard: Default::default(),
+            disclaimer_open: false,
+            disclaimer_ticked: false,
             settings_ui: Default::default(),
             logs: Default::default(),
             autotune: Default::default(),
@@ -266,12 +271,17 @@ impl XbApp {
                 tracing::warn!(path = %path.display(), why, "file not moved");
             }
         }
-        // A crash last time comes first; the guide waits for the next start.
+        // The engine-damage warning comes before anything else; the guide
+        // opens once it's accepted. A crash last time comes next; the guide
+        // then waits for the next start.
+        if app.shot.is_none() && app.settings.disclaimer_accepted < xbtune_core::disclaimer::VERSION {
+            app.disclaimer_open = true;
+        }
         if let Some(c) = crash.clone()
             && app.shot.is_none()
         {
             app.report.offer_crash(c, true);
-        } else if app.shot.is_none() && app.settings.show_wizard {
+        } else if app.shot.is_none() && app.settings.show_wizard && !app.disclaimer_open {
             app.wizard.open();
         }
         if app.shot.is_some() {
@@ -321,6 +331,10 @@ impl XbApp {
             // XBTUNE_SHOT_UNLOCK=commands|writes: the unlock confirmation.
             if let Ok(which) = std::env::var("XBTUNE_SHOT_UNLOCK") {
                 app.settings_ui.ask(&which);
+            }
+            // XBTUNE_SHOT_DISCLAIMER=1: the engine-damage warning.
+            if std::env::var_os("XBTUNE_SHOT_DISCLAIMER").is_some() {
+                app.disclaimer_open = true;
             }
             // XBTUNE_SHOT_WIZARD=N: guide step N; XBTUNE_SHOT_REPORT=1|crash
             // (the previous session's crash if there is one, else a made-up one).
@@ -1058,8 +1072,11 @@ impl eframe::App for XbApp {
         crate::autotune_view::show(self, ui);
         crate::afv_fold_view::show(self, ui);
         crate::remote_view::dialogs(self, ui);
-        // One dialog at a time: a report (or crash offer) before the guide.
-        if self.report.is_open() {
+        // One dialog at a time: the warning, then a report (or crash offer),
+        // then the guide.
+        if self.disclaimer_open {
+            crate::disclaimer_view::show(self, ui);
+        } else if self.report.is_open() {
             crate::report_view::show(self, ui);
         } else {
             crate::wizard::show(self, ui);

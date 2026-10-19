@@ -183,6 +183,7 @@ pub fn autotune(a: AutotuneArgs) -> Result<()> {
             let n = autotune::apply(&mut tune, &all).map_err(anyhow::Error::msg)?;
             tune.save(&path, &catalog)?;
             println!("{n} cell(s) changed; saved {}. Nothing was written to the ECM.", path.display());
+            println!("{}", xbtune_core::disclaimer::SHORT);
         }
     }
     Ok(())

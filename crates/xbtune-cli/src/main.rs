@@ -32,7 +32,9 @@ use xbtune_proto::{EcmAddress, LinkStats, RetryPolicy, TransactionError};
 #[command(
     name = "xbtune-cli",
     version,
-    about = "XBTune: diagnostics and tuning for Buell XB ECMs (DDFI-2/DDFI-3)"
+    about = "XBTune: diagnostics and tuning for Buell XB ECMs (DDFI-2/DDFI-3)",
+    after_help = "Warning: a bad tune can damage the engine. XBTune comes with NO WARRANTY (GPL-3.0); \
+                  you are responsible for what you write to the ECM."
 )]
 struct Cli {
     /// Show debug logs. Twice (-vv) also shows every frame in hex.

@@ -254,7 +254,7 @@ fn heading(ui: &mut Ui, text: &str) {
     ui.add_space(4.0);
 }
 
-fn bullet(ui: &mut Ui, text: &str) {
+pub fn bullet(ui: &mut Ui, text: &str) {
     ui.horizontal_top(|ui| {
         ui.label("•");
         ui.add(egui::Label::new(text).wrap());

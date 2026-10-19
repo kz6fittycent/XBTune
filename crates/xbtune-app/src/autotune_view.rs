@@ -157,6 +157,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             )
             .color(p.muted),
         );
+        ui.label(RichText::new(xbtune_core::disclaimer::SHORT).color(p.warn));
         ui.add_space(4.0);
         ui.label(format!("{logs_n} log(s) open"));
         if !wrong_ecm.is_empty() {

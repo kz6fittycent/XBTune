@@ -88,6 +88,8 @@ pub struct Settings {
     pub remote_name: String,
     /// Remote tuning: "Don't show this again" on the guide.
     pub remote_guide_seen: bool,
+    /// The version of the engine-damage warning the user accepted (0: none).
+    pub disclaimer_accepted: u32,
 }
 
 impl Default for Settings {
@@ -105,6 +107,7 @@ impl Default for Settings {
             show_wizard: true,
             remote_name: String::new(),
             remote_guide_seen: false,
+            disclaimer_accepted: 0,
         }
     }
 }

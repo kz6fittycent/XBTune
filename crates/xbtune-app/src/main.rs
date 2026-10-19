@@ -12,6 +12,7 @@ mod charts;
 mod connect;
 mod dashboard;
 mod diagnostics;
+mod disclaimer_view;
 mod gauge;
 mod grid;
 mod logs_view;
