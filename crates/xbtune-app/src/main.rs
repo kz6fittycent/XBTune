@@ -17,6 +17,7 @@ mod diagnostics;
 mod disclaimer_view;
 mod gauge;
 mod grid;
+mod import;
 mod logs_view;
 mod remote_sync;
 mod remote_view;
@@ -29,6 +30,8 @@ mod setup_view;
 mod table;
 mod theme;
 mod tune_view;
+#[cfg(target_os = "linux")]
+mod wayland_dnd;
 mod wizard;
 
 fn main() -> eframe::Result {

@@ -115,6 +115,9 @@ pub struct XbApp {
     pub wizard: crate::wizard::WizardUi,
     pub ai: crate::ai_view::AiUi,
     pub ai_wizard: crate::ai_wizard::WizardUi,
+    /// Files dropped on the window under Wayland (`wayland_dnd`).
+    #[cfg(target_os = "linux")]
+    dropped: Option<crate::wayland_dnd::Listener>,
     pub setup_ui: crate::setup_view::SetupUi,
     /// The engine-damage warning is waiting to be accepted, and its box.
     pub disclaimer_open: bool,
@@ -205,6 +208,8 @@ impl XbApp {
             wizard: Default::default(),
             ai: Default::default(),
             ai_wizard: Default::default(),
+            #[cfg(target_os = "linux")]
+            dropped: None,
             setup_ui: Default::default(),
             disclaimer_open: false,
             disclaimer_ticked: false,
@@ -392,6 +397,26 @@ impl XbApp {
             && let Some(t) = app.settings.last.clone()
         {
             app.start(t);
+        }
+        // Wayland: listen for dropped files ourselves (winit only does X11).
+        #[cfg(target_os = "linux")]
+        {
+            use winit::raw_window_handle::{HasDisplayHandle, RawDisplayHandle};
+            if let Ok(h) = cc.display_handle()
+                && let RawDisplayHandle::Wayland(w) = h.as_raw()
+            {
+                let ctx = cc.egui_ctx.clone();
+                // SAFETY: eframe's wl_display lives as long as the window, and
+                // the listener thread ends with the process.
+                app.dropped =
+                    unsafe { crate::wayland_dnd::start(w.display.as_ptr(), move || ctx.request_repaint()) };
+            }
+        }
+        // Files named on the command line ("Open With" in a file manager).
+        let files: Vec<PathBuf> =
+            std::env::args_os().skip(1).map(PathBuf::from).filter(|p| p.exists()).collect();
+        if !files.is_empty() && app.shot.is_none() {
+            crate::import::open_paths(&mut app, &files);
         }
         app
     }
@@ -1117,8 +1142,26 @@ fn status_text(link: &LinkView, p: &Palette) -> (Color32, String) {
 }
 
 impl eframe::App for XbApp {
-    fn logic(&mut self, _ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.drain_events();
+        // Dropped files: egui's events (X11), our own listener (Wayland).
+        let mut files: Vec<PathBuf> = ctx.input(|i| {
+            i.raw
+                .dropped_files
+                .iter()
+                .map(|f| f.path().to_path_buf())
+                .filter(|p| !p.as_os_str().is_empty())
+                .collect()
+        });
+        #[cfg(target_os = "linux")]
+        if let Some(l) = &self.dropped {
+            while let Ok(more) = l.rx.try_recv() {
+                files.extend(more);
+            }
+        }
+        if !files.is_empty() {
+            crate::import::open_paths(self, &files);
+        }
         self.connect.poll();
         crate::remote_view::poll(self);
         crate::logs_view::tick(self);
@@ -1177,6 +1220,11 @@ impl eframe::App for XbApp {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        // Before the window closes its Wayland display.
+        #[cfg(target_os = "linux")]
+        if let Some(mut l) = self.dropped.take() {
+            l.stop();
+        }
         crate::remote_view::end(self);
         self.save_recovery();
         self.stop();

@@ -24,6 +24,10 @@ clap = { version = "4", features = ["derive"] }
 directories = "6"
 # GUI. egui's bundled fonts are off (their licenses fail cargo-deny); the app
 # ships Inter (OFL-1.1) itself.
+# Files dropped on the window under Wayland (winit 0.30 only handles X11
+# drops). Same versions eframe's winit already uses; owner OK'd 2026-10-19.
+wayland-client = "0.31"
+smithay-client-toolkit = { version = "0.19", default-features = false }
 eframe = { version = "0.36", default-features = false, features = ["accesskit", "glow", "wayland", "x11"] }
 egui = { version = "0.36", default-features = false }
 egui_plot = "0.37"
@@ -32,7 +36,7 @@ egui_plot = "0.37"
 # winit's `wayland-csd-adwaita` renders the title with ab_glyph, which embeds
 # Cantarell (OFL-1.1, not allowed in dependencies by KICKOFF section 2), so
 # the title uses crossfont instead: system fonts via fontconfig + FreeType.
-winit = { version = "0.30", default-features = false, features = ["wayland-csd-adwaita-crossfont"] }
+winit = { version = "0.30", default-features = false, features = ["wayland-csd-adwaita-crossfont", "rwh_06"] }
 futures = "0.3"
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }

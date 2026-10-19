@@ -617,6 +617,13 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 Resume here (2026-10-19).
 
+0. 2026-10-19 later: ALL BUILT and committed locally (not pushed, no snap
+   built; owner asked to slow down): A2, location/air, Setup screen +
+   baro, AI setup guide, import anything + drag and drop (X11 via egui,
+   Wayland via `wayland_dnd.rs` on winit's connection, stoppable at exit;
+   CLI file args; desktop Exec %F, MimeType text/csv). Wayland drop is
+   untested with a real drag (owner: drag an .xpr/.csv onto the window).
+   Left: A3 eval, A4 bug-report helper, friend's wideband wizard, store.
 1. Order agreed 2026-10-19: A2 (BUILT, see AI.md 9a) -> location
    (offline standard pressure from altitude + Open-Meteo lookup by town on
    a click; owner OK'd the network use) -> EcmDroid-style named Setup
