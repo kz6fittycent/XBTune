@@ -142,7 +142,7 @@ pub fn prepare(cfg: &AiConfig, system: &str, turns: &[Turn]) -> Result<Prepared,
     Ok(Prepared { url, approx_tokens: body.len() / 4, body, host: cfg.host(), local: cfg.is_local(), model })
 }
 
-fn agent(cfg: &AiConfig) -> ureq::Agent {
+pub(crate) fn agent(cfg: &AiConfig) -> ureq::Agent {
     use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
     let _ = rustls::crypto::ring::default_provider().install_default();
     ureq::Agent::config_builder()

@@ -12,7 +12,7 @@ use clap::{Args, Subcommand};
 use xbtune_ai::bike::{self, Bikes};
 use xbtune_ai::client::{self, Role, Turn};
 use xbtune_ai::config::{self, Adapter, AiConfig};
-use xbtune_ai::{checker, memory};
+use xbtune_ai::{atmosphere, checker, memory};
 use xbtune_ai::{context, journal::Journal};
 use xbtune_core::logfile::Log;
 use xbtune_core::tune::Tune;
@@ -31,7 +31,7 @@ pub enum AiCmd {
     /// Ask a question about a tune (and logs). Answers in words; changes nothing.
     Ask(AskArgs),
     /// Show or change your bike's profile (model, mods, notes), sent with every question.
-    Bike(BikeArgs),
+    Bike(Box<BikeArgs>),
 }
 
 #[derive(Args)]
@@ -74,6 +74,16 @@ pub struct BikeArgs {
     /// Usual riding altitude, metres (0: not set).
     #[arg(long)]
     altitude_m: Option<u32>,
+    /// Look up your home town's elevation (sends the name to open-meteo.com).
+    #[arg(long)]
+    town: Option<String>,
+    /// With --town: which result to use (1 = first; see the list printed).
+    #[arg(long, default_value_t = 1)]
+    pick: usize,
+    /// Fetch the current pressure and temperature at the home town
+    /// (sends its coordinates, rounded to 0.01°, to open-meteo.com).
+    #[arg(long)]
+    weather: bool,
     /// Add another mod (repeatable).
     #[arg(long)]
     add_mod: Vec<String>,
@@ -205,7 +215,7 @@ pub fn ai(cmd: AiCmd) -> Result<()> {
             Ok(())
         }
         AiCmd::Ask(a) => ask(a),
-        AiCmd::Bike(a) => bike(a),
+        AiCmd::Bike(a) => bike(*a),
     }
 }
 
@@ -312,6 +322,25 @@ fn bike(a: BikeArgs) -> Result<()> {
     if let Some(alt) = a.altitude_m {
         p.altitude_m = (alt > 0).then_some(alt);
     }
+    if let Some(town) = &a.town {
+        eprintln!("Looking up \"{}\" at geocoding-api.open-meteo.com...", town.trim());
+        let places = atmosphere::lookup(town)?;
+        if places.is_empty() {
+            bail!("no place called \"{}\" found", town.trim());
+        }
+        for (i, pl) in places.iter().enumerate() {
+            eprintln!("  {}. {} ({:.0} m)", i + 1, pl.label(), pl.elevation_m);
+        }
+        let pl =
+            places.get(a.pick.saturating_sub(1)).ok_or_else(|| anyhow!("--pick is 1..{}", places.len()))?;
+        p.place = Some(pl.clone());
+        p.weather = None;
+    }
+    if a.weather {
+        let pl = p.place.clone().ok_or_else(|| anyhow!("set a home town first (--town)"))?;
+        eprintln!("Fetching the current weather at {} from api.open-meteo.com...", pl.label());
+        p.weather = Some(atmosphere::current(&pl)?);
+    }
     p.mods.other.extend(a.add_mod.iter().map(|m| m.trim().to_string()).filter(|m| !m.is_empty()));
     p.mods.other.retain(|m| !a.remove_mod.iter().any(|r| r.trim().eq_ignore_ascii_case(m)));
     if let Some(n) = &a.set_notes {
@@ -336,8 +365,21 @@ fn bike(a: BikeArgs) -> Result<()> {
             println!("{}{m}", if i == 0 { "Mods:   " } else { "        " });
         }
     }
-    if let Some(alt) = p.altitude_m {
-        println!("Usually rides at {alt} m");
+    if let Some(pl) = &p.place {
+        println!("Home:   {} ({:.0} m)", pl.label(), pl.elevation_m);
+    }
+    if let Some(alt) = p.altitude() {
+        let kpa = atmosphere::standard_pressure_kpa(alt);
+        let d = atmosphere::density_ratio(kpa, atmosphere::standard_temp_c(alt));
+        println!("Air:    {alt:.0} m: standard {kpa:.1} kPa, {:.0}% of sea-level density", d * 100.0);
+    }
+    if let Some(w) = &p.weather {
+        println!(
+            "        measured {:.1} kPa, {:.1} °C at {}",
+            w.surface_pressure_hpa / 10.0,
+            w.temperature_c,
+            w.time
+        );
     }
     if !p.notes.trim().is_empty() {
         println!("Notes:\n{}", p.notes.trim());

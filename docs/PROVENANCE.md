@@ -306,6 +306,13 @@ XBTune choices (not from a source; no real controller tested yet):
   displacement XB9 984 cc, XB12 and tube-frame 1203 cc (Buell's published
   figures, general knowledge). Which models an ECM fits comes from
   `data/ecm_models.toml` (a hint, see there).
+- Atmosphere (`crates/xbtune-ai/src/atmosphere.rs`): ICAO standard
+  atmosphere, troposphere: P = 101.325 kPa x (1 - 2.25577e-5 h)^5.25588,
+  T = 15 °C - 6.5 °C/km, density from the ideal gas law (tests check ISA
+  table values at 1500 and 3000 m). Open-Meteo geocoding
+  (`geocoding-api.open-meteo.com/v1/search`) and forecast
+  (`api.open-meteo.com/v1/forecast?current=surface_pressure,temperature_2m`)
+  response shapes as answered 2026-10-19 (Denver: 1609 m, 841.6 hPa).
 - The tuning notes in the system prompt are XBTune's own text (KICKOFF
   §2: no ECMSpy material).
 

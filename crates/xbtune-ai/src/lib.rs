@@ -7,9 +7,11 @@
 //! - [`client`]: building, sending and reading requests (blocking).
 //! - [`context`]: the system prompt and the data block sent with a question.
 //! - [`journal`]: the user's record of each conversation.
+//! - [`atmosphere`]: air pressure and density at altitude (Open-Meteo on a click).
 //! - [`bike`]: the bike profile (model from the ECM, mods, notes).
 //! - [`memory`]: the profile and recent conversations, sent with requests.
 
+pub mod atmosphere;
 pub mod bike;
 pub mod checker;
 pub mod client;

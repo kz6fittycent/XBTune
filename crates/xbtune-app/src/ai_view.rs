@@ -9,6 +9,7 @@ use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::time::Instant;
 
 use egui::{RichText, Ui};
+use xbtune_ai::atmosphere::{self, Place, Weather};
 use xbtune_ai::bike::{self, Bikes, Profile};
 use xbtune_ai::checker::{self, Accepted, Refused};
 use xbtune_ai::client::{self, AiError, Prepared, Reply, Role, Turn};
@@ -75,6 +76,17 @@ pub struct AiUi {
     apply_directly: bool,
     /// The warning before turning `apply_directly` on is showing.
     confirm_direct: bool,
+    geo: Geo,
+}
+
+/// The home-town lookup (Open-Meteo, on a click).
+#[derive(Default)]
+struct Geo {
+    query: String,
+    places_rx: Option<Receiver<Result<Vec<Place>, AiError>>>,
+    places: Vec<Place>,
+    weather_rx: Option<Receiver<Result<Weather, AiError>>>,
+    status: Option<(bool, String)>,
 }
 
 fn files_dir() -> std::path::PathBuf {
@@ -112,8 +124,10 @@ fn bike_editor(
     ecm: &EcmDef,
     b: &mut Profile,
     new_mod: &mut String,
+    geo: &mut Geo,
     dirty: bool,
 ) -> bool {
+    let ctx = ui.ctx().clone();
     let mut save = false;
     egui::Grid::new("ai-bike").num_columns(2).spacing([12.0, 5.0]).show(ui, |ui| {
         ui.label("Model");
@@ -198,8 +212,84 @@ fn bike_editor(
         num(ui, &mut b.mods.fuel_octane, "Octane", "", 91);
         ui.end_row();
         text(ui, "ECM / tune", &mut b.mods.ecm_tune, "stock (or race ECM, someone's tune)");
+        ui.label("Home town");
+        ui.vertical(|ui| {
+            ui.horizontal(|ui| {
+                if let Some(pl) = &b.place {
+                    ui.label(format!("{} ({:.0} m)", pl.label(), pl.elevation_m));
+                }
+                ui.add(egui::TextEdit::singleline(&mut geo.query).desired_width(160.0).hint_text("town name"));
+                let busy = geo.places_rx.is_some() || geo.weather_rx.is_some();
+                if ui.add_enabled(!busy && !geo.query.trim().is_empty(), egui::Button::new("Look up")).clicked() {
+                    let q = geo.query.clone();
+                    geo.places_rx = Some(spawn(&ctx, move || atmosphere::lookup(&q)));
+                    geo.status = None;
+                }
+                if let Some(pl) = b.place.clone()
+                    && ui.add_enabled(!busy, egui::Button::new("Current weather")).clicked()
+                {
+                    geo.weather_rx = Some(spawn(&ctx, move || atmosphere::current(&pl)));
+                }
+                if busy {
+                    ui.spinner();
+                }
+            });
+            if !geo.places.is_empty() {
+                let mut chosen = None;
+                egui::ComboBox::from_id_salt("ai-geo").selected_text("Pick the right place…").width(320.0).show_ui(
+                    ui,
+                    |ui| {
+                        for pl in &geo.places {
+                            if ui.selectable_label(false, format!("{} ({:.0} m)", pl.label(), pl.elevation_m)).clicked() {
+                                chosen = Some(pl.clone());
+                            }
+                        }
+                    },
+                );
+                if let Some(pl) = chosen {
+                    b.place = Some(pl);
+                    b.weather = None;
+                    geo.places.clear();
+                    geo.status = None;
+                }
+            }
+            if let Some(w) = &b.weather {
+                ui.label(
+                    RichText::new(format!(
+                        "Measured {:.1} kPa, {:.1} °C at {}",
+                        w.surface_pressure_hpa / 10.0,
+                        w.temperature_c,
+                        w.time
+                    ))
+                    .small(),
+                );
+            }
+            if let Some((good, s)) = &geo.status {
+                ui.colored_label(if *good { p.good } else { p.bad }, s);
+            }
+            ui.label(
+                RichText::new(
+                    "Look up sends the town name, and Current weather its coordinates (rounded to about 1 km), to \
+                     open-meteo.com. The advisor gets only the altitude and air numbers, never the place.",
+                )
+                .small()
+                .color(p.muted),
+            );
+        });
+        ui.end_row();
         ui.label("Usual altitude");
-        num(ui, &mut b.altitude_m, "Set", " m", 500);
+        ui.horizontal(|ui| {
+            num(ui, &mut b.altitude_m, "Set", " m", 500);
+            if let Some(alt) = b.altitude() {
+                let kpa = atmosphere::standard_pressure_kpa(alt);
+                let d = atmosphere::density_ratio(kpa, atmosphere::standard_temp_c(alt));
+                ui.label(
+                    RichText::new(format!("{alt:.0} m: standard {kpa:.1} kPa, {:.0}% of sea-level air density", d * 100.0))
+                        .small()
+                        .color(p.muted),
+                );
+            }
+        });
         ui.end_row();
         ui.label("Other mods");
         ui.vertical(|ui| {
@@ -400,6 +490,42 @@ fn poll(app: &mut XbApp) {
             }
             Err(TryRecvError::Empty) => {}
             Err(TryRecvError::Disconnected) => a.test_rx = None,
+        }
+    }
+    if let Some(rx) = &a.geo.places_rx {
+        match rx.try_recv() {
+            Ok(Ok(places)) => {
+                a.geo.status = Some(if places.is_empty() {
+                    (false, "No place by that name found".to_string())
+                } else {
+                    (true, format!("{} place(s) found: pick one", places.len()))
+                });
+                a.geo.places = places;
+                a.geo.places_rx = None;
+            }
+            Ok(Err(e)) => {
+                a.geo.status = Some((false, e.to_string()));
+                a.geo.places_rx = None;
+            }
+            Err(TryRecvError::Empty) => {}
+            Err(TryRecvError::Disconnected) => a.geo.places_rx = None,
+        }
+    }
+    if let Some(rx) = &a.geo.weather_rx {
+        match rx.try_recv() {
+            Ok(Ok(w)) => {
+                if let Some((_, b)) = &mut a.bike {
+                    b.weather = Some(w);
+                }
+                a.geo.status = None;
+                a.geo.weather_rx = None;
+            }
+            Ok(Err(e)) => {
+                a.geo.status = Some((false, e.to_string()));
+                a.geo.weather_rx = None;
+            }
+            Err(TryRecvError::Empty) => {}
+            Err(TryRecvError::Disconnected) => a.geo.weather_rx = None,
         }
     }
     let Some(pending) = &a.pending else { return };
@@ -760,7 +886,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     .id_salt("ai-bike")
                     .open(open.then_some(true))
                     .show(ui, |ui| {
-                        if bike_editor(ui, &p, ecm, b, &mut a.new_mod, dirty) {
+                        if bike_editor(ui, &p, ecm, b, &mut a.new_mod, &mut a.geo, dirty) {
                             save_bike_now = true;
                         }
                     });

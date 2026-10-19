@@ -116,8 +116,13 @@ pub struct Profile {
     pub model: String,
     pub year: Option<u16>,
     pub mods: Mods,
-    /// Usual riding altitude, metres.
+    /// Usual riding altitude, metres (else the home place's elevation).
     pub altitude_m: Option<u32>,
+    /// Home town, from the Open-Meteo lookup (kept here; never sent to the
+    /// advisor, only its elevation and weather numbers are).
+    pub place: Option<crate::atmosphere::Place>,
+    /// The last weather fetched for `place`.
+    pub weather: Option<crate::atmosphere::Weather>,
     /// Free text, and the advisor's suggestions the user kept.
     pub notes: String,
 }
@@ -148,6 +153,11 @@ impl Profile {
             (Some(y), false) => format!("{y} Buell {model}"),
             (None, false) => format!("Buell {model}"),
         }
+    }
+
+    /// The altitude to use: the usual riding altitude, else home's.
+    pub fn altitude(&self) -> Option<f64> {
+        self.altitude_m.map(f64::from).or(self.place.as_ref().map(|p| p.elevation_m))
     }
 
     /// The mods in words, for the advisor.
@@ -197,7 +207,7 @@ impl Profile {
             "ecm_fits": ecm.bikes,
             "stock_displacement_cc": model.map(|m| m.cc),
             "mods": if self.mod_lines().is_empty() { json!("none listed (stock)") } else { json!(self.mod_lines()) },
-            "usual_altitude_m": self.altitude_m,
+            "atmosphere": crate::atmosphere::to_json(self.altitude(), self.weather.as_ref()),
             "owner_notes": if self.notes.trim().is_empty() { Value::String("none".into()) } else { Value::String(self.notes.trim().to_string()) },
         })
     }
@@ -302,6 +312,17 @@ mod tests {
         let lines = p.mod_lines();
         assert_eq!(lines[0], "big bore kit: 1150 cc (stock 984 cc)");
         assert!(lines.contains(&"final drive: 27/64 teeth (ratio 2.37)".to_string()));
+        p.place = Some(crate::atmosphere::Place {
+            name: "Denver".into(),
+            region: "Colorado, United States".into(),
+            latitude: 39.739,
+            longitude: -104.985,
+            elevation_m: 1609.0,
+        });
+        // The advisor gets the numbers, never the place.
+        let text = p.to_json(&e).to_string();
+        assert!(!text.contains("Denver") && !text.contains("39.7"), "{text}");
+        assert!(text.contains("\"altitude_m\":1609"));
         let j = p.to_json(&e);
         assert_eq!(j["stock_displacement_cc"], 984);
         assert_eq!(j["owner_notes"], "- rear cylinder runs hotter");

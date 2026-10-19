@@ -271,9 +271,15 @@ axes, cell statistics, deterministic proposals, log summary, targets).
 - **Setup like Desktop Scriptures** (local server scan, cards, pick a
   model) and **drag and drop / import anything** (Wayland via
   `wayland-client` + `smithay-client-toolkit`, approved).
-- Ideas not designed yet: location for local pressure and elevation;
-  EcmDroid's named Setup screen (incl. the airbox pressure / baro
-  settings), see CLAUDE.md.
+- **Location / air BUILT 2026-10-19** (owner OK'd the network use):
+  standard pressure, temperature and air density from altitude (ISA,
+  offline); home town lookup and current surface pressure/temperature from
+  Open-Meteo, each on a click (town name, then coordinates rounded to
+  0.01°, go to open-meteo.com). Kept in the bike profile; the advisor gets
+  only `atmosphere` numbers (altitude, kPa, density %), never the place
+  (test). Prompt v5. CLI `ai bike --town NAME [--pick N] --weather`.
+- Not built yet: EcmDroid's named Setup screen (incl. airbox pressure /
+  baro), see CLAUDE.md.
 
 ## 10. Owner decisions (answered 2026-10-19)
 

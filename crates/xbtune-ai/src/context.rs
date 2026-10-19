@@ -16,7 +16,7 @@ use xbtune_core::tune::Tune;
 use xbtune_defs::{Shape, Value as DefValue};
 
 /// Bump when the prompt changes in substance (it's in every journal entry).
-pub const PROMPT_VERSION: u32 = 4;
+pub const PROMPT_VERSION: u32 = 5;
 
 /// The fixed system prompt.
 pub const SYSTEM_PROMPT: &str = "\
@@ -59,7 +59,11 @@ new = old x (1 + pct/100).
 - Engine speeds above the rev limit in the data never occur; ignore those columns.
 - 'memory.bike' is the owner's bike: model, year, stock displacement, mods (big bore, wideband, \
 exhaust, cams, final drive, fuel, ...) and notes. Take it as known and don't ask again; account \
-for the mods (a bigger engine or freer exhaust needs more fuel than stock maps assume). 'memory.earlier_conversations' recaps recent \
+for the mods (a bigger engine or freer exhaust needs more fuel than stock maps assume).
+- 'memory.bike.atmosphere' is the air where the bike is ridden: altitude, pressure and density \
+(standard values, and measured ones when present). Thinner air holds less oxygen, so the same \
+fuel runs richer at altitude. XBTune can't tell how much the ECM compensates by itself; say so \
+when it matters, and prefer logged EGO/AFR over altitude arithmetic. 'memory.earlier_conversations' recaps recent \
 conversations about this bike: build on them, but answer the new question from the current data \
 and don't repeat earlier answers.
 - If you learn a lasting fact about the bike (a modification, sensor, rev limit, goal) that \
