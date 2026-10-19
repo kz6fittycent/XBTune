@@ -8,11 +8,18 @@ description: |
   ECMs, over Bluetooth (BuellTooth and other SPP adapters) or a USB serial
   cable.
 
-  This is an early build. It identifies the ECM, reads and saves the
-  EEPROM, shows and logs live data, reads trouble codes, edits tunes and
-  suggests fuel corrections from logs. Tests, resets and writing to the ECM
-  are locked until you unlock them in Settings; every write makes a backup
-  first and is read back.
+  Free and open source: no price, no ads, no account. It identifies the
+  ECM, reads and saves the EEPROM, shows and logs live data (with an
+  optional Innovate LC-2 wideband), reads trouble codes and runs tests,
+  edits tunes offline, auto-tunes the fuel maps from your logs, and writes
+  tunes to the ECM. Remote tuning lets a tuner work on your tune over the
+  internet, end-to-end encrypted, with only the permissions you give.
+  Tests, resets and writing to the ECM are locked until you unlock them in
+  Settings; every write makes a verified backup first and is read back.
+
+  WARNING: a bad tune can damage your engine. Check every change before
+  writing it. XBTune comes with no warranty (GPL-3.0); you are responsible
+  for what you write to your ECM.
 
   After installing, connect the interfaces it needs:
 
