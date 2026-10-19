@@ -59,6 +59,8 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   pairing behaves sensibly. Engine-running link with the 400 ms timeout:
   5.6 Hz, 4% errors (was 3.7 Hz). Don't start phase 6 (burn) until the
   owner says so.
+- **Phase 9 wideband + disclaimer + store docs: built 2026-10-19**; see
+  the phase plan and "Next steps".
 - **Phase 7 (log viewer + auto-tune): built 2026-10-15** (owner's go; stock
   narrowband). Sim/owner-log tested; NOT yet tried by the owner. See
   "Phase 7 contents" and "Phase 7 checklist".
@@ -537,22 +539,22 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
    - No artwork/logo (owner's call; the Pegasus logo is a Buell trademark).
      Race ECMs: supported since 2026-10-15 (owner's request; see Status).
    Added by the owner 2026-10-16 (go for phase 9, leftovers included):
-   - Wideband input + lambda maps. Owner has NO wideband (2026-10-16):
-     build on stated assumptions (analog 0-5 V linear AFR and Innovate
-     serial, both public), sim-tested only, marked unverified on hardware.
-     NOT STARTED; paused 2026-10-16 while the owner asks a friend about
-     his wideband setup (which controller, how it's wired/connected).
-     Findings so far: the owner's BUEIB (category 8) runtime frame has
-     no air-fuel ADC channel (only ABAS "BAS ADC" at offset 65, AFP at
-     96). DDFI-3 (e.g. category 50) has "AF1 ADC" (offset 63) and
-     "AF ADC" (offset 65, same bytes as BAS ADC). EcmDroid's runtime .tab
-     files have no lambda/WB-AFR columns. Options put to the owner:
-     A) controller's 0-5 V into an ECM ADC (DDFI-3 only; not the BUEIB),
-     B) RECOMMENDED: read the controller's own serial/USB stream beside
-     the ECM and merge it into the log by time (any ECM, no harness
-     wiring); start with Innovate LC-1/LC-2 and AEM X-Series (public
-     formats). Then lambda/AFR maps and auto-tune toward a target AFR.
-     Waiting for the owner's choice (and the friend's hardware) before code.
+   - Wideband: BUILT 2026-10-19 (option B). The owner's friend uses
+     Innovate LC-2s ("Very simple"). `xbtune-proto::isp2` (decoder +
+     encoder, from Innovate's ISP2 spec PDF, PROVENANCE "Wideband"),
+     `xbtune-core::wideband` (task, `WbLink::serial`, fresh <= 300 ms,
+     pseudo-channels `wb_afr`/`wb_lambda` with offset 1<<30 that
+     `Sample::value` reads from `Sample.wb`), `SessionConfig.wideband`,
+     `Event::Wideband(WbState)`, CSV `# wideband:` + wb_lambda/wb_afr/
+     wb_status columns, `Log.wideband`. Auto-tune `Mode::Wideband{target:
+     TargetAfr, lag}`: correction = EGO x measured/target lambda, open loop
+     and WOT count, `Analysis.lean` (AFR > 14 at load >= 80). CLI live/log
+     `--wideband PORT|sim`, autotune `--wideband --target --lag`. App:
+     Connect "Wideband O2" card (`settings.wideband`), header dot + AFR,
+     gauge, AFR overlay, dialog mode/targets/delay; remote `FrameMsg.wb`.
+     Sim LC-2: `xbtune-sim::wideband` (in-process; `xbtune-sim
+     --wideband` pty). Hook `XBTUNE_SHOT_WIDEBAND=1`, overlay `afr`.
+     Sim-tested only. Analog 0-5 V (option A) and AEM not built.
    - "Fold AFV into the maps, then AFV reset" helper (via the burn path).
      BUILT 2026-10-16: `autotune::{afv_fold_plan, fold_afv,
      has_autotune_step}` (one undo step; front uses LFuel1 only with
@@ -584,29 +586,42 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
    numbers are checked, tests) for approval before code. Wideband
    (phase 9) makes it far more useful.
 
+   Added 2026-10-19: XBTune stays 100% FREE (owner): no paywall, no ads
+   (ads advised against: GPL code means any lock is removable, ad SDKs
+   on a Linux desktop app pay almost nothing and need tracking). Engine-
+   damage warning BUILT: `xbtune-core::disclaimer` (versioned), app modal
+   at first start until accepted (`settings.disclaimer_accepted`; hook
+   `XBTUNE_SHOT_DISCLAIMER=1`), short line in burn/auto-tune/fold dialogs
+   and CLI burn/autotune/fold-afv/--help. README, snap description and
+   docs/STORE.md listing updated.
+   Phase 10: owner wants any LLM incl. local. docs/AI.md DRAFTED
+   2026-10-19 (OpenAI-compatible + Anthropic adapters, Rust checker
+   decides what's allowed, no RAG to start, eval harness to find which
+   models are good enough); waiting for approval + its §10 decisions.
+
 ## Next steps
 
-Paused 2026-10-15 evening at the owner's request. Resume here.
+Resume here (2026-10-19).
 
-Done today: phase 7 tested by the owner (auto-tune works), factory race
-ECMs (retested on the bike), tube-frame DDFI ECMs, phase 8 remote tuning
-R1-R5 (passed on the owner's laptop + desktop, remote AFV reset took).
-Laptop snap: xbtune_0.1.0+git62bd467 (later commits are docs only).
-
-1. Phase 9 (polish + release): GO given 2026-10-16, leftovers included.
-   Done 2026-10-16 (pushed, 98d2e63): GNOME title bar, burn.txt listing,
-   AFV-fold helper, binary/.msl logs. None tried on the laptop yet (CI
-   snap for 98d2e63 or later has them all).
-   PAUSED 2026-10-16 at wideband: owner is asking a friend about his
-   wideband setup; resume with his answer (option A/B and which
-   controller, see the wideband note in "Phase plan"). Then store
-   listing + docs. Phase 10 (AI-assisted tuning) after that; docs/AI.md
-   first.
-2. Licence: waiting for the EcmDroid maintainer's email reply about the
-   ecmdroid.db permission (PROVENANCE). Data stays restricted; no public
-   repo or release until the owner says so.
-3. Untracked `app.log` / `fatal.log` in the repo root are the owner's
+1. Owner: read docs/AI.md and answer its §10 questions; then build A1-A3.
+2. Owner on the laptop: CI snap for c85405c or later has the disclaimer,
+   wideband (Connect -> Wideband O2), GNOME title bar, burn.txt listing,
+   AFV fold and .bin/.msl logs; none tried on the laptop yet. A real LC-2
+   (the friend's) on a USB serial cable is the first hardware test for
+   the wideband: `xbtune.cli live --bt ... --wideband /dev/ttyUSB0`, then
+   log a ride and `autotune --wideband`.
+3. `cargo deny check` fails since 2026-10-19 on new RUSTSEC "unmaintained"
+   advisories (2026-0370/0371/0372: zvariant, zbus_names, zvariant_derive,
+   via eframe -> accesskit_unix and zbus). Not a vulnerability; owner to
+   decide: ignore them in deny.toml with a note, or drop accesskit.
+4. Licence: still waiting for the EcmDroid maintainer about ecmdroid.db
+   (PROVENANCE); also ask whether it allows commercial use if that ever
+   matters. Data stays restricted; no public repo or upload until then.
+5. Store: docs/STORE.md "Before the first upload".
+6. Untracked `app.log` / `fatal.log` in the repo root are the owner's
    copies from the laptop; not committed.
+7. `xbtune-cli` test `log_writes_csv_through_dropouts` failed once under
+   full-suite load (timing), passed on rerun and alone.
 
 ## Remote tuning checklist (R2-R5; laptop = bike owner, desktop = tuner)
 
