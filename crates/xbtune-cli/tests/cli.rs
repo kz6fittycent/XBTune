@@ -181,7 +181,8 @@ fn log_writes_csv_through_dropouts() {
     assert!(text.contains("# ecm_id: BUEIB\n") && text.contains("# note: test ride\n"));
     let rows: Vec<&str> = text.lines().filter(|l| !l.starts_with('#')).collect();
     assert!(rows[0].starts_with("time_s,") && rows[0].ends_with(",frame"), "{}", rows[0]);
-    assert!(rows.len() > 20, "{} rows", rows.len());
+    // A loaded machine (the whole suite in parallel) gets fewer rows in 2 s.
+    assert!(rows.len() > 10, "{} rows", rows.len());
     let n = rows[0].split(',').count();
     assert!(rows.iter().all(|r| r.split(',').count() == n));
     // Time only goes forward.

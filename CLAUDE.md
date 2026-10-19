@@ -610,18 +610,19 @@ Resume here (2026-10-19).
    (the friend's) on a USB serial cable is the first hardware test for
    the wideband: `xbtune.cli live --bt ... --wideband /dev/ttyUSB0`, then
    log a ride and `autotune --wideband`.
-3. `cargo deny check` fails since 2026-10-19 on new RUSTSEC "unmaintained"
-   advisories (2026-0370/0371/0372: zvariant, zbus_names, zvariant_derive,
-   via eframe -> accesskit_unix and zbus). Not a vulnerability; owner to
-   decide: ignore them in deny.toml with a note, or drop accesskit.
+3. RUSTSEC-2026-0370/0371/0372 ("unmaintained" zvariant, zbus_names,
+   zvariant_derive, via eframe -> accesskit_unix and zbus) are ignored in
+   deny.toml with reasons (2026-10-19). Drop the ignores when egui moves on.
 4. Licence: still waiting for the EcmDroid maintainer about ecmdroid.db
    (PROVENANCE); also ask whether it allows commercial use if that ever
    matters. Data stays restricted; no public repo or upload until then.
 5. Store: docs/STORE.md "Before the first upload".
 6. Untracked `app.log` / `fatal.log` in the repo root are the owner's
    copies from the laptop; not committed.
-7. `xbtune-cli` test `log_writes_csv_through_dropouts` failed once under
-   full-suite load (timing), passed on rerun and alone.
+7. FUTURE (owner, 2026-10-19; not yet): the wideband will be tested by the
+   owner's friend in Ohio, remotely. Needs a temporary guided wizard for
+   him (install, connect the LC-2, log, send the log back). Don't build
+   until the owner says so.
 
 ## Remote tuning checklist (R2-R5; laptop = bike owner, desktop = tuner)
 
