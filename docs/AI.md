@@ -19,6 +19,18 @@ guide, "What gets sent", answers in words). Tried against a local Ollama
 - It read EGO 95% as "lean" despite the prompt. Each cell now has a
   plain-words reading from XBTune ("map RICH here: the ECM removed 4.7%
   fuel"). The A2 checker and the A3 eval exist for this kind of error.
+- Owner's test 2026-10-19 (LocalAI, gemma3-4b, two conversations): with no
+  logs open it quoted AFRs it didn't have (it read fuel-map values as
+  AFR); it took AFV 101.8% for EGO; misread a map row; called a decrease
+  an increase; repeated the prompt's example cell; got a percentage wrong.
+  Prompt v2 and the data block now say what map values are (not AFR),
+  "measurements: none" without logs, AFV in words, each proposal's
+  direction and percent, each cell's map value, rev limits and sensors,
+  and the prompt has no example cell. Replayed: no invented numbers, and
+  the right cell, direction and value (64 -> 62). It still mixed up front
+  and rear. Small models (4B) are marginal; A3 will measure.
+- That LocalAI answers `/v1/models` with `{"models":[{"name"}]}`; both
+  list formats are read now.
 
 ## 1. What it is
 

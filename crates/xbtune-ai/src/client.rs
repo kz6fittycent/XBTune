@@ -285,14 +285,18 @@ pub fn list_models(cfg: &AiConfig) -> Result<Vec<String>, AiError> {
     parse_models(&body).ok_or_else(|| AiError::BadReply { host: cfg.host(), message: "no model list".into() })
 }
 
-/// `{"data": [{"id": ...}, ...]}` (both adapters; Ollama's /v1 too).
+/// `{"data": [{"id": ...}, ...]}` (both adapters; Ollama's /v1 too), or
+/// `{"models": [{"name": ...}, ...]}` (some LocalAI/Ollama-style servers).
 pub fn parse_models(body: &str) -> Option<Vec<String>> {
     let v: Value = serde_json::from_str(body).ok()?;
-    let mut ids: Vec<String> = v
-        .get("data")?
+    let (list, key) = match v.get("data") {
+        Some(d) => (d, "id"),
+        None => (v.get("models")?, "name"),
+    };
+    let mut ids: Vec<String> = list
         .as_array()?
         .iter()
-        .filter_map(|m| m.get("id").and_then(Value::as_str).map(str::to_string))
+        .filter_map(|m| m.get(key).and_then(Value::as_str).map(str::to_string))
         .collect();
     ids.sort();
     Some(ids)
@@ -326,5 +330,16 @@ mod tests {
         assert!(r(1000).input_cut(&p));
         assert!(!r(3900).input_cut(&p));
         assert!(!Reply::default().input_cut(&p));
+    }
+
+    #[test]
+    fn model_list_formats() {
+        assert_eq!(parse_models(r#"{"data":[{"id":"b"},{"id":"a"}]}"#), Some(vec!["a".into(), "b".into()]));
+        // As LocalAI answered on the owner's PC (2026-10-19).
+        assert_eq!(
+            parse_models(r#"{"models":[{"name":"gemma3-4b","model":"gemma3-4b"}]}"#),
+            Some(vec!["gemma3-4b".into()])
+        );
+        assert_eq!(parse_models("{}"), None);
     }
 }
