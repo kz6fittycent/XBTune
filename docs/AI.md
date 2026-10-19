@@ -1,7 +1,10 @@
 # AI-assisted tuning (phase 10): design for approval
 
-Status: **DRAFT, waiting for the owner's approval.** No code until then
-(CLAUDE.md, phase 10; KICKOFF §9 for a network feature).
+Status: **DRAFT. Owner's answers to §10 recorded 2026-10-19** (spark maps
+in, 0600 key file, every provider listed, no default model until A3 has
+measured, hosted providers OK, plus a bug-report helper, §6a). Waiting
+for the owner to approve the whole document before code (CLAUDE.md,
+phase 10).
 
 ## 1. What it is
 
@@ -32,8 +35,20 @@ XBTune implements two adapters and nothing provider-specific:
 
 Settings → AI advisor: adapter, base URL, model name (with a "List models"
 button where the server supports `GET /models`), API key (optional for
-local servers), and a "Test connection" button. Presets fill in the URL
-for Ollama, LM Studio, llama.cpp, OpenRouter, OpenAI and Anthropic.
+local servers), and a "Test connection" button. Presets (owner: list them
+all) fill in the adapter and URL:
+
+- Local: Ollama, LM Studio, llama.cpp (`llama-server`), vLLM, LocalAI, Jan.
+- Hosted, OpenAI-compatible: OpenAI, Google Gemini (its OpenAI endpoint),
+  OpenRouter, Groq, Mistral, DeepSeek, xAI, Together AI, Fireworks AI,
+  Perplexity, Cerebras.
+- Hosted, Anthropic: Anthropic (Claude).
+- Custom: any OpenAI-compatible URL. (Azure OpenAI uses a different URL
+  scheme and `api-key` header: a Custom entry with a header field covers
+  it.)
+
+Preset URLs are checked when the presets are written, not trusted from
+memory, and the list is easy to extend.
 
 - HTTP with `ureq` + `serde_json` (both already approved); no new
   dependencies. Non-streaming requests on a background thread, with a
@@ -55,16 +70,21 @@ Rust before you see it as a proposal:
 1. **Structured output only.** Changes must come as JSON
    (`{"changes":[{"map","row","col","value","why"}], "notes"}`). Free text
    is shown as text. A malformed or partly malformed reply proposes nothing.
-2. **Allowed variables.** v1: the fuel maps only (`Tab_Fuel_Front/Rear`).
-   Spark maps, rev limits, fan and every other variable are refused, with
-   the reason shown. (Owner decision Q1: allow spark changes later, and
-   then only toward less advance?)
+2. **Allowed variables:** the fuel maps (`Tab_Fuel_Front/Rear`) and the
+   spark maps (`Tab_Spark_Front/Rear`, owner 2026-10-19). Rev limits, fan
+   and every other variable are refused, with the reason shown.
+   Spark rules (XBTune's proposal, owner to adjust): at most 2° less or
+   1° more advance per cell per round; never more advance at load ≥ 80;
+   never more advance in a cell the wideband shows lean; a spark change
+   needs logged data in that cell like a fuel change. The XB's ECM has no
+   knock sensing that XBTune can see, so advance changes are flagged
+   "check carefully" in the review.
 3. **Same limits as auto-tune.** At most ±`max_change` per cell (default
    10%) per round, inside the variable's own range. A cell needs logged
    data (`min_hits`) before it may change, unless you ask for edits
    without data ("smooth these cells") and tick "allow cells without log
    data" for that request.
-4. **No leaning at load.** At load ≥ 80 a cell may not end up leaner than
+4. **No leaning at load** (fuel). At load ≥ 80 a cell may not end up leaner than
    both its current value and the deterministic auto-tune's proposal for
    it. Where a wideband shows the cell already lean (the auto-tune lean
    warning), only richer is allowed.
@@ -141,6 +161,28 @@ provider's pricing page.
 - First use: a short guide (what it does, local vs hosted, cost and
   privacy, "Don't show again").
 
+## 6a. Bug reports: "Check with the AI first" (owner's idea, 2026-10-19)
+
+In Report a problem, when an AI is set up, a button "Check with the AI
+first" sends the same masked report the user would send (the "What gets
+sent" preview: description, recent app log, crash summary, app version,
+ECM ID) to the user's own model, with a system prompt about XBTune's
+known local problems. It answers with:
+
+- **Likely local causes** with what to do, e.g. snap permissions not
+  connected, adapter not paired or busy (EBUSY), wrong ECM type (factory
+  race), ignition off / kill switch, weak battery (logged voltage), a
+  noisy Bluetooth link (timeouts, NAKs), the wrong serial port, a
+  wideband that never sent data.
+- **A short summary for the developer**, which the user can add to the
+  report, marked "AI summary (user's model)". The report is still only
+  sent when the user clicks Send; the relay doesn't change.
+
+XBTune's own checks come first and don't need an AI: the plug check and
+link error hints that already exist feed the prompt as facts, so a small
+model mostly has to explain them. Tested like §8 with the mock server and
+recorded log excerpts (masked).
+
 ## 7. Prompt outline
 
 System prompt (fixed, versioned, shipped in the app):
@@ -174,14 +216,18 @@ axes, cell statistics, deterministic proposals, log summary, targets).
 - **A2**: structured proposals, checker, review table, apply/undo, CLI
   `ai ask`.
 - **A3**: `ai eval` and the measured model table here; guide text from it.
+- **A4**: the bug-report helper (§6a).
 
-## 10. Owner decisions needed
+## 10. Owner decisions (answered 2026-10-19)
 
-1. Spark maps: never, or later with "less advance only"? (Proposed: fuel
-   only in v1.)
-2. API key in a 0600 file (proposed), or a keyring (extra snap plug)?
-3. Presets: which providers to list (proposed: Ollama, LM Studio,
-   llama.cpp, OpenRouter, OpenAI, Anthropic)?
-4. A default model to suggest for local use, after A3 measures some?
-5. OK to send the data in §4 to a hosted provider when the user clicks
-   Send (KICKOFF §9: network-facing feature)?
+1. Spark maps: **included**, with the rules in §3.2.
+2. API key: **0600 file** (`<config>/ai.toml`).
+3. Presets: **all providers** (list in §2).
+4. Default model: **none yet**; A3 measures candidates (a range of local
+   models in several sizes, and current models from the hosted providers)
+   and the guide recommends from the results.
+5. Sending the §4 data to a hosted provider on the user's click: **OK**.
+   Plus the bug-report helper (§6a).
+
+Still open: approval of this document as a whole, and the spark limits in
+§3.2.
