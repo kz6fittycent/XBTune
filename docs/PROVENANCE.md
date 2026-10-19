@@ -241,6 +241,43 @@ Gauge ranges in the app (`gauge.rs`) are XBTune display choices, not ECM data.
 | `data/ecmdroid.toml` | ED-DB tables `eeprom` (id, type, size, xsize, poll_len, remark, file) and `pages` |
 | `data/ecm_models.toml` | RM, BX. Hints only: ECMs are swapped between bikes |
 
+## Wideband (`crates/xbtune-proto/src/isp2.rs`, `crates/xbtune-core/src/wideband.rs`)
+
+Not from EcmDroid. Source: Innovate Motorsports, "Innovate Serial Protocol
+2 (ISP2) specification (preliminary)", 5/3/2004 (public; copy at
+<https://github.com/ohhorob/arduino-MTS/tree/master/doc>, file
+"Innovate Serial Protocol 2 Specification.pdf", SHA-256
+`c0ebc3c8dff7f3a19d64b6ab2bf4ff9b4da88852c1e3f4e41d70d67a3bec475f`). The
+spec text only was used; no code from other ISP2 implementations.
+
+| Fact | Spec section |
+|---|---|
+| 19200 baud, 8N1 | 1 |
+| Packets every 81.92 ms; 16-bit big-endian words; both header bytes have the high bit set | 2 |
+| Header: bits 15, 13, 9, 7 = 1; bit 14 recording; bit 12 sensor data (0 = command response); length in bits 8 and 6..0, in words after the header | 2, "Header Word" |
+| LC-1 sub-packet: 2 words; word 0 = 0 1 0 F2 F1 F0 1 AF7 0 AF6..AF0; word 1 = 0 0 L12..L7 0 L6..L0 | "LC-1 Sub-Packet format" |
+| LM-1 sub-packet: 8 words (function, lambda, battery, 5 aux), word 0 bit 15 set, bits 13, 9, 7 clear | "LM-1 Sub-Packet format" |
+| Function codes 000 lambda, 001 O2 % x10, 010 free-air calibration, 011 needs calibration, 100 warming %, 101 heater calibration, 110 error code, 111 reserved/flash | 2.1 |
+| Lambda = (L + 500) / 1000; AFR = (L + 500) x AF / 10000; AF = stoich x 10 (147 petrol) | 2.1, 2.2 |
+| The first wideband device's AF multiplier applies to all | "LC-1 Sub-Packet format" |
+| Other devices add data words 0 0 D12..D7 0 D6..D0 | "Other data source sub-packets" |
+
+Innovate sells the LC-2 as an MTS device (its manual, 11-0137C, could not
+be downloaded here). That it sends the LC-1 sub-packet above is ASSUMED
+until a real LC-2 has been logged. Error code meanings are device-specific
+and not in the spec, so XBTune shows the number only. XBTune never sends
+commands to the chain.
+
+XBTune choices (not from a source; no real controller tested yet):
+- A reading goes on an ECM sample if it is at most 300 ms old.
+- Auto-tune with a wideband: correction = EGO / 100 x measured lambda /
+  target lambda. ASSUMED: in open loop the EGO value (held at AFV) is
+  applied to the fuel. Default sensor delay 0.2 s; default targets by load
+  40: 14.7, 60: 14.0, 80: 13.5, 100: 13.2, 125: 13.0 (stoichiometric in the
+  light-load closed-loop area, richer with load). These are starting points
+  for the owner to adjust, not Buell data.
+- Lean warning: average AFR above 14.0 in a cell at load 80 or more.
+
 ## Simulator assumptions (ASSUMED, sim only)
 
 These are made up for the simulator and are **not** known ECM behaviour.
@@ -262,3 +299,9 @@ Nothing outside tests may rely on them.
   code 15 worked and the re-read showed none.) What the real ECM does to `RDiag`/EEPROM `HDiag` is
   unknown.
 - Runtime data is answered normally while busy.
+- The simulated LC-2 (`xbtune-sim/src/wideband.rs`) warms up for 6 s, then
+  sends a made-up lambda for the made-up ride (`engine::lambda_at`), and
+  free-air O2 (20.9%) with the engine stopped.
+- The made-up ride reports Accel Corr. 0% (it was 100%, which auto-tune's
+  filter reads as acceleration enrichment); the owner's logs show 0 when
+  steady.

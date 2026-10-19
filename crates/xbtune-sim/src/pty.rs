@@ -89,4 +89,32 @@ impl Pty {
             }
         })
     }
+
+    /// Stream a simulated LC-2 ([`crate::wideband`]) on a background
+    /// thread: the made-up ride from now, engine running. Packets nobody
+    /// reads are dropped (the master is non-blocking), so a client that
+    /// opens the port later gets current data.
+    pub fn stream_wideband(self) -> io::Result<thread::JoinHandle<()>> {
+        use std::os::fd::AsRawFd;
+        // SAFETY: fcntl on a valid, owned fd.
+        unsafe {
+            let fd = self.master.as_raw_fd();
+            let flags = libc::fcntl(fd, libc::F_GETFL);
+            libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+        }
+        let mut file = File::from(self.master);
+        thread::Builder::new().name("xbtune-sim-wideband".into()).spawn(move || {
+            let started = std::time::Instant::now();
+            loop {
+                thread::sleep(crate::wideband::INTERVAL);
+                let t = started.elapsed().as_secs_f64();
+                match file.write(&crate::wideband::packet(t, t, true)) {
+                    Ok(_) => {}
+                    Err(e) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::Interrupted) => {}
+                    Err(e) if e.raw_os_error() == Some(libc::EIO) => {}
+                    Err(_) => return,
+                }
+            }
+        })
+    }
 }

@@ -15,6 +15,7 @@
 
 pub mod engine;
 pub mod pty;
+pub mod wideband;
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -278,6 +279,13 @@ impl Simulator {
         if let Some(e) = &mut self.engine {
             e.2 = t;
         }
+    }
+
+    /// Seconds into the made-up ride (`None` without an engine).
+    pub fn engine_time(&self) -> Option<f64> {
+        self.engine
+            .as_ref()
+            .map(|(_, started, fixed)| fixed.unwrap_or_else(|| started.elapsed().as_secs_f64()))
     }
 
     pub fn config(&self) -> &SimConfig {

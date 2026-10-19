@@ -43,6 +43,9 @@ struct Args {
     delay: f64,
     #[arg(long, default_value_t = 1500)]
     delay_ms: u64,
+    /// Also simulate an Innovate LC-2 wideband (ISP2) on a second pty.
+    #[arg(long)]
+    wideband: bool,
 }
 
 fn main() -> Result<()> {
@@ -73,6 +76,12 @@ fn main() -> Result<()> {
     let pty = xbtune_sim::pty::open().context("opening a pty")?;
     println!("Simulated ECM {version} on {}", pty.path);
     println!("Try: xbtune-cli info --serial {}", pty.path);
+    if a.wideband {
+        let wb = xbtune_sim::pty::open().context("opening a pty")?;
+        println!("Simulated Innovate LC-2 (ISP2) on {}", wb.path);
+        println!("Try: xbtune-cli live --serial {} --wideband {}", pty.path, wb.path);
+        wb.stream_wideband()?;
+    }
     println!("Ctrl+C to stop.");
     pty.serve(sim)?.join().ok();
     Ok(())

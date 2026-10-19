@@ -15,6 +15,7 @@ use std::time::SystemTime;
 use xbtune_defs::{Catalog, Definition, EcmDef, RtVar};
 
 use crate::live::{Sample, channels};
+use crate::wideband::{self, Sensor, Status};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LogError {
@@ -74,6 +75,9 @@ pub struct Log {
     /// Rows that couldn't be read (bad hex, wrong frame length, bad checksum).
     pub skipped: usize,
     pub source: LogSource,
+    /// The wideband controller named in the header, if the log has its
+    /// columns.
+    pub wideband: Option<String>,
 }
 
 impl Log {
@@ -94,11 +98,13 @@ impl Log {
     pub fn parse(path: &Path, text: &str, catalog: &Catalog) -> Result<Self, LogError> {
         let p = || path.to_path_buf();
         let mut format_ok = false;
-        let (mut version, mut started, mut note) = (None, None, None);
+        let (mut version, mut started, mut note, mut wideband) = (None, None, None, None);
         let mut events = Vec::new();
         let mut columns: Option<(usize, usize)> = None;
+        // wb_lambda and wb_status, if the log has them.
+        let mut wb_cols: Option<(usize, usize, usize)> = None;
         let mut header_seen = false;
-        let mut rows: Vec<(f64, &str)> = Vec::new();
+        let mut rows: Vec<(f64, &str, Option<Sensor>)> = Vec::new();
         let mut skipped = 0;
         for line in text.lines() {
             if let Some(h) = line.strip_prefix('#') {
@@ -111,6 +117,8 @@ impl Log {
                     started = Some(v.trim().to_string());
                 } else if let Some(v) = h.strip_prefix("note:") {
                     note = Some(v.trim().to_string());
+                } else if let Some(v) = h.strip_prefix("wideband:") {
+                    wideband = Some(v.trim().to_string());
                 } else if let Some(e) = h.strip_prefix("event:") {
                     let e = e.trim();
                     if let Some((t, rest)) = e.strip_prefix("t=").and_then(|r| r.split_once(' '))
@@ -132,12 +140,18 @@ impl Log {
                     let time = names.iter().position(|n| n == "time_s");
                     let frame = names.iter().position(|n| n == "frame");
                     columns = time.zip(frame);
+                    let col = |c: &str| names.iter().position(|n| n == c);
+                    wb_cols = match (col(wideband::LAMBDA), col(wideband::AFR), col(wideband::STATUS)) {
+                        (Some(l), Some(a), Some(s)) => Some((l, a, s)),
+                        _ => None,
+                    };
                 }
                 Some((ti, fi)) => {
                     // Data rows hold numbers and hex only: no quoting.
                     let cells: Vec<&str> = line.split(',').collect();
+                    let wb = wb_cols.and_then(|c| wb_cells(&cells, c));
                     match (cells.get(ti).and_then(|t| t.parse::<f64>().ok()), cells.get(fi)) {
-                        (Some(t), Some(f)) if !f.is_empty() => rows.push((t, f)),
+                        (Some(t), Some(f)) if !f.is_empty() => rows.push((t, f, wb)),
                         _ => skipped += 1,
                     }
                 }
@@ -155,15 +169,19 @@ impl Log {
             return Err(LogError::NoColumns(p()));
         }
         let mut samples = Vec::with_capacity(rows.len());
-        for (t, hex) in rows {
+        for (t, hex, wb) in rows {
             match from_hex(hex) {
                 Some(frame) if frame.len() == ecm.runtime_len => {
-                    samples.push(Sample { t, wall: SystemTime::UNIX_EPOCH, frame })
+                    samples.push(Sample { t, wall: SystemTime::UNIX_EPOCH, frame, wb })
                 }
                 _ => skipped += 1,
             }
         }
-        let channels = channels(&definition);
+        let mut channels = channels(&definition);
+        let wideband = wb_cols.map(|_| wideband.unwrap_or_else(|| "wideband".into()));
+        if wideband.is_some() {
+            channels.extend(crate::wideband::channels());
+        }
         Ok(Self {
             path: p(),
             ecm,
@@ -176,6 +194,7 @@ impl Log {
             events,
             skipped,
             source: LogSource::Xbtune,
+            wideband,
         })
     }
 
@@ -209,6 +228,19 @@ impl Log {
     pub fn name(&self) -> String {
         self.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
     }
+}
+
+/// A wideband reading from a row's wb_lambda, wb_afr and wb_status cells
+/// (empty cells: no reading). The fuel's stoich comes from AFR / lambda.
+fn wb_cells(cells: &[&str], (l, a, s): (usize, usize, usize)) -> Option<Sensor> {
+    let status = Status::parse(cells.get(s)?.trim())?;
+    let num = |i: usize| cells.get(i).and_then(|c| c.trim().parse::<f64>().ok());
+    let lambda = num(l);
+    let stoich = match (lambda, num(a)) {
+        (Some(l), Some(a)) if l > 0.0 => ((a / l) * 10.0).round() / 10.0,
+        _ => 14.7,
+    };
+    Some(Sensor { status, lambda, stoich })
 }
 
 /// Split the column row, honouring `"` quoting (names with `,` or `"`).
@@ -256,11 +288,17 @@ mod tests {
             target: "sim".into(),
             started: SystemTime::UNIX_EPOCH,
             note: Some("a, \"quoted\" note".into()),
+            wideband: None,
         };
         let mut w = CsvLogger::new(Vec::new(), &meta, channels(&def)).unwrap();
         let frame = include_bytes!("../../../tests/fixtures/RT_BUEIB.bin").to_vec();
         let written: Vec<Sample> = (0..5)
-            .map(|i| Sample { t: 0.15 * i as f64, wall: SystemTime::UNIX_EPOCH, frame: frame.clone() })
+            .map(|i| Sample {
+                t: 0.15 * i as f64,
+                wall: SystemTime::UNIX_EPOCH,
+                frame: frame.clone(),
+                wb: None,
+            })
             .collect();
         for (i, s) in written.iter().enumerate() {
             w.write(s).unwrap();
@@ -278,6 +316,49 @@ mod tests {
         assert_eq!(log.ecm.id, "BUEIB");
         let rpm = log.channel("RPM").unwrap();
         assert_eq!(log.samples[0].value(rpm), written[0].value(rpm));
+    }
+
+    #[test]
+    fn wideband_columns_read_back() {
+        let catalog = Catalog::builtin().unwrap();
+        let ecm = catalog.lookup("BUEIB310 12-11-03").unwrap().clone();
+        let def = catalog.definition(&ecm).unwrap().clone();
+        let meta = LogMeta {
+            ecm_id: ecm.id.clone(),
+            version: "BUEIB310 12-11-03".into(),
+            target: "sim".into(),
+            started: SystemTime::UNIX_EPOCH,
+            note: None,
+            wideband: Some("Innovate ISP2 on /dev/ttyUSB1".into()),
+        };
+        // Wideband channels in the list are not written as frame columns.
+        let mut vars = channels(&def);
+        vars.extend(wideband::channels());
+        let mut w = CsvLogger::new(Vec::new(), &meta, vars).unwrap();
+        let frame = include_bytes!("../../../tests/fixtures/RT_BUEIB.bin").to_vec();
+        let wbs = [
+            Some(Sensor { status: Status::Normal, lambda: Some(0.912), stoich: 14.7 }),
+            None,
+            Some(Sensor { status: Status::WarmingUp(45.5), lambda: None, stoich: 14.7 }),
+        ];
+        for (i, wb) in wbs.iter().enumerate() {
+            w.write(&Sample {
+                t: i as f64 * 0.15,
+                wall: SystemTime::UNIX_EPOCH,
+                frame: frame.clone(),
+                wb: *wb,
+            })
+            .unwrap();
+        }
+        let text = String::from_utf8(w.into_inner()).unwrap();
+        assert!(text.contains("# wideband: Innovate ISP2 on /dev/ttyUSB1"));
+        assert_eq!(text.matches(",wb_lambda,").count(), 1, "{text}");
+        let log = Log::parse(Path::new("t.csv"), &text, &catalog).unwrap();
+        assert_eq!(log.wideband.as_deref(), Some("Innovate ISP2 on /dev/ttyUSB1"));
+        assert_eq!(log.samples.iter().map(|s| s.wb).collect::<Vec<_>>(), wbs);
+        let afr: Vec<Option<f64>> = log.series(wideband::AFR);
+        assert!((afr[0].unwrap() - 0.912 * 14.7).abs() < 0.01);
+        assert_eq!(afr[1], None);
     }
 
     #[test]

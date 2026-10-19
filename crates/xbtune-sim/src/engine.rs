@@ -66,6 +66,24 @@ pub fn state_at(t: f64) -> EngineState {
     }
 }
 
+/// What a wideband sensor would read at `t` in the made-up ride: rich on
+/// the pull (open loop), near 1 in closed loop, a little lean at idle and
+/// very lean on the overrun. With the engine stopped: `None` (free air).
+/// Made up like the rest; it only gives the views something to show.
+pub fn lambda_at(t: f64, running: bool) -> Option<f64> {
+    if !running {
+        return None;
+    }
+    let s = state_at(t);
+    let c = t.rem_euclid(CYCLE);
+    Some(match c {
+        c if (20.0..25.0).contains(&c) => 1.6,
+        _ if s.tps >= 30.0 => 0.86 + 0.01 * (t * 5.0).sin(),
+        _ if s.tps < 30.0 && s.rpm > 1500.0 => 1.0 + 0.025 * (t * 6.0).sin(),
+        _ => 1.03 + 0.01 * (t * 3.0).sin(),
+    })
+}
+
 /// Writes [`state_at`] into runtime frames of one definition.
 #[derive(Debug, Clone)]
 pub struct Engine {
@@ -117,7 +135,7 @@ impl Engine {
             ("O2", s.o2_volts),
             ("CrTE", 100.0 + ((120.0 - s.engine_temp) / 2.0).max(0.0)),
             ("CrTA", 100.0),
-            ("CrAcc", 100.0),
+            ("CrAcc", 0.0),
             ("CrDec", 100.0),
             ("CrWOT", 100.0),
             ("CrIdle", 100.0),

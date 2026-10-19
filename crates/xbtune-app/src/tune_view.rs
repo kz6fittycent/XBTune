@@ -479,6 +479,9 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
             ui.selectable_value(&mut app.autotune.overlay, Overlay::Off, "Off");
             ui.selectable_value(&mut app.autotune.overlay, Overlay::Hits, "Samples per cell");
             ui.selectable_value(&mut app.autotune.overlay, Overlay::Ego, "Average EGO");
+            if crate::autotune_view::logs_have_wideband(app) {
+                ui.selectable_value(&mut app.autotune.overlay, Overlay::Afr, "Average AFR (wideband)");
+            }
             if ui.button("Auto-tune…").clicked() {
                 crate::autotune_view::open(app);
             }
@@ -635,6 +638,7 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         mode: match (&log_stats, app.autotune.overlay) {
             (Some(_), crate::autotune_view::Overlay::Hits) => CellMode::LogHits,
             (Some(_), crate::autotune_view::Overlay::Ego) => CellMode::LogEgo,
+            (Some(_), crate::autotune_view::Overlay::Afr) => CellMode::LogAfr,
             _ if other.is_some() => app.tune_ui.mode,
             _ => CellMode::Values,
         },

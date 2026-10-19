@@ -11,6 +11,7 @@ use anyhow::{Result, bail};
 use clap::Args;
 use xbtune_core::live::{DEFAULT_CHANNELS, channels, format_value, set_flags, units};
 use xbtune_core::session::{self, Command, Event, Identity, LinkState, SessionConfig};
+use xbtune_core::wideband::{self, WbLink};
 use xbtune_defs::{Catalog, RtVar};
 use xbtune_proto::LinkStats;
 
@@ -35,6 +36,10 @@ pub struct LiveArgs {
     /// Shortest time between requests, in milliseconds (0: as fast as the link allows).
     #[arg(long, default_value_t = 0)]
     interval_ms: u64,
+    /// Wideband controller (Innovate LC-2 or other ISP2 device) on this
+    /// serial port, e.g. /dev/ttyUSB1; "sim" for a simulated one.
+    #[arg(long, value_name = "PORT")]
+    wideband: Option<String>,
 }
 
 #[derive(Args)]
@@ -57,12 +62,18 @@ pub struct LogArgs {
     /// Give up after this many reconnects in a row without data.
     #[arg(long, default_value_t = 20)]
     reconnects: u32,
+    /// Wideband controller (Innovate LC-2 or other ISP2 device) on this
+    /// serial port, e.g. /dev/ttyUSB1; "sim" for a simulated one. Its
+    /// readings are logged as wb_lambda, wb_afr and wb_status.
+    #[arg(long, value_name = "PORT")]
+    wideband: Option<String>,
 }
 
 fn start(
     conn: &mut Connection,
     interval_ms: u64,
     max_reconnects: Option<u32>,
+    wideband: Option<&str>,
 ) -> Result<(session::Session, String)> {
     // The demo ECM behaves like a BuellTooth: ~35 ms latency plus the
     // K-line's 9600-baud wire time.
@@ -74,6 +85,27 @@ fn start(
     cfg.policy = conn.policy_with(session::LIVE_TIMEOUT);
     cfg.min_interval = Duration::from_millis(interval_ms);
     cfg.max_reconnects = max_reconnects;
+    cfg.wideband = match wideband {
+        None => None,
+        Some("sim") => {
+            // Follows the simulated ECM's ride when there is one.
+            let sim = match &ep {
+                Endpoint::Sim(s) => s.clone(),
+                Endpoint::Real(_) => xbtune_sim::shared(xbtune_sim::Simulator::bueib_running()),
+            };
+            Some(WbLink {
+                label: "simulated Innovate LC-2".into(),
+                opener: Arc::new(move || {
+                    let sim = sim.clone();
+                    Box::pin(async move { Ok(xbtune_sim::wideband::in_process(sim)) })
+                }),
+            })
+        }
+        Some(path) => Some(WbLink::serial(path)),
+    };
+    if let Some(w) = &cfg.wideband {
+        eprintln!("Wideband: {}", w.label);
+    }
     let s = session::start(cfg, ep.opener(), Arc::new(Catalog::builtin()?), None);
     Ok((s, label))
 }
@@ -123,11 +155,14 @@ fn pick(all: &[RtVar], names: &[String], every: bool) -> Result<Vec<RtVar>> {
 }
 
 pub async fn live(mut a: LiveArgs) -> Result<()> {
-    let (mut s, label) = start(&mut a.conn, a.interval_ms, Some(2))?;
+    let (mut s, label) = start(&mut a.conn, a.interval_ms, Some(2), a.wideband.as_deref())?;
     eprintln!("Connecting: {label}");
     let id = identify(&mut s).await?;
     eprintln!("ECM: {} ({}, {})", id.version, id.ecm.id, id.ecm.family);
-    let all = channels(&id.definition);
+    let mut all = channels(&id.definition);
+    if a.wideband.is_some() {
+        all.extend(wideband::channels());
+    }
     if a.list {
         println!("{:<14} {:<16} {:<6} {:>4}  Label", "Channel", "Variable", "Units", "Off");
         for v in &all {
@@ -136,7 +171,10 @@ pub async fn live(mut a: LiveArgs) -> Result<()> {
         s.send(Command::Stop);
         return Ok(());
     }
-    let vars = pick(&all, &a.channels, a.all)?;
+    let mut vars = pick(&all, &a.channels, a.all)?;
+    if a.wideband.is_some() && a.channels.is_empty() && !a.all {
+        vars.extend(wideband::channels());
+    }
     let tty = std::io::stdout().is_terminal() && a.count.is_none();
     let mut frames = 0u64;
     let mut last_draw = Instant::now() - Duration::from_secs(1);
@@ -169,7 +207,11 @@ pub async fn live(mut a: LiveArgs) -> Result<()> {
                         break;
                     }
                 }
-                Some(Event::Stats { stats, hz, reconnects, .. }) => status = Status { stats: Some(stats), hz, reconnects },
+                Some(Event::Stats { stats, hz, reconnects, .. }) => {
+                    status.stats = Some(stats);
+                    status.hz = hz;
+                    status.reconnects = reconnects;
+                }
                 Some(Event::State(LinkState::Reconnecting { reason, .. })) => eprintln!("link lost ({}); reconnecting...", reason.lines().next().unwrap_or_default()),
                 Some(Event::State(LinkState::Stopped { reason })) => {
                     if let Some(r) = reason {
@@ -178,6 +220,8 @@ pub async fn live(mut a: LiveArgs) -> Result<()> {
                     break;
                 }
                 Some(Event::Warning(w)) => eprintln!("warning: {w}"),
+                Some(Event::Wideband(w)) if !tty => eprintln!("wideband: {}", w.text()),
+                Some(Event::Wideband(w)) => status.wideband = Some(w),
                 Some(_) => {}
                 None => break,
             },
@@ -193,19 +237,24 @@ struct Status {
     stats: Option<LinkStats>,
     hz: f64,
     reconnects: u32,
+    wideband: Option<wideband::WbState>,
 }
 
 impl Status {
     fn line(&self) -> String {
         let Some(st) = &self.stats else { return "starting".into() };
-        format!(
+        let mut s = format!(
             "{:.1} Hz  RTT {}  retries {}  errors {:.0}%  reconnects {}",
             self.hz,
             st.rtt_avg.map_or("-".into(), |d| format!("{:.0} ms", d.as_secs_f64() * 1000.0)),
             st.retries,
             st.recent_error_rate() * 100.0,
             self.reconnects
-        )
+        );
+        if let Some(w) = &self.wideband {
+            s.push_str(&format!("  wideband {}", w.text()));
+        }
+        s
     }
 }
 
@@ -214,7 +263,7 @@ fn logs_dir() -> PathBuf {
 }
 
 pub async fn log(mut a: LogArgs) -> Result<()> {
-    let (mut s, label) = start(&mut a.conn, a.interval_ms, Some(a.reconnects))?;
+    let (mut s, label) = start(&mut a.conn, a.interval_ms, Some(a.reconnects), a.wideband.as_deref())?;
     eprintln!("Connecting: {label}");
     let id = identify(&mut s).await?;
     eprintln!("ECM: {} ({}, {})", id.version, id.ecm.id, id.ecm.family);
@@ -236,9 +285,12 @@ pub async fn log(mut a: LogArgs) -> Result<()> {
                     started = Some(Instant::now());
                     eprintln!("Logging to {}  (Ctrl+C to stop)", p.display());
                 }
+                Some(Event::Wideband(w)) => eprintln!("\n  wideband: {}", w.text()),
                 Some(Event::Stats { stats, hz, reconnects, log_rows }) => {
                     rows = log_rows.unwrap_or(rows);
-                    status = Status { stats: Some(stats), hz, reconnects };
+                    status.stats = Some(stats);
+                    status.hz = hz;
+                    status.reconnects = reconnects;
                     if let Some(t) = started {
                         eprint!("\r  {:>6.1} s  {rows} rows  {}   ", t.elapsed().as_secs_f64(), status.line());
                         let _ = std::io::stderr().flush();

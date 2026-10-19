@@ -11,6 +11,7 @@
 //! - [`session`]: the live-data task (poll, reconnect, log).
 //! - [`tune`]: offline editing with undo/redo.
 //! - [`time`]: UTC timestamps without extra dependencies.
+//! - [`wideband`]: an Innovate (ISP2) wideband controller beside the ECM.
 
 pub mod autotune;
 pub mod burn;
@@ -26,3 +27,4 @@ pub mod read;
 pub mod session;
 pub mod time;
 pub mod tune;
+pub mod wideband;

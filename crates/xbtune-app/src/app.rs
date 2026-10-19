@@ -53,6 +53,8 @@ pub struct LinkView {
     pub log: Option<(PathBuf, u64)>,
     /// Remote tuning: the bike owner whose bike this is (tuner's side).
     pub remote: Option<String>,
+    /// The wideband read with this session, and how it's doing.
+    pub wideband: Option<(String, xbtune_core::wideband::WbState)>,
 }
 
 impl LinkView {
@@ -170,6 +172,11 @@ impl XbApp {
                 Ok("light") => ThemePref::Light,
                 _ => ThemePref::Dark,
             };
+            // XBTUNE_SHOT_WIDEBAND=1: the simulated LC-2, with its gauge.
+            if std::env::var_os("XBTUNE_SHOT_WIDEBAND").is_some() {
+                settings.wideband = Some(crate::settings::WidebandPref::Demo);
+                settings.gauges.push(xbtune_core::wideband::AFR.into());
+            }
         }
         theme::apply(&cc.egui_ctx, settings.theme);
         let catalog = Arc::new(Catalog::builtin().expect("built-in definitions load"));
@@ -313,6 +320,7 @@ impl XbApp {
                 app.autotune.overlay = match std::env::var("XBTUNE_SHOT_OVERLAY").as_deref() {
                     Ok("hits") => crate::autotune_view::Overlay::Hits,
                     Ok("ego") => crate::autotune_view::Overlay::Ego,
+                    Ok("afr") => crate::autotune_view::Overlay::Afr,
                     _ => Default::default(),
                 };
                 if std::env::var_os("XBTUNE_SHOT_AUTOTUNE").is_some() {
@@ -445,6 +453,7 @@ impl XbApp {
         };
         tracing::info!("connecting to {label}");
         let mut cfg = SessionConfig::new(label, target_address(&target));
+        cfg.wideband = self.wideband_link();
         cfg.permit = xbtune_core::diag::permit(target.is_demo()).ok();
         self.permitted = cfg.permit.is_some();
         cfg.write_permit = xbtune_core::diag::write_permit(target.is_demo()).ok();
@@ -455,14 +464,39 @@ impl XbApp {
         let ctx = self.egui_ctx.clone();
         let notify: session::Notify = Arc::new(move || ctx.request_repaint());
         let catalog = self.catalog.clone();
+        let cfg_wideband = cfg.wideband.as_ref().map(|w| w.label.clone());
         let _guard = self.rt.enter();
         self.session = Some(session::start(cfg, opener, catalog, Some(notify)));
-        self.link = LinkView { target: Some(target.clone()), ..Default::default() };
+        let wideband = cfg_wideband.map(|l| (l, xbtune_core::wideband::WbState::Connecting));
+        self.link = LinkView { target: Some(target.clone()), wideband, ..Default::default() };
         self.history = History::default();
         self.chart_paused = None;
         self.diag = Default::default();
         self.settings.last = Some(target);
         self.save_settings();
+    }
+
+    /// The wideband to read with the next session (Settings / Connect).
+    fn wideband_link(&self) -> Option<xbtune_core::wideband::WbLink> {
+        match self.settings.wideband.as_ref()? {
+            crate::settings::WidebandPref::Serial { path } => {
+                Some(xbtune_core::wideband::WbLink::serial(path))
+            }
+            crate::settings::WidebandPref::Demo => {
+                // Follows the demo ECM's ride; with a real ECM, a ride of its own.
+                let sim = self
+                    .demo_sim
+                    .clone()
+                    .unwrap_or_else(|| xbtune_sim::shared(xbtune_sim::Simulator::bueib_running()));
+                Some(xbtune_core::wideband::WbLink {
+                    label: "simulated Innovate LC-2".into(),
+                    opener: Arc::new(move || {
+                        let sim = sim.clone();
+                        Box::pin(async move { Ok(xbtune_sim::wideband::in_process(sim)) })
+                    }),
+                })
+            }
+        }
     }
 
     pub fn stop(&mut self) {
@@ -686,6 +720,9 @@ impl XbApp {
                         );
                     }
                     self.link.channels = channels(&id.definition);
+                    if self.link.wideband.is_some() {
+                        self.link.channels.extend(xbtune_core::wideband::channels());
+                    }
                     self.link.identity = Some(id);
                 }
                 Event::Sample(s) => {
@@ -740,6 +777,11 @@ impl XbApp {
                     self.got_eeprom(*img);
                 }
                 Event::Warning(w) => self.say(w, true),
+                Event::Wideband(w) => {
+                    if let Some((_, state)) = &mut self.link.wideband {
+                        *state = w;
+                    }
+                }
             }
             if self.session.is_none() {
                 break;
@@ -763,6 +805,27 @@ impl XbApp {
             let (r, painter) = ui.allocate_painter(egui::vec2(10.0, 10.0), egui::Sense::hover());
             painter.circle_filled(r.rect.center(), 5.0, dot);
             ui.label(text);
+            if let Some((label, state)) = &self.link.wideband
+                && self.session.is_some()
+            {
+                use xbtune_core::wideband::WbState;
+                let color = match state {
+                    WbState::Live => p.good,
+                    WbState::Connecting => p.muted,
+                    WbState::Silent | WbState::Failed(_) => p.warn,
+                };
+                ui.add_space(8.0);
+                let (r, painter) = ui.allocate_painter(egui::vec2(10.0, 10.0), egui::Sense::hover());
+                painter.circle_filled(r.rect.center(), 4.0, color);
+                let text = match self.history.latest().and_then(|s| s.wb) {
+                    Some(w) => match w.afr() {
+                        Some(a) => format!("AFR {a:.1}"),
+                        None => format!("WB {}", w.status.text()),
+                    },
+                    None => "WB".into(),
+                };
+                ui.label(text).on_hover_text(format!("Wideband, {label}: {}", state.text()));
+            }
             if let (Some(id), Some(s)) = (&self.link.identity, self.history.latest()) {
                 let codes = xbtune_core::diag::codes_from_runtime(
                     &id.definition,
@@ -835,14 +898,20 @@ impl XbApp {
                     } else {
                         p.muted
                     };
-                    ui.label(
-                        RichText::new(format!(
+                    // The full line when there's room (the buttons are already
+                    // placed), else the short one.
+                    let text = if ui.available_width() > 360.0 {
+                        format!(
                             "{:.1} Hz · RTT {rtt} · errors {err:.0}% · retries {} · reconnects {}",
                             self.link.hz, st.retries, self.link.reconnects
-                        ))
-                        .color(color)
-                        .size(12.5),
-                    );
+                        )
+                    } else {
+                        format!("{:.1} Hz · errors {err:.0}%", self.link.hz)
+                    };
+                    ui.label(RichText::new(text).color(color).size(12.5)).on_hover_text(format!(
+                        "RTT {rtt} · retries {} · reconnects {}",
+                        st.retries, self.link.reconnects
+                    ));
                 }
             });
         });

@@ -285,6 +285,8 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             }
         });
         ui.add_space(8.0);
+        wideband(app, ui, &p);
+        ui.add_space(8.0);
 
         theme::card(ui).show(ui, |ui| {
             ui.set_width(ui.available_width());
@@ -310,6 +312,80 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             });
         });
     });
+}
+
+/// An optional wideband controller, read beside the ECM from the next
+/// connect on.
+fn wideband(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
+    use crate::settings::WidebandPref;
+    theme::card(ui).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.label(RichText::new("Wideband O2 (optional)").font(theme::strong_font(16.0)));
+        ui.label(
+            RichText::new(
+                "An Innovate LC-2 (or another Innovate MTS device) on its own USB serial cable, plugged into \
+                 the controller's serial OUT. Its AFR shows on the dashboard, goes into data logs and lets \
+                 auto-tune aim for a target AFR. Not yet tried with a real controller: please report how it goes.",
+            )
+            .small()
+            .color(p.muted),
+        );
+        let before = app.settings.wideband.clone();
+        let mut pick = before.clone();
+        ui.horizontal_wrapped(|ui| {
+            ui.radio_value(&mut pick, None, "None");
+            for port in &app.connect.ports {
+                let this = Some(WidebandPref::Serial { path: port.path.clone() });
+                ui.radio_value(&mut pick, this, &port.path).on_hover_text(&port.description);
+            }
+            if let Some(WidebandPref::Serial { path }) = &before
+                && !app.connect.ports.iter().any(|q| &q.path == path)
+            {
+                ui.radio_value(&mut pick, before.clone(), format!("{path} (not plugged in)"));
+            }
+            ui.radio_value(&mut pick, Some(WidebandPref::Demo), "Simulated LC-2");
+        });
+        if pick != before {
+            // A first wideband gets a dashboard gauge.
+            let afr = xbtune_core::wideband::AFR.to_string();
+            if before.is_none() && pick.is_some() && !app.settings.gauges.contains(&afr) {
+                app.settings.gauges.push(afr);
+            }
+            app.settings.wideband = pick;
+            app.save_settings();
+        }
+        let ecm_port = match &app.settings.last {
+            Some(SavedTarget::Serial { path, .. }) => Some(path.clone()),
+            _ => None,
+        };
+        if let (Some(WidebandPref::Serial { path }), Some(ecm)) = (&app.settings.wideband, &ecm_port)
+            && path == ecm
+        {
+            ui.colored_label(p.warn, "That's the ECM's port. The wideband needs a cable of its own.");
+        }
+        let running = app.link.target.is_some()
+            && app.link.state.as_ref().is_some_and(|s| !matches!(s, LinkState::Stopped { .. }));
+        let reading = app.link.wideband.as_ref().map(|(l, _)| l.clone());
+        if running && reading != wanted_label(app) {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Applies from the next connect.").color(p.muted));
+                if ui.button("Reconnect now").clicked()
+                    && let Some(t) = app.link.target.clone()
+                {
+                    app.start(t);
+                }
+            });
+        }
+    });
+}
+
+/// The session label of the chosen wideband (as `WbLink` names it).
+fn wanted_label(app: &XbApp) -> Option<String> {
+    use crate::settings::WidebandPref;
+    Some(match app.settings.wideband.as_ref()? {
+        WidebandPref::Demo => "simulated Innovate LC-2".to_string(),
+        WidebandPref::Serial { path } => xbtune_core::wideband::WbLink::serial_label(path),
+    })
 }
 
 /// Stock or factory race: EcmDroid's protocol choice (3c189be). A factory

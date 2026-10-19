@@ -58,6 +58,8 @@ pub enum CellMode {
     LogHits,
     /// Average EGO correction per cell (%).
     LogEgo,
+    /// Average wideband AFR per cell, coloured against the target.
+    LogAfr,
 }
 
 pub struct GridSpec<'a> {
@@ -141,7 +143,8 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> bool {
         Rect::from_min_size(origin + vec2(c as f32 * cell_w, r as f32 * cell_h), vec2(cell_w, cell_h))
     };
 
-    let log_mode = matches!(spec.mode, CellMode::LogHits | CellMode::LogEgo) && spec.log.is_some();
+    let log_mode =
+        matches!(spec.mode, CellMode::LogHits | CellMode::LogEgo | CellMode::LogAfr) && spec.log.is_some();
     if log_mode && let Some(log) = spec.log {
         draw_log(&painter, spec, log, rows, cols, &cell_rect);
     }
@@ -273,8 +276,9 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> bool {
     *sel != before
 }
 
-/// The log overlay: hits as a heatmap, or average EGO coloured by how far
-/// it is from 100% (red: the ECM added fuel, blue: it took fuel away).
+/// The log overlay: hits as a heatmap, average EGO coloured by how far
+/// it is from 100% (red: the ECM added fuel, blue: it took fuel away), or
+/// average wideband AFR against the target (red: leaner, blue: richer).
 /// Cells below `min_hits` are faded; cells without data are blank.
 fn draw_log(
     painter: &egui::Painter,
@@ -300,6 +304,7 @@ fn draw_log(
                     heat(if max_hits > 0.0 { (s.hits.ln_1p() / max_hits.ln_1p()) as f32 } else { 0.0 }),
                     format!("{:.0}", s.hits),
                 ),
+                CellMode::LogAfr => (diff_colour(s.afr - s.target, 1.0), format!("{:.1}", s.afr)),
                 _ => (diff_colour(s.ego - 100.0, max_dev.max(2.0)), format!("{:.1}", s.ego)),
             };
             let enough = s.hits >= spec.min_hits;

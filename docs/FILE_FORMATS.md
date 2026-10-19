@@ -102,6 +102,15 @@ time_s,SysConfig,MilliSec,Seconds,RPM,spark1,...,frame
   ("1 failed attempt(s) (timeout 1)"), requests that gave up, reconnects.
   `t` uses the same clock as `time_s`. Readers skip every `#` line.
 - The file is flushed about once a second and when logging stops.
+- With a wideband controller connected (`--wideband`, app Connect), the
+  header has `# wideband: <controller>` and three columns come before
+  `frame`: `wb_lambda` (3 decimals), `wb_afr` (2 decimals, lambda x the
+  controller's stoich AFR) and `wb_status` (`ok`, `warming 45.5%`,
+  `calibrating`, `needs calibration`, `o2 20.9%`, `heater calibration N`,
+  `error N`, `other N`). Each is the controller's latest reading if it
+  was at most 300 ms old when the frame arrived; all three are empty
+  otherwise. `wb_lambda`/`wb_afr` are empty unless the status is `ok`.
+  Readers that only use `time_s` and `frame` are unaffected.
 
 ## `.bin`: EcmDroid binary log (read only)
 
@@ -135,5 +144,6 @@ units row; XBTune skips one if present.
   the channels found, so missing ones read as missing, not 0.
 - Writing (`xbtune.cli log-convert LOG -o OUT.msl`, Logs view "Export
   .msl"): title `"XBTune <ID> <version>"`, then `Time` (seconds from the
-  first sample) and every channel of the log; numbers with up to 3
+  first sample) and every channel of the log (with `wb_afr`/`wb_lambda`
+  for wideband logs; reading an .msl back ignores those); numbers with up to 3
   decimals, flag bytes as integers.

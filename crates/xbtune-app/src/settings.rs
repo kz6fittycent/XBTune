@@ -33,6 +33,16 @@ pub enum SavedTarget {
     },
 }
 
+/// A wideband controller read beside the ECM (Innovate ISP2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum WidebandPref {
+    /// On a USB serial port (a cable on the controller's serial OUT).
+    Serial { path: String },
+    /// A simulated LC-2 (follows the demo ECM's ride).
+    Demo,
+}
+
 impl SavedTarget {
     pub fn label(&self) -> String {
         let base = match self {
@@ -90,6 +100,8 @@ pub struct Settings {
     pub remote_guide_seen: bool,
     /// The version of the engine-damage warning the user accepted (0: none).
     pub disclaimer_accepted: u32,
+    /// Read a wideband controller during live sessions.
+    pub wideband: Option<WidebandPref>,
 }
 
 impl Default for Settings {
@@ -108,6 +120,7 @@ impl Default for Settings {
             remote_name: String::new(),
             remote_guide_seen: false,
             disclaimer_accepted: 0,
+            wideband: None,
         }
     }
 }

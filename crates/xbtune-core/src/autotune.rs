@@ -24,6 +24,16 @@
 //! throttle, no acceleration/deceleration/WOT enrichment, no gap before the
 //! sample. A cell needs a minimum weight of samples, and each pass changes
 //! a cell by at most `max_change`.
+//!
+//! With a wideband ([`Mode::Wideband`], logs with `crate::wideband`
+//! readings) the correction is `EGO / 100 × measured λ / target λ`: the
+//! fuel the cell needs to reach the target AFR with EGO back at 100%.
+//! Open-loop and WOT samples count too (that's where a wideband helps);
+//! the reading is taken `lag` seconds after the sample, for the time the
+//! exhaust takes to reach the sensor. ASSUMED (no wideband log from a
+//! real bike yet): EGO holding at AFV in open loop is applied to the fuel
+//! there as well, and the default lag and targets ([`TargetAfr`]) are
+//! XBTune's starting points, not Buell figures.
 
 use xbtune_defs::{EeVar, Shape};
 
@@ -86,11 +96,103 @@ pub struct Filters {
     pub max_tpd_rate: f64,
     /// A sample more than this after the previous one is skipped (s).
     pub max_gap: f64,
+    pub mode: Mode,
 }
 
 impl Default for Filters {
     fn default() -> Self {
-        Self { min_clt: 80.0, ego_window: 3, max_rpm_rate: 800.0, max_tpd_rate: 10.0, max_gap: 1.0 }
+        Self {
+            min_clt: 80.0,
+            ego_window: 3,
+            max_rpm_rate: 800.0,
+            max_tpd_rate: 10.0,
+            max_gap: 1.0,
+            mode: Mode::Narrowband,
+        }
+    }
+}
+
+/// What the correction is based on.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum Mode {
+    /// The ECM's EGO correction in closed loop (stock O2 sensor).
+    #[default]
+    Narrowband,
+    /// A wideband's measured lambda against a target AFR.
+    Wideband {
+        target: TargetAfr,
+        /// Seconds from a sample to the wideband reading that matches it.
+        lag: f64,
+    },
+}
+
+impl Mode {
+    /// Wideband with the default targets and lag.
+    pub fn wideband() -> Self {
+        Self::Wideband { target: TargetAfr::default(), lag: DEFAULT_LAG }
+    }
+}
+
+/// Default exhaust-to-sensor delay (XBTune's starting point).
+pub const DEFAULT_LAG: f64 = 0.2;
+
+/// Measured AFR above this at load >= [`LEAN_LOAD`] is flagged.
+pub const LEAN_AFR: f64 = 14.0;
+pub const LEAN_LOAD: f64 = 80.0;
+
+/// Target AFR by load (the fuel map's load axis), straight lines between
+/// points and flat beyond the ends.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TargetAfr {
+    /// (load, AFR), sorted by load.
+    pub points: Vec<(f64, f64)>,
+}
+
+impl Default for TargetAfr {
+    /// XBTune's starting point, to be adjusted: stoichiometric where the
+    /// stock ECM runs closed loop (light load), richer as load rises.
+    fn default() -> Self {
+        Self { points: vec![(40.0, 14.7), (60.0, 14.0), (80.0, 13.5), (100.0, 13.2), (125.0, 13.0)] }
+    }
+}
+
+impl TargetAfr {
+    pub fn at(&self, load: f64) -> f64 {
+        let p = &self.points;
+        match (p.first(), p.last()) {
+            (Some(&(l0, a0)), _) if load <= l0 => a0,
+            (_, Some(&(l1, a1))) if load >= l1 => a1,
+            _ => p
+                .windows(2)
+                .find(|w| load <= w[1].0)
+                .map(|w| w[0].1 + (w[1].1 - w[0].1) * (load - w[0].0) / (w[1].0 - w[0].0))
+                .unwrap_or(14.7),
+        }
+    }
+
+    /// "40:14.7,60:14.0,..." (the CLI's --target form).
+    pub fn text(&self) -> String {
+        self.points.iter().map(|(l, a)| format!("{l}:{a}")).collect::<Vec<_>>().join(",")
+    }
+
+    pub fn parse(s: &str) -> Result<Self, String> {
+        let mut points = Vec::new();
+        for part in s.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+            let (l, a) = part.split_once(':').ok_or_else(|| format!("'{part}': say load:AFR"))?;
+            let (l, a): (f64, f64) = (
+                l.trim().parse().map_err(|_| format!("'{l}' isn't a load"))?,
+                a.trim().parse().map_err(|_| format!("'{a}' isn't an AFR"))?,
+            );
+            if !(9.0..=17.0).contains(&a) {
+                return Err(format!("target AFR {a} is outside 9-17"));
+            }
+            points.push((l, a));
+        }
+        if points.is_empty() {
+            return Err("no targets given".into());
+        }
+        points.sort_by(|x, y| x.0.total_cmp(&y.0));
+        Ok(Self { points })
     }
 }
 
@@ -119,11 +221,19 @@ pub struct Rejected {
     pub transient: usize,
     pub enrichment: usize,
     pub gap: usize,
+    /// Wideband mode: no valid reading at the sample (+ lag).
+    pub no_wideband: usize,
 }
 
 impl Rejected {
     pub fn total(&self) -> usize {
-        self.missing + self.cold + self.open_loop + self.transient + self.enrichment + self.gap
+        self.missing
+            + self.cold
+            + self.open_loop
+            + self.transient
+            + self.enrichment
+            + self.gap
+            + self.no_wideband
     }
 }
 
@@ -131,8 +241,12 @@ impl Rejected {
 pub struct CellStat {
     /// Sum of sample weights in this cell.
     pub hits: f64,
-    /// Weighted average EGO correction (%), meaningful when `hits > 0`.
+    /// Weighted average correction (%), meaningful when `hits > 0`: the
+    /// EGO correction, or with a wideband EGO x measured / target lambda.
     pub ego: f64,
+    /// Wideband: weighted average measured AFR and target AFR (else 0).
+    pub afr: f64,
+    pub target: f64,
 }
 
 /// Samples from one or more logs placed on one fuel map.
@@ -149,6 +263,10 @@ pub struct Analysis {
     pub rejected: Rejected,
     /// AFV from the logs (last value seen), if logged.
     pub afv: Option<f64>,
+    pub wideband: bool,
+    /// Wideband: cells at load >= `LEAN_LOAD` measured leaner than
+    /// `LEAN_AFR` on average, as (row, col).
+    pub lean: Vec<(usize, usize)>,
 }
 
 fn grid_of(v: &EeVar) -> Result<(usize, usize), String> {
@@ -173,7 +291,12 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
     let (rows, cols) = grid_of(&v)?;
     let (xs, xch) = axis(tune, v.x_axis.as_ref())?;
     let (ys, ych) = axis(tune, v.y_axis.as_ref())?;
-    let mut sum = vec![vec![(0.0f64, 0.0f64); cols]; rows];
+    // Per cell: weight, weighted correction, weighted AFR, weighted target.
+    let mut sum = vec![vec![[0.0f64; 4]; cols]; rows];
+    let wb = match &f.mode {
+        Mode::Narrowband => None,
+        Mode::Wideband { target, lag } => Some((target, *lag)),
+    };
     let mut a = Analysis {
         map: map.into(),
         rows,
@@ -183,6 +306,8 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
         used: 0,
         rejected: Rejected::default(),
         afv: None,
+        wideband: wb.is_some(),
+        lean: Vec::new(),
     };
     for log in logs {
         if log.ecm.id != tune.ecm.id {
@@ -201,6 +326,13 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
         if let Some(Some(v)) = series("AFV").last() {
             a.afv = Some(*v);
         }
+        if wb.is_some() && log.wideband.is_none() {
+            return Err(format!("{} has no wideband readings", log.name()));
+        }
+        // The load each sample sits at (for the target AFR).
+        let load = series("Load");
+        let lag = wb.map_or(0.0, |(_, l)| l);
+        let mut later = 0;
         for i in 0..log.samples.len() {
             a.samples += 1;
             let rej = &mut a.rejected;
@@ -222,7 +354,7 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
                 continue;
             }
             let lo = i.saturating_sub(f.ego_window);
-            if !(lo..i).any(|j| ego[j].is_some_and(|p| p != e)) {
+            if wb.is_none() && !(lo..i).any(|j| ego[j].is_some_and(|p| p != e)) {
                 rej.open_loop += 1;
                 continue;
             }
@@ -234,20 +366,53 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
                 rej.transient += 1;
                 continue;
             }
+            // WOT enrichment stays in the fuel after a change, so with a
+            // wideband those samples count.
             if accel[i].is_some_and(|v| v > 0.0)
                 || decel[i].is_some_and(|v| v != 100.0)
-                || wot[i].is_some_and(|v| v != 100.0)
+                || (wb.is_none() && wot[i].is_some_and(|v| v != 100.0))
             {
                 rej.enrichment += 1;
                 continue;
             }
+            let (correction, afr, target) = match wb {
+                None => (e, 0.0, 0.0),
+                Some((targets, _)) => {
+                    // The first reading at or after t + lag, if close enough.
+                    let want = log.samples[i].t + lag;
+                    later = later.max(i);
+                    while later < log.samples.len() && log.samples[later].t < want {
+                        later += 1;
+                    }
+                    let reading = log
+                        .samples
+                        .get(later)
+                        .filter(|s| s.t - want <= crate::wideband::MAX_AGE.as_secs_f64())
+                        .and_then(|s| s.wb)
+                        .filter(|w| w.status == crate::wideband::Status::Normal);
+                    let (Some(w), Some(l), Some(ld)) = (reading, reading.and_then(|w| w.lambda), load[i])
+                    else {
+                        rej.no_wideband += 1;
+                        continue;
+                    };
+                    if !(0.6..=1.5).contains(&l) {
+                        rej.no_wideband += 1;
+                        continue;
+                    }
+                    let target = targets.at(ld);
+                    (e * l / (target / w.stoich), l * w.stoich, target)
+                }
+            };
             let (Some(c), Some(r)) = (frac_index(&xs, xv), frac_index(&ys, yv)) else {
                 rej.missing += 1;
                 continue;
             };
             for ((rr, cc), w) in cell_weights(r, c, rows, cols) {
-                sum[rr][cc].0 += w;
-                sum[rr][cc].1 += w * e;
+                let s = &mut sum[rr][cc];
+                s[0] += w;
+                s[1] += w * correction;
+                s[2] += w * afr;
+                s[3] += w * target;
             }
             a.used += 1;
         }
@@ -256,10 +421,22 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
         .into_iter()
         .map(|row| {
             row.into_iter()
-                .map(|(h, s)| CellStat { hits: h, ego: if h > 0.0 { s / h } else { 0.0 } })
+                .map(|[h, e, afr, t]| {
+                    let avg = |x: f64| if h > 0.0 { x / h } else { 0.0 };
+                    CellStat { hits: h, ego: avg(e), afr: avg(afr), target: avg(t) }
+                })
                 .collect()
         })
         .collect();
+    if a.wideband {
+        for (r, row) in a.cells.iter().enumerate() {
+            for (c, st) in row.iter().enumerate() {
+                if st.hits >= 1.0 && ys.get(r).is_some_and(|&l| l >= LEAN_LOAD) && st.afr > LEAN_AFR {
+                    a.lean.push((r, c));
+                }
+            }
+        }
+    }
     Ok(a)
 }
 
@@ -277,6 +454,8 @@ pub struct Proposal {
     pub hits: f64,
     /// The change was capped at `max_change`.
     pub limited: bool,
+    /// Wideband: average measured AFR and the target there.
+    pub afr: Option<(f64, f64)>,
 }
 
 /// Proposed values for the cells with enough samples whose value would
@@ -309,6 +488,7 @@ pub fn propose(a: &Analysis, tune: &Tune, s: &Settings) -> Result<Vec<Proposal>,
                 ego: st.ego,
                 hits: st.hits,
                 limited: (factor - want).abs() > 1e-9,
+                afr: a.wideband.then_some((st.afr, st.target)),
             });
         }
     }
@@ -450,6 +630,7 @@ mod tests {
             ego: 100.0,
             hits: 0.0,
             limited: false,
+            afr: None,
         };
         apply(&mut t, &[p]).unwrap();
         assert!(has_autotune_step(&t));
@@ -614,7 +795,7 @@ mod tests {
             set(&mut f, "Accel Corr.", 0.0);
             set(&mut f, "Decel Corr.", 100.0);
             set(&mut f, "WOT Corr.", 100.0);
-            samples.push(Sample { t: i as f64 * 0.15, wall: std::time::UNIX_EPOCH, frame: f });
+            samples.push(Sample { t: i as f64 * 0.15, wall: std::time::UNIX_EPOCH, frame: f, wb: None });
         }
         let log = Log {
             path: "made-up.csv".into(),
@@ -628,6 +809,7 @@ mod tests {
             events: Vec::new(),
             skipped: 0,
             source: Default::default(),
+            wideband: None,
         };
         let a = analyze(std::slice::from_ref(&log), &tune, "Tab_Fuel_Front", &Filters::default()).unwrap();
         assert_eq!(a.used, 199, "{:?}", a.rejected);
@@ -647,5 +829,104 @@ mod tests {
         assert_eq!(t.elements("Tab_Fuel_Front").unwrap()[x.index], x.new);
         t.undo();
         assert_eq!(t.elements("Tab_Fuel_Front").unwrap()[x.index], x.old);
+    }
+
+    #[test]
+    fn target_afr_interpolates_and_parses() {
+        let t = TargetAfr::default();
+        assert_eq!(t.at(10.0), 14.7);
+        assert!((t.at(50.0) - 14.35).abs() < 1e-9);
+        assert_eq!(t.at(255.0), 13.0);
+        assert_eq!(TargetAfr::parse(&t.text()).unwrap(), t);
+        assert!(TargetAfr::parse("60:20").is_err());
+        assert!(TargetAfr::parse("x").is_err());
+    }
+
+    #[test]
+    fn wideband_corrects_toward_the_target_after_the_lag() {
+        let catalog = Catalog::builtin().unwrap();
+        let img = crate::image::Image::from_raw(catalog.lookup("BUEIB").unwrap(), xbtune_sim::BUEIB_EEPROM)
+            .unwrap();
+        let tune = Tune::new(img, &catalog).unwrap();
+        let def = tune.def.clone();
+        let frame0 = include_bytes!("../../../tests/fixtures/RT_BUEIB.bin").to_vec();
+        let chans = crate::live::channels(&def);
+        let set = |frame: &mut Vec<u8>, name: &str, value: f64| {
+            let v = chans.iter().find(|v| v.name == name).unwrap();
+            let raw = ((value - v.translate) / v.scale).round() as u32;
+            for k in 0..v.size {
+                frame[v.offset + k] = (raw >> (8 * k)) as u8;
+            }
+        };
+        // 2900 rpm: 40 s at load 30 (target 14.7), then 40 s at load 100
+        // (target 13.2). Open loop: EGO holds at 100. The mixture is
+        // lambda 1.05, then 0.85; the wideband shows it 0.3 s late.
+        let mut samples = Vec::new();
+        for i in 0..534 {
+            let t = i as f64 * 0.15;
+            let (load, lambda) = if t < 40.0 { (30.0, 1.05) } else { (100.0, 0.85) };
+            let mut f = frame0.clone();
+            for (n, v) in [
+                ("RPM", 2900.0),
+                ("Load", load),
+                ("TPD", 10.0),
+                ("CLT", 150.0),
+                ("EGO Corr.", 100.0),
+                ("Accel Corr.", 0.0),
+                ("Decel Corr.", 100.0),
+                ("WOT Corr.", if load > 50.0 { 110.0 } else { 100.0 }),
+            ] {
+                set(&mut f, n, v);
+            }
+            let wb = crate::wideband::Sensor {
+                status: crate::wideband::Status::Normal,
+                lambda: Some(lambda),
+                stoich: 14.7,
+            };
+            samples.push(Sample { t, wall: std::time::UNIX_EPOCH, frame: f, wb: Some(wb) });
+        }
+        // Each reading shows the mixture of 2 samples (0.3 s) earlier.
+        let shift = 2;
+        for i in (shift..samples.len()).rev() {
+            samples[i].wb = samples[i - shift].wb;
+        }
+        let mut channels = chans.clone();
+        channels.extend(crate::wideband::channels());
+        let log = Log {
+            path: "made-up.csv".into(),
+            ecm: tune.ecm.clone(),
+            version: "BUEIB310 12-11-03".into(),
+            channels,
+            definition: def,
+            started: None,
+            note: None,
+            samples,
+            events: Vec::new(),
+            skipped: 0,
+            source: Default::default(),
+            wideband: Some("test".into()),
+        };
+        let f =
+            Filters { mode: Mode::Wideband { target: TargetAfr::default(), lag: 0.3 }, ..Default::default() };
+        let a = analyze(std::slice::from_ref(&log), &tune, "Tab_Fuel_Front", &f).unwrap();
+        assert!(a.wideband && a.used > 500, "{:?}", a.rejected);
+        let s = Settings { max_change: 0.2, ..Default::default() };
+        let p = propose(&a, &tune, &s).unwrap();
+        let lean =
+            p.iter().find(|x| x.afr.is_some_and(|(_, t)| (t - 14.7).abs() < 1e-6)).expect("load 30 cell");
+        // Lean at light load: 5% more fuel.
+        assert!((lean.ego - 105.0).abs() < 0.01, "{lean:?}");
+        let (afr, _) = lean.afr.unwrap();
+        assert!((afr - 1.05 * 14.7).abs() < 0.01);
+        let rich =
+            p.iter().find(|x| x.afr.is_some_and(|(_, t)| (t - 13.2).abs() < 1e-6)).expect("load 100 cell");
+        // 0.85 lambda = 12.5 AFR against 13.2: less fuel; the lag hid the
+        // old mixture, so the average is exact.
+        assert!((rich.ego - 100.0 * 0.85 / (13.2 / 14.7)).abs() < 0.01, "{rich:?}");
+        assert!(a.lean.is_empty());
+        // Narrowband logs can't be used in wideband mode.
+        let mut nb = log.clone();
+        nb.wideband = None;
+        assert!(analyze(&[nb], &tune, "Tab_Fuel_Front", &f).is_err());
     }
 }

@@ -169,7 +169,7 @@ async fn app_messages_pass_through_in_order() {
     paired(&mut h).await;
     paired(&mut g).await;
     for i in 0..50u8 {
-        let m = Msg::Frames { frames: vec![FrameMsg { t: f64::from(i), raw: B64(vec![i; 107]) }] };
+        let m = Msg::Frames { frames: vec![FrameMsg { t: f64::from(i), raw: B64(vec![i; 107]), wb: None }] };
         h.send(Command::Send(Box::new(m)));
     }
     // A big one (a shared log chunk) too.

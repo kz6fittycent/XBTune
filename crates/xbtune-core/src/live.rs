@@ -80,10 +80,16 @@ pub struct Sample {
     pub wall: SystemTime,
     /// The whole reply frame; channel offsets are into it.
     pub frame: Vec<u8>,
+    /// The wideband controller's reading at the same moment, if one is
+    /// connected and its reading was fresh.
+    pub wb: Option<crate::wideband::Sensor>,
 }
 
 impl Sample {
     pub fn value(&self, var: &RtVar) -> Option<f64> {
+        if crate::wideband::is_wideband(var) {
+            return crate::wideband::value(var, self.wb.as_ref());
+        }
         var.value(&self.frame)
     }
 }
@@ -137,6 +143,8 @@ pub struct LogMeta {
     pub target: String,
     pub started: SystemTime,
     pub note: Option<String>,
+    /// The wideband controller, if one is connected: adds the wb_* columns.
+    pub wideband: Option<String>,
 }
 
 /// Writes samples as CSV: a `#` header block, a column row, then one row
@@ -144,11 +152,14 @@ pub struct LogMeta {
 pub struct CsvLogger<W: Write> {
     out: W,
     vars: Vec<RtVar>,
+    wideband: bool,
     rows: u64,
 }
 
 impl<W: Write> CsvLogger<W> {
-    pub fn new(mut out: W, meta: &LogMeta, vars: Vec<RtVar>) -> io::Result<Self> {
+    pub fn new(mut out: W, meta: &LogMeta, mut vars: Vec<RtVar>) -> io::Result<Self> {
+        // Wideband readings have their own columns (below), not frame ones.
+        vars.retain(|v| !crate::wideband::is_wideband(v));
         writeln!(out, "# XBTune live log")?;
         writeln!(out, "# format: xbtune-log {LOG_FORMAT}")?;
         writeln!(out, "# app: xbtune {}", env!("CARGO_PKG_VERSION"))?;
@@ -159,14 +170,22 @@ impl<W: Write> CsvLogger<W> {
         if let Some(n) = &meta.note {
             writeln!(out, "# note: {}", n.replace(['\n', '\r'], " "))?;
         }
+        if let Some(w) = &meta.wideband {
+            writeln!(out, "# wideband: {}", w.replace(['\n', '\r'], " "))?;
+        }
         for v in &vars {
             writeln!(out, "# channel: {} | {} | {}", v.name, v.label(), units(v))?;
         }
         let mut cols = vec!["time_s".to_string()];
         cols.extend(vars.iter().map(|v| csv_field(&v.name)));
+        let wideband = meta.wideband.is_some();
+        if wideband {
+            use crate::wideband::{AFR, LAMBDA, STATUS};
+            cols.extend([LAMBDA, AFR, STATUS].map(String::from));
+        }
         cols.push("frame".into());
         writeln!(out, "{}", cols.join(","))?;
-        Ok(Self { out, vars, rows: 0 })
+        Ok(Self { out, vars, wideband, rows: 0 })
     }
 
     pub fn write(&mut self, s: &Sample) -> io::Result<()> {
@@ -178,6 +197,15 @@ impl<W: Write> CsvLogger<W> {
                     RtKind::Bitfield => format!("{}", x as u8),
                     RtKind::Scalar => format_number(x, v.names.decimals.or(Some(4))),
                 });
+            }
+        }
+        if self.wideband {
+            match &s.wb {
+                Some(w) => {
+                    let n = |v: Option<f64>, d| v.map(|x| format!("{x:.d$}")).unwrap_or_default();
+                    row.push_str(&format!(",{},{},{}", n(w.lambda, 3), n(w.afr(), 2), w.status.text()));
+                }
+                None => row.push_str(",,,"),
             }
         }
         row.push(',');
@@ -246,9 +274,10 @@ mod tests {
             target: "sim".into(),
             started: std::time::UNIX_EPOCH,
             note: Some("a, b\nc".into()),
+            wideband: None,
         };
         let mut log = CsvLogger::new(Vec::new(), &meta, vars.clone()).unwrap();
-        log.write(&Sample { t: 0.5, wall: std::time::UNIX_EPOCH, frame: frame.clone() }).unwrap();
+        log.write(&Sample { t: 0.5, wall: std::time::UNIX_EPOCH, frame: frame.clone(), wb: None }).unwrap();
         log.event(0.75, "1 failed attempt(s) (timeout 1)\nx").unwrap();
         let text = String::from_utf8(log.into_inner()).unwrap();
         let lines: Vec<&str> = text.lines().collect();

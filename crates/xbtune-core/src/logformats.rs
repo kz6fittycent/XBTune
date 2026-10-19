@@ -69,7 +69,7 @@ pub fn parse_bin(path: &Path, bytes: &[u8], catalog: &Catalog) -> Result<Log, Lo
             skipped += 1;
             continue;
         }
-        samples.push(Sample { t, wall: SystemTime::UNIX_EPOCH, frame: frame.to_vec() });
+        samples.push(Sample { t, wall: SystemTime::UNIX_EPOCH, frame: frame.to_vec(), wb: None });
     }
     if !records.remainder().is_empty() {
         skipped += 1;
@@ -87,6 +87,7 @@ pub fn parse_bin(path: &Path, bytes: &[u8], catalog: &Catalog) -> Result<Log, Lo
         events: Vec::new(),
         skipped,
         source: LogSource::EcmDroidBin,
+        wideband: None,
     })
 }
 
@@ -137,7 +138,7 @@ pub fn parse_msl(path: &Path, text: &str, catalog: &Catalog) -> Result<Log, LogE
                 put(&mut frame, v, x);
             }
         }
-        samples.push(Sample { t, wall: SystemTime::UNIX_EPOCH, frame });
+        samples.push(Sample { t, wall: SystemTime::UNIX_EPOCH, frame, wb: None });
     }
     let channels: Vec<RtVar> =
         all.into_iter().filter(|v| cols.iter().any(|(_, c)| c.name == v.name)).collect();
@@ -153,6 +154,7 @@ pub fn parse_msl(path: &Path, text: &str, catalog: &Catalog) -> Result<Log, LogE
         events: Vec::new(),
         skipped,
         source: LogSource::Msl,
+        wideband: None,
     })
 }
 

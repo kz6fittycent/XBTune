@@ -116,6 +116,9 @@ pub struct SessionConfig {
     pub store: Option<PathBuf>,
     pub link_limits: crate::burn::LinkLimits,
     pub function_timing: crate::diag::FunctionTiming,
+    /// A wideband controller to read beside the ECM; its readings go on
+    /// the samples and in the log.
+    pub wideband: Option<crate::wideband::WbLink>,
 }
 
 impl SessionConfig {
@@ -134,6 +137,7 @@ impl SessionConfig {
             store: crate::env::Dirs::detect().map(|d| d.files),
             link_limits: crate::burn::LinkLimits::default(),
             function_timing: crate::diag::FunctionTiming::default(),
+            wideband: None,
         }
     }
 }
@@ -237,6 +241,8 @@ pub enum Event {
     BurnDone(Result<BurnSummary, BurnFailure>),
     /// Something worth showing that doesn't stop the session.
     Warning(String),
+    /// The wideband link changed state.
+    Wideband(crate::wideband::WbState),
 }
 
 /// A successful burn.
@@ -281,9 +287,20 @@ impl Session {
 pub fn start(cfg: SessionConfig, opener: Opener, catalog: Arc<Catalog>, notify: Option<Notify>) -> Session {
     let (ctx, crx) = mpsc::unbounded_channel();
     let (etx, erx) = mpsc::unbounded_channel();
+    // The wideband (if any) is read by its own task, for as long as the session runs.
+    let (wb, wb_task) = match cfg.wideband.clone() {
+        Some(link) => {
+            let (tx, rx) = tokio::sync::watch::channel(None);
+            let state = Out { tx: etx.clone(), notify: notify.clone() };
+            let task = crate::wideband::spawn(link, tx, move |s| state.send(Event::Wideband(s)));
+            (Some(rx), Some(task))
+        }
+        None => (None, None),
+    };
     let out = Out { tx: etx, notify };
     let task = tokio::spawn(async move {
         let mut w = Worker {
+            wb,
             cfg,
             opener,
             catalog,
@@ -298,6 +315,9 @@ pub fn start(cfg: SessionConfig, opener: Opener, catalog: Arc<Catalog>, notify: 
             reconnects: 0,
         };
         let reason = w.run().await;
+        if let Some(t) = wb_task {
+            t.abort();
+        }
         w.stop_log(None);
         info!(?reason, "session stopped");
         w.out.send(Event::State(LinkState::Stopped { reason }));
@@ -343,6 +363,8 @@ struct Worker {
     /// Links that opened but got no answer to the version request, before
     /// the ECM was ever identified.
     unanswered: u32,
+    /// The wideband's latest reading, if one is configured.
+    wb: Option<tokio::sync::watch::Receiver<crate::wideband::Latest>>,
 }
 
 /// Opened links with no answer to the version request before the session
@@ -529,6 +551,7 @@ impl Worker {
                         t: now.duration_since(self.started).as_secs_f64(),
                         wall: SystemTime::now(),
                         frame,
+                        wb: self.wb.as_ref().and_then(|l| crate::wideband::fresh(l, now)),
                     };
                     self.write_log(&sample);
                     self.out.send(Event::Sample(sample));
@@ -820,6 +843,7 @@ impl Worker {
             target: self.cfg.target.clone(),
             started: SystemTime::now(),
             note,
+            wideband: self.cfg.wideband.as_ref().map(|w| w.label.clone()),
         };
         let opened = path
             .parent()
@@ -912,6 +936,53 @@ mod tests {
             }
         }
         seen
+    }
+
+    #[tokio::test]
+    async fn wideband_readings_go_on_samples_and_into_the_log() {
+        let sim = shared(Simulator::bueib_running());
+        let mut cfg = SessionConfig::new("sim", EcmAddress::Stock);
+        fast(&mut cfg);
+        cfg.min_interval = Duration::from_millis(50);
+        let wb_sim = sim.clone();
+        cfg.wideband = Some(crate::wideband::WbLink {
+            label: "simulated LC-2".into(),
+            opener: Arc::new(move || {
+                let sim = wb_sim.clone();
+                Box::pin(async move { Ok(xbtune_sim::wideband::in_process(sim)) })
+            }),
+        });
+        let mut s = start(cfg, sim_opener(sim), Arc::new(Catalog::builtin().unwrap()), None);
+        let dir = std::env::temp_dir().join(format!("xbtune-session-wb-{}", std::process::id()));
+        let path = dir.join("log.csv");
+        let mut with_wb = 0;
+        let ev = collect_until(&mut s, |e| {
+            if let Event::Sample(x) = e
+                && x.wb.is_some()
+            {
+                with_wb += 1;
+            }
+            with_wb >= 10
+        })
+        .await;
+        assert!(ev.iter().any(|e| matches!(e, Event::Wideband(crate::wideband::WbState::Live))), "{ev:?}");
+        s.send(Command::StartLog { path: path.clone(), note: None });
+        let mut rows = 0;
+        collect_until(&mut s, |e| {
+            if matches!(e, Event::Sample(_)) {
+                rows += 1;
+            }
+            rows >= 10
+        })
+        .await;
+        s.send(Command::StopLog);
+        collect_until(&mut s, |e| matches!(e, Event::LogStopped { .. })).await;
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("# wideband: simulated LC-2"));
+        let log = crate::logfile::Log::parse(&path, &text, &Catalog::builtin().unwrap()).unwrap();
+        assert!(log.samples.iter().filter(|x| x.wb.is_some()).count() >= 5);
+        let _ = std::fs::remove_dir_all(&dir);
+        s.send(Command::Stop);
     }
 
     #[tokio::test]

@@ -10,9 +10,12 @@
 //!   with garbage, or contain our own echoed requests.
 //! - [`eeprom`]: EEPROM page model and the read/write chunk plans.
 //! - [`transaction`]: response validation, retry policy and link statistics.
+//! - [`isp2`]: Innovate's wideband data stream (not from EcmDroid; from
+//!   Innovate's published ISP2 specification).
 
 pub mod decoder;
 pub mod eeprom;
+pub mod isp2;
 pub mod pdu;
 pub mod transaction;
 

@@ -288,7 +288,12 @@ pub fn on_sample(app: &mut XbApp, s: &Sample) {
     if host_paired(app) {
         let h = &mut app.remote.host;
         if h.frames.len() < 64 {
-            h.frames.push(FrameMsg { t: s.t, raw: B64(s.frame.clone()) });
+            let wb = s.wb.map(|w| xbtune_remote::msg::WbMsg {
+                lambda: w.lambda,
+                stoich: w.stoich,
+                status: w.status.text(),
+            });
+            h.frames.push(FrameMsg { t: s.t, raw: B64(s.frame.clone()), wb });
         }
     }
 }
@@ -933,7 +938,15 @@ fn guest_message(app: &mut XbApp, m: Msg) {
             let len = app.link.identity.as_ref().map(|i| i.ecm.runtime_len);
             for f in frames {
                 if Some(f.raw.0.len()) == len {
-                    app.history.push(Sample { t: f.t, wall: SystemTime::now(), frame: f.raw.0 });
+                    let wb = f.wb.and_then(|w| {
+                        let status = xbtune_core::wideband::Status::parse(&w.status)?;
+                        Some(xbtune_core::wideband::Sensor { status, lambda: w.lambda, stoich: w.stoich })
+                    });
+                    // The host has a wideband: show its channels too.
+                    if wb.is_some() && app.link.channel(xbtune_core::wideband::AFR).is_none() {
+                        app.link.channels.extend(xbtune_core::wideband::channels());
+                    }
+                    app.history.push(Sample { t: f.t, wall: SystemTime::now(), frame: f.raw.0, wb });
                 }
             }
         }

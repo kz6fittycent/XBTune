@@ -150,6 +150,19 @@ pub struct FrameMsg {
     /// Seconds on the host's session clock.
     pub t: f64,
     pub raw: B64,
+    /// The host's wideband reading at that moment, if it has one (older
+    /// versions leave it out and ignore it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wb: Option<WbMsg>,
+}
+
+/// A wideband reading: lambda (when valid), the fuel's stoich AFR and the
+/// status text (`xbtune_proto::isp2::Status::text`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WbMsg {
+    pub lambda: Option<f64>,
+    pub stoich: f64,
+    pub status: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -314,7 +327,7 @@ mod tests {
             note: "check the fan".into(),
         };
         assert_eq!(Msg::decode(&m.encode()).unwrap(), m);
-        let m = Msg::Frames { frames: vec![FrameMsg { t: 1.5, raw: B64(vec![1, 2, 255]) }] };
+        let m = Msg::Frames { frames: vec![FrameMsg { t: 1.5, raw: B64(vec![1, 2, 255]), wb: None }] };
         assert!(String::from_utf8(m.encode()).unwrap().contains(r#""raw":"AQL/""#));
         assert_eq!(Msg::decode(&m.encode()).unwrap(), m);
     }

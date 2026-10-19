@@ -50,6 +50,16 @@ pub struct AutotuneArgs {
     /// Ignore samples below this engine temperature (°C).
     #[arg(long, default_value_t = 80.0)]
     min_clt: f64,
+    /// Correct toward a target AFR with the logs' wideband readings
+    /// (logged with --wideband) instead of the ECM's EGO correction.
+    #[arg(long)]
+    wideband: bool,
+    /// Wideband: target AFR by load, as load:AFR pairs (straight lines between).
+    #[arg(long, value_name = "LOAD:AFR,...", requires = "wideband")]
+    target: Option<String>,
+    /// Wideband: seconds from a sample to the reading that matches it.
+    #[arg(long, default_value_t = autotune::DEFAULT_LAG, requires = "wideband")]
+    lag: f64,
 }
 
 #[derive(Args)]
@@ -132,8 +142,18 @@ pub fn autotune(a: AutotuneArgs) -> Result<()> {
     if maps.is_empty() {
         bail!("{}: no fuel maps to tune (--maps front, rear or both)", tune.ecm.id);
     }
+    let mode = if a.wideband {
+        let target = match &a.target {
+            Some(t) => autotune::TargetAfr::parse(t).map_err(anyhow::Error::msg)?,
+            None => autotune::TargetAfr::default(),
+        };
+        println!("Wideband: target AFR by load {}, lag {} s", target.text(), a.lag);
+        autotune::Mode::Wideband { target, lag: a.lag }
+    } else {
+        autotune::Mode::Narrowband
+    };
     let settings = Settings {
-        filters: Filters { min_clt: a.min_clt, ..Default::default() },
+        filters: Filters { min_clt: a.min_clt, mode, ..Default::default() },
         min_hits: a.min_hits,
         max_change: a.max_change / 100.0,
     };
@@ -143,29 +163,47 @@ pub fn autotune(a: AutotuneArgs) -> Result<()> {
         let an = autotune::analyze(&logs, &tune, map, &settings.filters).map_err(anyhow::Error::msg)?;
         afv = afv.or(an.afv);
         let r = &an.rejected;
-        println!(
-            "{map}: {} of {} samples used (left out: {} open loop, {} cold, {} changing, {} enrichment, {} after a gap, {} missing)",
-            an.used, an.samples, r.open_loop, r.cold, r.transient, r.enrichment, r.gap, r.missing
-        );
+        if an.wideband {
+            println!(
+                "{map}: {} of {} samples used (left out: {} no wideband reading, {} cold, {} changing, {} enrichment, {} after a gap, {} missing)",
+                an.used, an.samples, r.no_wideband, r.cold, r.transient, r.enrichment, r.gap, r.missing
+            );
+        } else {
+            println!(
+                "{map}: {} of {} samples used (left out: {} open loop, {} cold, {} changing, {} enrichment, {} after a gap, {} missing)",
+                an.used, an.samples, r.open_loop, r.cold, r.transient, r.enrichment, r.gap, r.missing
+            );
+        }
         let ys = tune.var(map).ok().and_then(|v| v.y_axis.clone()).and_then(|n| tune.elements(&n).ok());
         let xs = tune.var(map).ok().and_then(|v| v.x_axis.clone()).and_then(|n| tune.elements(&n).ok());
         let p = autotune::propose(&an, &tune, &settings).map_err(anyhow::Error::msg)?;
         if p.is_empty() {
             println!("  no cell has enough samples ({} needed) and a change to make", a.min_hits);
         }
+        let at = |v: &Option<Vec<f64>>, i: usize| {
+            v.as_ref().and_then(|v| v.get(i)).map_or("?".into(), |v| format!("{v}"))
+        };
         for x in &p {
-            let at = |v: &Option<Vec<f64>>, i: usize| {
-                v.as_ref().and_then(|v| v.get(i)).map_or("?".into(), |v| format!("{v}"))
+            let why = match x.afr {
+                Some((afr, target)) => format!("AFR {afr:.1} for {target:.1}, x{:.3}", x.ego / 100.0),
+                None => format!("EGO {:.1}%", x.ego),
             };
             println!(
-                "  load {:>4} rpm {:>5}: {:>6.1} -> {:>6.1}  (EGO {:.1}%, {:.0} hits){}",
+                "  load {:>4} rpm {:>5}: {:>6.1} -> {:>6.1}  ({why}, {:.0} hits){}",
                 at(&ys, x.row),
                 at(&xs, x.col),
                 x.old,
                 x.new,
-                x.ego,
                 x.hits,
                 if x.limited { "  capped" } else { "" }
+            );
+        }
+        for &(r, c) in &an.lean {
+            println!(
+                "  WARNING: lean at high load: load {} rpm {} averaged AFR {:.1}. Check this before riding hard.",
+                at(&ys, r),
+                at(&xs, c),
+                an.cells[r][c].afr
             );
         }
         all.extend(p);
@@ -213,6 +251,7 @@ pub fn log_convert(a: ConvertArgs) -> Result<()> {
                 target: format!("converted from {} ({})", log.name(), log.source.describe()),
                 started: std::time::SystemTime::now(),
                 note: log.note.clone(),
+                wideband: log.wideband.clone(),
             };
             let mut w = CsvLogger::new(out, &meta, log.channels.clone())?;
             for s in &log.samples {

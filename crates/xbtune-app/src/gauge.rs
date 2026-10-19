@@ -34,6 +34,8 @@ pub fn range_for(var: &RtVar) -> Range {
         "O2" => r(0.0, 1.2, None),
         "EGO Corr." | "AFV" | "WUE" => r(70.0, 130.0, None),
         "veCurr1" | "veCurr2" => r(0.0, 255.0, None),
+        "wb_afr" => r(10.0, 18.0, Some(15.5)),
+        "wb_lambda" => r(0.7, 1.3, Some(1.05)),
         _ => match (var.low, var.high) {
             (Some(lo), Some(hi)) if hi > lo && hi.is_finite() && lo.is_finite() => r(lo, hi, None),
             _ => r(0.0, 100.0, None),
