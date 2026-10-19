@@ -192,3 +192,22 @@ fn not_configured_sends_nothing() {
     let c = AiConfig::default();
     assert!(matches!(client::prepare(&c, "s", &ask()), Err(AiError::NotConfigured(_))));
 }
+
+/// The bug-report check against a real local model, when one is set up
+/// (XBTUNE_TEST_AI_URL / XBTUNE_TEST_AI_MODEL); skipped otherwise.
+#[test]
+fn triage_with_a_real_local_model() {
+    let (Ok(url), Ok(model)) = (std::env::var("XBTUNE_TEST_AI_URL"), std::env::var("XBTUNE_TEST_AI_MODEL"))
+    else {
+        return;
+    };
+    let cfg = AiConfig { base_url: url, model, timeout_s: 180, ..Default::default() };
+    let report = r#"{"description":"Can't find my BuellTooth, the scan says nothing","log":"WARN bluetooth scan failed: org.freedesktop.DBus.Error.AccessDenied"}"#;
+    let facts = vec!["snap permission bluez (Bluetooth adapters): NOT connected".to_string()];
+    let p =
+        client::prepare(&cfg, xbtune_ai::triage::TRIAGE_PROMPT, &xbtune_ai::triage::turns(report, &facts))
+            .unwrap();
+    let r = client::send(&cfg, &p).unwrap();
+    eprintln!("{}", r.text);
+    assert!(r.text.contains("snap connect"), "{}", r.text);
+}

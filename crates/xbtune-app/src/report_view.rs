@@ -64,8 +64,46 @@ fn ecm_label(app: &XbApp) -> Option<String> {
     app.link.identity.as_ref().map(|i| format!("{} ({}, {})", i.version.trim(), i.ecm.id, i.ecm.family))
 }
 
+/// The AI's answer: (text, its summary for the developer, model).
+type Checked = (String, Option<String>, String);
+
+/// "Check with the AI first": the answer on its way, or back.
+#[derive(Default)]
+pub struct Triage {
+    rx: Option<mpsc::Receiver<Result<xbtune_ai::Reply, xbtune_ai::AiError>>>,
+    answer: Option<Result<Checked, String>>,
+    added: bool,
+}
+
+/// What XBTune checked itself, for the AI.
+fn facts(app: &XbApp) -> Vec<String> {
+    let mut f: Vec<String> = app
+        .plugs
+        .iter()
+        .map(|s| {
+            let state = match s.connected {
+                Some(true) => "connected".to_string(),
+                Some(false) => format!("NOT connected (fix: {})", s.connect_command()),
+                None => "unknown".to_string(),
+            };
+            format!("snap permission {} ({}): {state}", s.plug, s.purpose)
+        })
+        .collect();
+    f.push(match &app.link.state {
+        Some(s) => format!("link state now: {s:?}"),
+        None => "not connected to an ECM now".into(),
+    });
+    if let Some((label, state)) = &app.link.wideband {
+        f.push(format!("wideband {label}: {}", state.text()));
+    }
+    f
+}
+
 pub fn show(app: &mut XbApp, ui: &mut Ui) {
     if !app.report.is_open() {
+        if app.report_triage.answer.is_some() || app.report_triage.rx.is_some() {
+            app.report_triage = Triage::default();
+        }
         return;
     }
     let p = Palette::for_visuals(ui.visuals());
@@ -73,6 +111,26 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     let mut close = false;
     let mut send = false;
     let mut discard = false;
+    // "Check with the AI first", when an AI advisor is set up.
+    let ai = xbtune_ai::AiConfig::path()
+        .and_then(|p| xbtune_ai::AiConfig::load(&p).ok())
+        .filter(|c| c.missing().is_none());
+    let checked = facts(app);
+    let mut ask_ai = false;
+    let mut add_summary: Option<String> = None;
+    let t = &mut app.report_triage;
+    if let Some(rx) = &t.rx
+        && let Ok(r) = rx.try_recv()
+    {
+        t.answer = Some(match r {
+            Ok(r) => {
+                let s = xbtune_ai::triage::summary(&r.text);
+                Ok((r.text, s, r.model.unwrap_or_default()))
+            }
+            Err(e) => Err(e.to_string()),
+        });
+        t.rx = None;
+    }
     if let ReportUi::Sending { rx, crash } = &app.report
         && let Ok(o) = rx.try_recv()
     {
@@ -163,6 +221,45 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     // Rebuilt from the current text when opened again.
                     *preview = None;
                 }
+                if let Some(cfg) = &ai {
+                    let t = &app.report_triage;
+                    ui.add_space(6.0);
+                    ui.horizontal(|ui| {
+                        let place = if cfg.is_local() { "your model on this computer".to_string() } else { cfg.host() };
+                        if ui
+                            .add_enabled(t.rx.is_none(), egui::Button::new("Check with the AI first"))
+                            .on_hover_text(format!(
+                                "Sends this report (as shown under What gets sent) to {place} to look for causes on your side. \
+                                 It doesn't send the report to the developer."
+                            ))
+                            .clicked()
+                        {
+                            ask_ai = true;
+                        }
+                        if t.rx.is_some() {
+                            ui.spinner();
+                            ui.label(RichText::new("Asking…").small());
+                        }
+                    });
+                    match &t.answer {
+                        Some(Ok((text, summary, model))) => {
+                            egui::ScrollArea::vertical().id_salt("triage").max_height(200.0).show(ui, |ui| {
+                                ui.add(egui::Label::new(text.as_str()).wrap().selectable(true));
+                            });
+                            ui.label(RichText::new(format!("{model} · {}", xbtune_core::disclaimer::AI)).small().color(p.muted));
+                            if let Some(s) = summary
+                                && !t.added
+                                && ui.small_button("Add the AI's summary to my report").clicked()
+                            {
+                                add_summary = Some(format!("[AI summary, from the user's model {model}]: {s}"));
+                            }
+                        }
+                        Some(Err(e)) => {
+                            ui.colored_label(p.bad, e);
+                        }
+                        None => {}
+                    }
+                }
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     let b = egui::Button::new(RichText::new("Send report").color(egui::Color32::WHITE))
@@ -214,6 +311,31 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             }
         }
     });
+    if let Some(s) = add_summary
+        && let ReportUi::Editing { description, preview, .. } = &mut app.report
+    {
+        if !description.trim().is_empty() {
+            description.push_str("\n\n");
+        }
+        description.push_str(&s);
+        *preview = None;
+        app.report_triage.added = true;
+    }
+    if ask_ai && let (Some(cfg), ReportUi::Editing { crash, description, contact, .. }) = (ai, &app.report) {
+        let r = report::build(description, contact, ecm.clone(), crash.as_ref());
+        let json = serde_json::to_string_pretty(&r).unwrap_or_default();
+        let ctx = ui.ctx().clone();
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let turns = xbtune_ai::triage::turns(&json, &checked);
+            let r = xbtune_ai::client::prepare(&cfg, xbtune_ai::triage::TRIAGE_PROMPT, &turns)
+                .and_then(|p| xbtune_ai::client::send(&cfg, &p));
+            let _ = tx.send(r);
+            ctx.request_repaint();
+        });
+        tracing::info!("bug report checked with the AI first");
+        app.report_triage = Triage { rx: Some(rx), ..Default::default() };
+    }
     if send && let ReportUi::Editing { crash, description, contact, .. } = &app.report {
         if app.is_screenshot() {
             // UI checks never send anything.

@@ -297,6 +297,16 @@ axes, cell statistics, deterministic proposals, log summary, targets).
   or the checker blocked it; runs the server cut are "not valid". CLI `ai
   eval` (asks first for hosted models), results in `AI/eval_*.json`.
 
+- **A4 BUILT 2026-10-19**: Report a problem -> "Check with the AI first"
+  (shown when an advisor is set up): the report exactly as built for
+  sending, plus facts XBTune checked (snap permissions with the exact fix
+  command, link state, wideband state), goes to the user's model with
+  `triage::TRIAGE_PROMPT` (XBTune's known local problems). The answer
+  shows in the dialog; "Add the AI's summary to my report" appends it,
+  marked. Nothing goes to the developer without Send. Tried with gemma3-4b
+  on a made-up "scan finds nothing" report: named the bluez permission and
+  `snap connect` (test runs when XBTUNE_TEST_AI_URL/MODEL are set).
+
 ### Measured models (prompt v6, owner's desktop, 2026-10-19)
 
 | Model | Where | Passed | Notes |

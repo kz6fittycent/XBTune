@@ -623,7 +623,12 @@ Resume here (2026-10-19).
    Wayland via `wayland_dnd.rs` on winit's connection, stoppable at exit;
    CLI file args; desktop Exec %F, MimeType text/csv). Wayland drop is
    untested with a real drag (owner: drag an .xpr/.csv onto the window).
-   Left: A3 eval, A4 bug-report helper, friend's wideband wizard, store.
+   Then A3 (eval) and A4 (bug-report check) BUILT too (AI.md 9a). Phase
+   10 complete except measuring more models (hosted ones cost money:
+   owner's call; re-run qwen3-coder with OLLAMA_CONTEXT_LENGTH=16384).
+   Left: friend's wideband wizard (deferred), store (licence), owner's
+   laptop/desktop test of everything since a64264c (needs a push or a
+   local snap build: ask first).
 1. Order agreed 2026-10-19: A2 (BUILT, see AI.md 9a) -> location
    (offline standard pressure from altitude + Open-Meteo lookup by town on
    a click; owner OK'd the network use) -> EcmDroid-style named Setup

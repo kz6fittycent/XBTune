@@ -11,6 +11,7 @@
 //! - [`journal`]: the user's record of each conversation.
 //! - [`atmosphere`]: air pressure and density at altitude (Open-Meteo on a click).
 //! - [`bike`]: the bike profile (model from the ECM, mods, notes).
+//! - [`triage`]: "Check with the AI first" for bug reports.
 //! - [`memory`]: the profile and recent conversations, sent with requests.
 
 pub mod atmosphere;
@@ -23,6 +24,7 @@ pub mod discover;
 pub mod eval;
 pub mod journal;
 pub mod memory;
+pub mod triage;
 
 pub use client::{AiError, Prepared, Reply, Role, Turn};
 pub use config::{Adapter, AiConfig, PRESETS, Preset};

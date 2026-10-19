@@ -115,6 +115,7 @@ pub struct XbApp {
     pub wizard: crate::wizard::WizardUi,
     pub ai: crate::ai_view::AiUi,
     pub ai_wizard: crate::ai_wizard::WizardUi,
+    pub report_triage: crate::report_view::Triage,
     /// Files dropped on the window under Wayland (`wayland_dnd`).
     #[cfg(target_os = "linux")]
     dropped: Option<crate::wayland_dnd::Listener>,
@@ -208,6 +209,7 @@ impl XbApp {
             wizard: Default::default(),
             ai: Default::default(),
             ai_wizard: Default::default(),
+            report_triage: Default::default(),
             #[cfg(target_os = "linux")]
             dropped: None,
             setup_ui: Default::default(),
