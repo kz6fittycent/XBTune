@@ -35,6 +35,7 @@ pub enum View {
     Diagnostics,
     Resets,
     Tune,
+    Setup,
     Logs,
     Remote,
     Settings,
@@ -113,6 +114,7 @@ pub struct XbApp {
     pub burn: crate::burn_view::BurnUi,
     pub wizard: crate::wizard::WizardUi,
     pub ai: crate::ai_view::AiUi,
+    pub setup_ui: crate::setup_view::SetupUi,
     /// The engine-damage warning is waiting to be accepted, and its box.
     pub disclaimer_open: bool,
     pub disclaimer_ticked: bool,
@@ -201,6 +203,7 @@ impl XbApp {
             burn: Default::default(),
             wizard: Default::default(),
             ai: Default::default(),
+            setup_ui: Default::default(),
             disclaimer_open: false,
             disclaimer_ticked: false,
             settings_ui: Default::default(),
@@ -263,6 +266,7 @@ impl XbApp {
                 "diag" => View::Diagnostics,
                 "resets" => View::Resets,
                 "settings" => View::Settings,
+                "setup" => View::Setup,
                 "remote" => View::Remote,
                 "logs" => View::Logs,
                 "tune" => View::Tune,
@@ -935,6 +939,7 @@ impl XbApp {
             (View::Diagnostics, "Diagnostics"),
             (View::Resets, "Resets"),
             (View::Tune, "Tune"),
+            (View::Setup, "Setup"),
             (View::Logs, "Logs"),
             (View::Remote, "Remote"),
             (View::Settings, "Settings"),
@@ -1143,6 +1148,7 @@ impl eframe::App for XbApp {
                     View::Remote => crate::remote_view::show(self, ui),
                     View::Logs => crate::logs_view::show(self, ui),
                     View::Tune => crate::tune_view::show(self, ui),
+                    View::Setup => crate::setup_view::show(self, ui),
                 }
             });
         crate::burn_view::show(self, ui);

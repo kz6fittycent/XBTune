@@ -278,8 +278,10 @@ axes, cell statistics, deterministic proposals, log summary, targets).
   0.01°, go to open-meteo.com). Kept in the bike profile; the advisor gets
   only `atmosphere` numbers (altitude, kPa, density %), never the place
   (test). Prompt v5. CLI `ai bike --town NAME [--pick N] --weather`.
-- Not built yet: EcmDroid's named Setup screen (incl. airbox pressure /
-  baro), see CLAUDE.md.
+- **Setup screen + baro BUILT 2026-10-19** (parity with EcmDroid): app
+  Setup view and CLI `setup FILE`; the advisor's data gets `ecm_settings`
+  (System, Airbox Pressure Sensor, Closed Loop Configuration, EGO
+  Correction Settings). Prompt v6.
 
 ## 10. Owner decisions (answered 2026-10-19)
 

@@ -213,14 +213,8 @@ fn toolbar(app: &mut XbApp, ui: &mut Ui) {
                 "Backup, review the differences, confirm, write only what changed, read it back",
             )
         };
-        if r.clicked()
-            && let Some(t) = &app.tune
-        {
-            let mode = crate::burn_view::Mode::Tune {
-                tune: Box::new(t.image.clone()),
-                opened: t.opened_bytes().to_vec(),
-            };
-            crate::burn_view::start(app, mode);
+        if r.clicked() {
+            start_burn(app);
         }
         let may_save = has && !crate::remote_sync::save_blocked(app);
         let blocked = "The bike owner hasn't allowed saving a copy of their tune";
@@ -1127,6 +1121,17 @@ pub fn scripted(app: &mut XbApp, script: &str) {
             "mode" if v == "diff" => app.tune_ui.mode = CellMode::Difference,
             _ => {}
         }
+    }
+}
+
+/// Open the Burn dialog for the open tune (Tune and Setup views).
+pub fn start_burn(app: &mut XbApp) {
+    if let Some(t) = &app.tune {
+        let mode = crate::burn_view::Mode::Tune {
+            tune: Box::new(t.image.clone()),
+            opened: t.opened_bytes().to_vec(),
+        };
+        crate::burn_view::start(app, mode);
     }
 }
 

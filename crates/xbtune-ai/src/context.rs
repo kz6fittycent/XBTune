@@ -16,7 +16,7 @@ use xbtune_core::tune::Tune;
 use xbtune_defs::{Shape, Value as DefValue};
 
 /// Bump when the prompt changes in substance (it's in every journal entry).
-pub const PROMPT_VERSION: u32 = 5;
+pub const PROMPT_VERSION: u32 = 6;
 
 /// The fixed system prompt.
 pub const SYSTEM_PROMPT: &str = "\
@@ -57,6 +57,8 @@ AFR numbers: don't invent any; say what to log instead.
 - Use the 'means' and 'direction' fields as given; they are computed by XBTune. Percent changes: \
 new = old x (1 + pct/100).
 - Engine speeds above the rev limit in the data never occur; ignore those columns.
+- 'ecm_settings' are the ECM's own switches and values (EcmDroid's Setup screen names), e.g. \
+whether baro correction or idle closed loop is on.
 - 'memory.bike' is the owner's bike: model, year, stock displacement, mods (big bore, wideband, \
 exhaust, cams, final drive, fuel, ...) and notes. Take it as known and don't ask again; account \
 for the mods (a bigger engine or freer exhaust needs more fuel than stock maps assume).
@@ -152,6 +154,32 @@ fn axis_values(tune: &Tune, map: &str) -> impl Fn(usize, usize) -> Value {
     }
 }
 
+/// The Setup screen groups that matter for fuelling, as on/off and values
+/// (EcmDroid's names), e.g. whether baro correction is on.
+fn ecm_settings(tune: &Tune) -> Value {
+    use xbtune_core::setup::{self, State};
+    const GROUPS: &[&str] = &["System", "Airbox Pressure Sensor", "Closed Loop Configuration", "EGO Correction Settings"];
+    let mut out = serde_json::Map::new();
+    for g in setup::screen(tune) {
+        let Some(name) = g.path.last().filter(|n| GROUPS.contains(&n.as_str())) else { continue };
+        let mut items = serde_json::Map::new();
+        for i in &g.items {
+            let v = match &i.state {
+                State::Switch { on, .. } => json!(if *on { "on" } else { "off" }),
+                State::Number { value, units, .. } => {
+                    json!(format!("{} {}", round(*value, 2), units.as_deref().unwrap_or_default()).trim_end())
+                }
+                _ => continue,
+            };
+            items.insert(i.title.clone(), v);
+        }
+        if !items.is_empty() {
+            out.insert(name.clone(), Value::Object(items));
+        }
+    }
+    Value::Object(out)
+}
+
 /// What a map's numbers are, in words.
 fn values_are(name: &str) -> &'static str {
     if is_fuel(name) {
@@ -200,6 +228,7 @@ pub fn data_block(tune: &Tune, map: &str, logs: &[Log]) -> Value {
         .filter_map(|n| Some(json!({"name": n, "label": tune.var(n).ok()?.label(), "rpm": number(tune, n)?})))
         .collect();
     d["rev_limits"] = json!(limits);
+    d["ecm_settings"] = ecm_settings(tune);
     let lim = crate::checker::Limits::default();
     d["change_rules"] = json!({
         "maps_allowed": "fuel maps (Tab_Fuel_*) and spark maps (Tab_Spark_*) only",
@@ -382,6 +411,7 @@ mod tests {
         assert!(d["measurements"].as_str().unwrap().starts_with("none"));
         assert!(d["map"]["values_are"].as_str().unwrap().contains("NOT an air/fuel ratio"));
         assert_eq!(d["rev_limits"][0]["name"], "KRPM_Hard_Hi");
+        assert!(d["ecm_settings"]["Airbox Pressure Sensor"]["Baro Correction Feature"].is_string());
         assert!(d["afv"][0]["means"].as_str().is_some());
         let text = user_message("Why is idle rich?", &d);
         for secret in ["4MZAX", "00:19:10", "Bluetooth", "/home"] {

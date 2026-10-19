@@ -1,0 +1,500 @@
+# EcmDroid's ECM Setup screen, extracted by tools/extract_ecmdroid_setup.py.
+# From EcmDroid source (GPL-3.0-or-later, Copyright (C) 2012 Michel Marti),
+# NOT from ecmdroid.db. See docs/PROVENANCE.md.
+source = "ecmdroid 2f17d29f5b08f67fb357ee8f2ec21e7ae930343e app/src/main/res/xml/ecm_setup.xml, values/strings.xml"
+
+[[group]]
+path = ["General Config", "System"]
+[[group.item]]
+kind = "bits"
+keys = ["KConfig[4]"]
+title = "Bank Angle Sensor"
+[[group.item]]
+kind = "bits"
+keys = ["KConfig[2]"]
+title = "Deceleration Fuel Cut"
+[[group.item]]
+kind = "bits"
+keys = ["KConfig[5]"]
+[[group.item]]
+kind = "bits"
+keys = ["KConfig[1]"]
+[[group.item]]
+kind = "bits"
+keys = ["KConfig[0]"]
+title = "Idle Fuel & Ign. Adjust."
+[[group.item]]
+kind = "bits"
+keys = ["KConfig[3]"]
+[[group.item]]
+kind = "bits"
+keys = ["KSI_Config[6]"]
+[[group.item]]
+kind = "bits"
+keys = ["KSI_Config[5]"]
+
+[[group]]
+path = ["General Config", "Noise Reduction"]
+[[group.item]]
+kind = "bits"
+keys = ["KRet_Config[0]"]
+title = "On Accel. Condition Only"
+[[group.item]]
+kind = "bits"
+keys = ["KRet_Config[2]"]
+title = "On Accel. and WOT Condition"
+[[group.item]]
+kind = "bits"
+keys = ["KRet_Config[1]"]
+title = "On WOT Condition Only"
+[[group.item]]
+kind = "bits"
+keys = ["KRet_Config[6]"]
+[[group.item]]
+kind = "bits"
+keys = ["KRet_Config[7]"]
+title = "Suppress Accel. Enrichment"
+[[group.item]]
+kind = "bits"
+keys = ["KAIC_Config[7]"]
+title = "Active Intake"
+
+[[group]]
+path = ["General Config", "Airbox Pressure Sensor"]
+[[group.item]]
+kind = "bits"
+keys = ["KBaro_Config[7]"]
+title = "Baro Correction Feature"
+[[group.item]]
+kind = "bits"
+keys = ["KBaro_Config[6]", "KABP_Config[7]"]
+title = "Airbox Pressure Feature"
+[[group.item]]
+kind = "bits"
+keys = ["KBaro_Config[2]", "KABP_Config[0]"]
+title = "Log Avg. Baro & ABP Corr. Data"
+[[group.item]]
+kind = "bits"
+keys = ["KABP_Config[1]"]
+title = "Log MAP Front/Rear Data"
+[[group.item]]
+kind = "bits"
+keys = ["KBaro_Config[0]", "KBaro_Read[4]"]
+title = "Read Baro at Key-On"
+[[group.item]]
+kind = "bits"
+keys = ["KABP_Config[5]"]
+title = "Read Sensor Continuously"
+[[group.item]]
+kind = "bits"
+keys = ["KBaro_Config[1]", "KBaro_Read[5]"]
+title = "Skip Key-On Read if Engine runs"
+[[group.item]]
+kind = "bits"
+keys = ["KABP_Config[4]"]
+title = "Speed Correction"
+[[group.item]]
+kind = "bits"
+keys = ["KABP_Config[6]"]
+title = "Use Baro (not MAP) Sensor"
+
+[[group]]
+path = ["General Config", "Shifter"]
+[[group.item]]
+kind = "bits"
+keys = ["KShift_Config[7]"]
+title = "Shifter Feature"
+[[group.item]]
+kind = "bits"
+keys = ["KShift_Config[0]"]
+title = "Shifter Transition required"
+[[group.item]]
+kind = "bits"
+keys = ["KShift_Config[1]"]
+title = "Shifter Fuel & Spark Cut"
+[[group.item]]
+kind = "bits"
+keys = ["KSL_Config[7]"]
+title = "Shift Light Feature"
+[[group.item]]
+kind = "bits"
+keys = ["KSL_Config[0]"]
+title = "Shift Light Output"
+
+[[group]]
+path = ["Error Mask", "Sensors"]
+[[group.item]]
+kind = "bits"
+keys = ["EDiag1[6,7]"]
+title = "Air Temperature Sensor"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag3[6,7]"]
+title = "Bank Angle Sensor"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag8[6,7]"]
+title = "Baro Sensor"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag1[4,5]"]
+title = "Battery Voltage"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag3[0]"]
+title = "Camshaft Position"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag5[4,5]"]
+title = "Clutch Switch"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag8[2,3]"]
+title = "Crankshaft Position"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag0[0,1]"]
+title = "Engine Temp. Sensor"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag7[1,2,3]"]
+title = "Fuel Pressure"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag8[4,5]"]
+title = "Manifold Pressure"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag5[2,3]"]
+title = "Neutral Indicator Switch"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag0[2,3,4]"]
+title = "O2 Sensor (Rear)"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag7[5,6,7]"]
+title = "O2 Sensor (Front)"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag4[5,6,7]"]
+title = "Sidestand Switch"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag0[5,6]"]
+title = "Throttle Pos. Sensor"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag0[2,3,4]"]
+title = "Velocity Sensor"
+
+[[group]]
+path = ["Error Mask", "Actuators"]
+[[group.item]]
+kind = "bits"
+keys = ["EDiag4_2[0,1,2,3]"]
+title = "Exhaust Valve Actuator"
+[[group.item]]
+kind = "bits"
+keys = ["EDiag0[7]"]
+title = "Cooling Fan"
+
+[[group]]
+path = ["Limits", "RPM Limits", "Fixed"]
+[[group.item]]
+kind = "value"
+keys = ["KRPM_Soft_Hi"]
+title = "Soft Limit Trigger"
+[[group.item]]
+kind = "value"
+keys = ["KRPM_Soft_Lo"]
+title = "Soft Limit Reset"
+[[group.item]]
+kind = "value"
+keys = ["KRPM_Hard_Hi"]
+title = "Hard Limit Trigger"
+[[group.item]]
+kind = "value"
+keys = ["KRPM_Hard_Lo"]
+title = "Hard Limit Reset"
+[[group.item]]
+kind = "value"
+keys = ["KRPM_Kill_Hi"]
+title = "Kill Limit Trigger"
+[[group.item]]
+kind = "value"
+keys = ["KRPM_Kill_Lo"]
+title = "Kill Limit Reset"
+
+[[group]]
+path = ["Limits", "RPM Limits", "Cold Engine"]
+[[group.item]]
+kind = "value"
+keys = ["KTE_Cold"]
+title = "Cold Engine Temp (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KRPM_Cold_Soft_Hi"]
+title = "Soft Limit Trigger"
+[[group.item]]
+kind = "value"
+keys = ["KRPM_Cold_Soft_Lo"]
+title = "Soft Limit Reset"
+[[group.item]]
+kind = "value"
+keys = ["KRPM_Cold_Hard_Hi"]
+title = "Hard Limit Trigger"
+[[group.item]]
+kind = "value"
+keys = ["KRPM_Cold_Hard_Lo"]
+title = "Hard Limit Reset"
+
+[[group]]
+path = ["Limits", "Temperature Limits", "Limits"]
+[[group.item]]
+kind = "value"
+keys = ["KTemp_Soft_Hi"]
+title = "Soft Limit Trigger (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_Soft_Lo"]
+title = "Soft Limit Reset (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_Hard_Hi"]
+title = "Hard Limit Trigger (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_Hard_Lo"]
+title = "Hard Limit Reset (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_Kill_Hi"]
+title = "Kill Limit Trigger (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_Kill_Lo"]
+title = "Kill Limit Reset (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_CEL_Flash_Hi"]
+title = "Engine Light Flashing On (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_CEL_Flash_Lo"]
+title = "Engine Light Flashing Off (°C)"
+
+[[group]]
+path = ["Limits", "Temperature Limits", "Conditions"]
+[[group.item]]
+kind = "value"
+keys = ["KTemp_Load_Soft"]
+title = "Soft Limit Min. Load"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_Load_Hard"]
+title = "Hard Limit Min. Load"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_RPM_Soft"]
+title = "Soft Limit Min. RPM"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_RPM_Hard"]
+title = "Hard Limit Min. RPM"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_Abs_Hi"]
+title = "Ignore RPM Trigger (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_Abs_Lo"]
+title = "Ignore RPM Reset (°C)"
+
+[[group]]
+path = ["Limits", "Fan Setup", "Key Off"]
+[[group.item]]
+kind = "value"
+keys = ["KKey_Off_Fan_Time"]
+title = "Max Duration (min)"
+[[group.item]]
+kind = "value"
+keys = ["KKey_Off_Min_Bat"]
+title = "Min Batt. Voltg."
+[[group.item]]
+kind = "value"
+keys = ["KKey_Off_Fan_On"]
+title = "On Temp (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KKey_Off_Fan_Off"]
+title = "Off Temp (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KKey_Off_Delay"]
+title = "100% Runtime (s)"
+[[group.item]]
+kind = "value"
+keys = ["KKey_Off_Fan_DC"]
+title = "Run Duty Cycle (%)"
+
+[[group]]
+path = ["Limits", "Fan Setup", "Key On"]
+[[group.item]]
+kind = "value"
+keys = ["KTemp_Fan_On"]
+title = "On Temp (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KTemp_Fan_Off"]
+title = "Off Temp (°C)"
+[[group.item]]
+kind = "bits"
+keys = ["KCF_Config[5]"]
+title = "Speed-based Fan Control"
+
+[[group]]
+path = ["AFV Settings"]
+[[group.item]]
+kind = "value"
+keys = ["LFuel"]
+title = "AFV (Rear)"
+[[group.item]]
+kind = "value"
+keys = ["LFuel1"]
+title = "AFV (Front)"
+
+[[group]]
+path = ["O2 Setup", "O2 Sensor"]
+[[group.item]]
+kind = "value"
+keys = ["KO2_Rich"]
+title = "Rich (V)"
+[[group.item]]
+kind = "value"
+keys = ["KO2_Midpoint"]
+title = "Midpoint (V)"
+[[group.item]]
+kind = "value"
+keys = ["KO2_Lean"]
+title = "Lean (V)"
+[[group.item]]
+kind = "value"
+keys = ["KO2_Min_RPM"]
+title = "Minimum RPM"
+[[group.item]]
+kind = "value"
+keys = ["KO2_Min_TP"]
+title = "Min. Load (8bit)"
+[[group.item]]
+kind = "value"
+keys = ["KO2_Act_Time"]
+title = "Activation Delay (s)"
+[[group.item]]
+kind = "value"
+keys = ["KO2_Inact_Time"]
+title = "Deactivation Delay (s)"
+
+[[group]]
+path = ["O2 Setup", "Closed Loop Configuration"]
+[[group.item]]
+kind = "bits"
+keys = ["KCL_Fuel_Config[7]"]
+title = "Enable Closed Loop"
+[[group.item]]
+kind = "bits"
+keys = ["KCL_Fuel_Config[0]"]
+title = "Enable Independent Front CL"
+[[group.item]]
+kind = "bits"
+keys = ["KCL_Fuel_Config[6]"]
+title = "Log Front EGO & Fuel Data"
+
+[[group]]
+path = ["O2 Setup", "EGO Correction Settings"]
+[[group.item]]
+kind = "value"
+keys = ["KFBFuel_Max"]
+title = "Max. EGO Corr. (%)"
+[[group.item]]
+kind = "value"
+keys = ["KFBFuel_Min"]
+title = "Min. EGO Corr. (%)"
+[[group.item]]
+kind = "value"
+keys = ["KCL_Max_TE"]
+title = "Max. Engine Temp (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KCL_Min_TE"]
+title = "Min. Engine Temp (°C)"
+
+[[group]]
+path = ["O2 Setup", "AFV Settings"]
+[[group.item]]
+kind = "value"
+keys = ["KLFuel_Max"]
+title = "Maximum AFV (%)"
+[[group.item]]
+kind = "value"
+keys = ["KLFuel_Min"]
+title = "Minimum AFV (%)"
+[[group.item]]
+kind = "value"
+keys = ["Enrich_Time"]
+title = "OL Learn Delay (s)"
+[[group.item]]
+kind = "value"
+keys = ["KLFuel_Inc"]
+title = "Increase Factor (%)"
+[[group.item]]
+kind = "value"
+keys = ["KLFuel_Dec"]
+title = "Decrease Factor (%)"
+[[group.item]]
+kind = "value"
+keys = ["KLCL_Count"]
+title = "Transitions required"
+[[group.item]]
+kind = "value"
+keys = ["KLCL_Max_TE"]
+title = "Max. Engine Temp (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KLCL_Min_TE"]
+title = "Min. Engine Temp (°C)"
+[[group.item]]
+kind = "value"
+keys = ["KLFCD"]
+title = "Max. Cylinder Diff. (%)"
+
+[[group]]
+path = ["Exhaust Config"]
+[[group.item]]
+kind = "bits"
+keys = ["KAMC_Config[7]"]
+title = "Exhaust valve enabled"
+[[group.item]]
+kind = "bits"
+keys = ["KAMC_Config[0]"]
+[[group.item]]
+kind = "bits"
+keys = ["KAMC_Config[1]"]
+title = "Keep open when not in WOT"
+[[group.item]]
+kind = "bits"
+keys = ["KAMC_Config[2]"]
+[[group.item]]
+kind = "bits"
+keys = ["KAMC_Config[4]"]
+[[group.item]]
+kind = "bits"
+keys = ["KAMC_Config[5]"]
+title = "Close Valve on AMC error"
+[[group.item]]
+kind = "bits"
+keys = ["KAMC_Config[3]"]
+[[group.item]]
+kind = "bits"
+keys = ["KAMC_Config[6]"]
+title = "Cycle valve at ignition-on"

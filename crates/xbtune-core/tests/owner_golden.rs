@@ -175,3 +175,36 @@ fn owner_logs_decode_as_logged() {
         assert!(rows > 100, "{}: {rows} rows", path.display());
     }
 }
+
+/// The Setup screen (EcmDroid's, ported) shows the values the owner read
+/// off EcmDroid's own Setup screens.
+#[test]
+fn setup_screen_matches_ecmdroid() {
+    use xbtune_core::setup::{self, State};
+    let Some(ours) = ours() else { return };
+    if !present(&["ecmdroid_values.toml"]) {
+        return;
+    }
+    #[derive(serde::Deserialize)]
+    struct Expected {
+        values: std::collections::BTreeMap<String, String>,
+    }
+    let c = Catalog::builtin().unwrap();
+    let tune = xbtune_core::tune::Tune::new(Image::load(&ours, Some("BUEIB"), &c).unwrap(), &c).unwrap();
+    let exp: Expected =
+        toml::from_str(&std::fs::read_to_string(fixture("ecmdroid_values.toml")).unwrap()).unwrap();
+    let screen = setup::screen(&tune);
+    let numbers: std::collections::BTreeMap<String, String> = screen
+        .iter()
+        .flat_map(|g| &g.items)
+        .filter_map(|i| match &i.state {
+            State::Number { var, value, decimals, .. } => {
+                Some((var.clone(), format_number(*value, *decimals)))
+            }
+            _ => None,
+        })
+        .collect();
+    for (name, want) in &exp.values {
+        assert_eq!(numbers.get(name), Some(want), "{name} not on the Setup screen with EcmDroid's value");
+    }
+}

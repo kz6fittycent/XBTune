@@ -9,6 +9,7 @@
 //! - [`read`]: reading the whole EEPROM, with resume and a verify pass.
 //! - [`live`]: runtime channels, samples, rate and CSV logs.
 //! - [`session`]: the live-data task (poll, reconnect, log).
+//! - [`setup`]: the ECM Setup screen (EcmDroid's named settings).
 //! - [`tune`]: offline editing with undo/redo.
 //! - [`time`]: UTC timestamps without extra dependencies.
 //! - [`wideband`]: an Innovate (ISP2) wideband controller beside the ECM.
@@ -25,6 +26,7 @@ pub mod logformats;
 pub mod logstats;
 pub mod read;
 pub mod session;
+pub mod setup;
 pub mod time;
 pub mod tune;
 pub mod wideband;

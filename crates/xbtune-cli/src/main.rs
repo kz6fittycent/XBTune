@@ -115,6 +115,14 @@ enum Cmd {
     /// AI tuning advisor (any model, local or hosted; docs/AI.md). Answers only.
     #[command(subcommand)]
     Ai(ai::AiCmd),
+    /// The ECM Setup screen (EcmDroid's named settings) for a tune: switches and values.
+    Setup {
+        /// Tune (.xbt or .xpr).
+        file: PathBuf,
+        /// Also list settings this ECM doesn't have.
+        #[arg(long)]
+        all: bool,
+    },
     /// Show what XBTune knows about an ECM ID's definition, and data issues.
     Defs {
         /// ECM ID, e.g. BUEIB.
@@ -304,6 +312,7 @@ async fn run(cmd: Cmd) -> Result<()> {
         Cmd::Diff { a, b, id } => diff(&a, &b, id.as_deref()),
         Cmd::Convert { input, output, id } => convert(&input, &output, id.as_deref()),
         Cmd::Defs { id, list } => defs(&id, list),
+        Cmd::Setup { file, all } => setup_screen(&file, all),
         Cmd::Live(a) => live::live(a).await,
         Cmd::Set(a) => edit::set(a),
         Cmd::Burn(a) => burn::burn(a).await,
@@ -914,5 +923,35 @@ fn defs(id: &str, list: bool) -> Result<()> {
             println!("rt {:>4} {:<16} {}", v.offset, v.name, v.label());
         }
     }
+    Ok(())
+}
+
+fn setup_screen(file: &Path, all: bool) -> Result<()> {
+    use xbtune_core::setup::{self, State};
+    let catalog = Catalog::builtin()?;
+    let tune = xbtune_core::tune::Tune::open(file, &catalog)?;
+    for g in setup::screen(&tune) {
+        let shown: Vec<_> = g.items.iter().filter(|i| all || i.state != State::Missing).collect();
+        if shown.is_empty() {
+            continue;
+        }
+        println!("{}", g.path.join(" > "));
+        for i in shown {
+            let v = match &i.state {
+                State::Switch { on, .. } => if *on { "on" } else { "off" }.to_string(),
+                State::Odd { .. } => "mixed (bits disagree)".into(),
+                State::Number { value, units, decimals, .. } => format!(
+                    "{} {}",
+                    xbtune_defs::format_number(*value, *decimals),
+                    units.as_deref().unwrap_or_default()
+                )
+                .trim_end()
+                .to_string(),
+                State::Missing => "not on this ECM".into(),
+            };
+            println!("  {:<44} {v}", i.title);
+        }
+    }
+    println!("Change settings in the app (Setup) or with `set`; writing them to the ECM is `burn`.");
     Ok(())
 }

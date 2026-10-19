@@ -145,6 +145,8 @@ impl Engine {
             ("ATPS", 100.0 + s.tps * 7.0),
             ("Fan_Duty", if s.engine_temp > 220.0 { 100.0 } else { 0.0 }),
             ("VSS_Count", s.rpm / 60.0),
+            // No baro sensor fitted, as on the owner's XB9SX (reads 254-255).
+            ("ABaro", 255.0),
         ];
         for (varname, v) in values {
             let Some(var) = self.def.runtime.values().find(|r| r.varname == *varname) else { continue };

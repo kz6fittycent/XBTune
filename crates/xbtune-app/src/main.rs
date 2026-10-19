@@ -24,6 +24,7 @@ mod report_view;
 mod resets;
 mod settings;
 mod settings_view;
+mod setup_view;
 mod table;
 mod theme;
 mod tune_view;

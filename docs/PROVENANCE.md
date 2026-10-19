@@ -278,6 +278,22 @@ XBTune choices (not from a source; no real controller tested yet):
   for the owner to adjust, not Buell data.
 - Lean warning: average AFR above 14.0 in a cell at load 80 or more.
 
+## Setup screen (`data/ecm_setup.toml`, `crates/xbtune-core/src/setup.rs`)
+
+- The screen (groups, order, switches `Name[bits]`, `A:B` alternatives,
+  numbers, English titles): EcmDroid `app/src/main/res/xml/ecm_setup.xml`
+  and `res/values/strings.xml` at the pinned commit, extracted by
+  `tools/extract_ecmdroid_setup.py` (EcmDroid source, GPL-3.0-or-later;
+  not ecmdroid.db, so not restricted). Rules (all bits on = on, none =
+  off, mixed = unusable; first alternative present wins; titles fall back
+  to the bit's or variable's name): `fragments/SetupFragment.java`
+  `readPrefs`/`setupPreference`/`onPreferenceChange`.
+- Golden test: the 26 values the owner read off EcmDroid's Setup screens
+  (2026-10-14) all appear with the same text.
+- Baro ADC "no sensor" at >= 254: XB, from the owner's logs (254-255 in
+  every sample, `KBaro_Config` = 0). Other readings are shown, not
+  interpreted.
+
 ## AI advisor (`crates/xbtune-ai`)
 
 - Anthropic Messages API: `POST /v1/messages`, headers `x-api-key` and
