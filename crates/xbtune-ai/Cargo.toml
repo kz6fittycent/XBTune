@@ -17,8 +17,7 @@ tracing.workspace = true
 ureq.workspace = true
 xbtune-core.workspace = true
 xbtune-defs.workspace = true
-
-[dev-dependencies]
+# The eval cases run on the simulator's BUEIB image.
 xbtune-sim.workspace = true
 
 [lints]

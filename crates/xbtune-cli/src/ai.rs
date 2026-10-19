@@ -24,6 +24,13 @@ pub enum AiCmd {
     Presets,
     /// Look for model servers running on this computer (default ports, localhost only).
     Scan,
+    /// Measure the configured model on XBTune's fixed tuning cases (made-up
+    /// data on the simulator's tune); results saved in the AI folder.
+    Eval {
+        /// Don't ask before sending (each case is one request; hosted models cost money).
+        #[arg(long)]
+        yes: bool,
+    },
     /// Show or change the settings (saved in ai.toml, readable only by you).
     Setup(SetupArgs),
     /// List the models the server offers.
@@ -189,6 +196,7 @@ fn describe(c: &AiConfig) {
 
 pub fn ai(cmd: AiCmd) -> Result<()> {
     match cmd {
+        AiCmd::Eval { yes } => eval(yes),
         AiCmd::Scan => {
             let found = xbtune_ai::discover::scan();
             if found.is_empty() {
@@ -280,6 +288,55 @@ fn setup(a: SetupArgs) -> Result<()> {
     }
     describe(&c);
     Ok(())
+}
+
+fn eval(yes: bool) -> Result<()> {
+    use xbtune_ai::eval;
+    let c = load()?;
+    let catalog = Catalog::builtin()?;
+    let cases = eval::cases(&catalog);
+    let place = if c.is_local() { "this computer".to_string() } else { c.host() };
+    eprintln!("{} case(s) for {} on {place}: one request each, about 4-8k tokens.", cases.len(), c.model);
+    if !yes && !c.is_local() {
+        eprint!("Hosted models charge for this. Type 'send' to go on: ");
+        std::io::stderr().flush().ok();
+        let mut line = String::new();
+        std::io::stdin().lock().read_line(&mut line)?;
+        if line.trim() != "send" {
+            bail!("cancelled; nothing was sent");
+        }
+    }
+    let mut out = Vec::new();
+    for case in &cases {
+        eprint!("  {:<36} ", case.name);
+        std::io::stderr().flush().ok();
+        let o = eval::run(&c, case);
+        eprintln!("{}  {} ({:.0} s)", if o.pass { "PASS" } else { "FAIL" }, o.why, o.secs);
+        out.push(o);
+    }
+    let passed = out.iter().filter(|o| o.pass).count();
+    let json_ok = out.iter().filter(|o| o.valid_json).count();
+    println!("{}: {passed}/{} passed; readable answers {json_ok}/{}", c.model, out.len(), out.len());
+    let cut = out.iter().filter(|o| o.input_cut).count();
+    if cut > 0 {
+        println!("{cut} run(s) not valid: {}", client::INPUT_CUT_HINT);
+    }
+    let report = eval::report(&c.model, &place, &out);
+    let path = files_dir()?.join("AI").join(format!(
+        "eval_{}_{}.json",
+        xbtune_core::time::file_stamp(std::time::SystemTime::now()),
+        c.model.replace(['/', ':', ' '], "_")
+    ));
+    if let Some(d) = path.parent() {
+        std::fs::create_dir_all(d)?;
+    }
+    std::fs::write(&path, serde_json_pretty(&report))?;
+    println!("Saved {}", path.display());
+    Ok(())
+}
+
+fn serde_json_pretty(v: &serde_json::Value) -> String {
+    serde_json::to_string_pretty(v).unwrap_or_default()
 }
 
 fn files_dir() -> Result<PathBuf> {
