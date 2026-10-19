@@ -617,6 +617,9 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 Resume here (2026-10-19).
 
+0. Owner tried snap dedb0f4 on this desktop 2026-10-19: "okay better"
+   (AI dialog without the review step). Drag and drop, Setup view and the
+   AI guide not reported on separately yet.
 0. 2026-10-19 later: ALL BUILT and committed locally (not pushed, no snap
    built; owner asked to slow down): A2, location/air, Setup screen +
    baro, AI setup guide, import anything + drag and drop (X11 via egui,
