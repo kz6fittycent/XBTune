@@ -35,7 +35,7 @@ description: |
     xbtune.cli info --serial /dev/ttyUSB0
 
 base: core24
-grade: devel
+grade: stable
 confinement: strict
 license: GPL-3.0-or-later
 contact: https://github.com/kz6fittycent/XBTune/issues
