@@ -43,7 +43,7 @@ account. The store description is `description:` in `snap/snapcraft.yaml`
 - **Summary:** Diagnostics, logging and tuning for Buell DDFI motorcycles
 - **Categories:** Utilities (primary), Development
 - **License:** GPL-3.0-or-later
-- **Contact:** the address in `snapcraft.yaml`
+- **Contact:** https://github.com/kz6fittycent/XBTune/issues (`contact:` in `snapcraft.yaml`; never a personal email)
 - **Website / source:** the repo URL once public (bug reports go through
   the app's Report a problem; see `relay/bug-report/`)
 - **Icon:** none (owner's call: the Pegasus logo is a Buell trademark). The
