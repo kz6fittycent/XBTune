@@ -750,21 +750,44 @@ Resume here (2026-10-22).
 
 ## Phase 9 checklist (laptop; no ECM writes needed)
 
-1. Install the new snap. First start: the "Tuning can damage your engine"
-   warning; Continue stays grey until the box is ticked; Quit closes.
-   After Continue the Getting started guide opens. Restart: no warning.
-2. GNOME: native title bar with your buttons on the left.
-3. Connect -> Wideband O2 -> "Simulated LC-2", then connect to the bike:
+Covers everything built since the laptop's last snap (c85405c): the
+store build is the easy way in.
+
+0. `sudo snap refresh xbtune --channel=latest/candidate --amend` (from
+   the local --dangerous install to the store's 0.1.1+), then
+   `snap connections xbtune`: bluez, raw-usb, removable-media connected
+   (reconnect any that aren't).
+1. Start XBTune: the splash (tach needle sweeps up and back, name fades
+   in, ~2.4 s); a click or key skips it. Side bar shows `v0.1.1`.
+2. Then the "Tuning can damage your engine" warning (5 points, no AI
+   point): Continue stays grey until the box is ticked; Quit closes.
+   After Continue the Getting started guide opens. Restart: splash, no
+   warning. Settings -> Startup -> untick "Show the splash screen" ->
+   restart: no splash; tick it again.
+3. No AI anywhere: Settings has no "AI advisor" card, Tune has no "Ask
+   the AI advisor..." button, Report a problem has no "Check with the AI".
+4. GNOME: native title bar with your buttons on the left.
+5. Connect to the bike (ignition on, engine off). Setup (side bar) ->
+   compare the switches and values with EcmDroid's Setup screen (rev
+   limits, fan temps, the 26 values in tests/fixtures/owner/). The baro
+   reading shows "no sensor" (your bike's Baro ADC reads 254-255).
+6. Drag a .xbt backup and a .csv log from the Files app onto the window:
+   the tune opens in Tune, the log in Logs. Also `xbtune <file>` from a
+   terminal.
+7. Connect -> Wideband O2 -> "Simulated LC-2", then connect to the bike:
    header shows a dot + "AFR 12.x" after ~6 s (warming first); dashboard
    has a Wideband AFR gauge. Record 1-2 min, then Logs -> open it ->
    Tune -> fuel map -> "Average AFR (wideband)" overlay -> Auto-tune...
    shows the Wideband mode (target AFR, sensor delay). Nothing is written.
    Set Wideband back to None afterwards (the simulated values are made up).
-4. Logs -> Export .msl; `xbtune.cli log-convert <log> -o ~/x.msl`.
-5. Tune -> "Fold AFV into the maps..." on a backup copy: preview, Apply,
+8. Logs -> Export .msl; `xbtune.cli log-convert <log> -o ~/x.msl`.
+9. Tune -> "Fold AFV into the maps..." on a backup copy: preview, Apply,
    Undo. Don't burn it unless you want to.
-6. If you burn anything: the History folder's burn.txt lists the
-   variables old -> new and "verified: yes".
+10. Optional (writes, needs the unlock): burn something small and
+   reversible (KRPM_Hard_Hi 7450, then back to 7500): the History
+   folder's burn.txt lists the variables old -> new and "verified: yes".
+11. Send back: anything odd (screenshots), and `~/snap/xbtune/common/data/app-log/app.log`
+   if something failed.
 
 ## Remote tuning checklist (R2-R5; laptop = bike owner, desktop = tuner)
 
