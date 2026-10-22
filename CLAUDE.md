@@ -625,6 +625,57 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
    answer[:MAP]`. Tested with mock servers (both adapters) and local
    Ollama qwen3-coder (findings in AI.md). Next: A2 (structured
    proposals + checker + review), A3 (eval), A4 (bug-report helper).
+   HIDDEN 2026-10-22 (owner): `xbtune_ai::enabled()`, see Next steps.
+11. **Windows and macOS** (owner's plan, 2026-10-22; NOT started: wait
+   for the owner's go). **Linux is and stays the first-class platform**:
+   features land and are tested there first, the snap is the reference
+   build, and Windows/macOS must never hold back or complicate a Linux
+   release. They get the same features where the OS allows, released
+   from the same version.
+   - Distribution: installers live on **GitHub Releases**; Windows also
+     via **winget** (PR to microsoft/winget-pkgs, automated with
+     winget-releaser) and **Chocolatey** (community repo, moderated, API
+     key); macOS via a **Homebrew tap** (`kz6fittycent/homebrew-tap`).
+     No paid code signing or notarization to start: winget installs
+     trigger far fewer SmartScreen prompts than browser downloads;
+     on macOS start with a formula installing a prebuilt binary (a
+     non-notarized cask hits Gatekeeper; re-check current Homebrew
+     behaviour before building). Check the `xbtune` name is free on all
+     three first.
+   - Releases: one version for every platform. The version the
+     call-for-testing `gate` finds new also builds Windows (x64 zip,
+     "portable" for winget; MSI later if needed) and macOS (arm64 + x64)
+     in Actions and attaches them to a GitHub **pre-release** `v0.x.y`.
+     `/promote` to stable makes it the latest full release and only then
+     updates winget, Chocolatey and the tap. Windows/macOS jobs failing
+     must not block the snap.
+   - Updates (owner): the Windows/macOS builds check GitHub Releases and
+     tell the user; they never download or install anything themselves.
+     At most once a day, at start, `GET
+     api.github.com/repos/kz6fittycent/XBTune/releases/latest` (stable
+     only; unauthenticated, ureq); newer semver -> a dismissible banner
+     with the version, a link to the release notes and the right command
+     for how it was installed (`winget upgrade xbtune`, `choco upgrade
+     xbtune`, `brew upgrade xbtune`, or the release page for a zip);
+     "Skip this version"; a Settings switch to turn the check off;
+     failures are silent (logged). The snap does NOT check (snapd
+     updates it); a non-snap Linux build may use the same notice.
+     Network use OK'd by the owner (KICKOFF §9).
+   - Code: Bluetooth on Windows/macOS = the OS's serial port for a
+     paired SPP adapter (`COMn`, `/dev/cu.*`), so it uses the existing
+     serial path; the Connect view gets a "Bluetooth serial port" picker
+     there and hides the BlueZ scan. `#[cfg]`-gate the Linux-only parts:
+     `xbtune-link/src/bluetooth.rs` (bluer, RFCOMM), `report.rs` signal
+     handler, `wayland_dnd.rs`, snap plug checks and wizard text,
+     serialport's `libudev` feature. `env::Dirs`: `Documents\XBTune` /
+     `~/XBTune` via `directories`. `deny.toml` gains the new targets.
+     CI: windows-latest and macos-latest build + test jobs.
+   - Order: Windows + winget first (most riders' garage laptops), then
+     Chocolatey, then the Homebrew tap. Each starts simulator-tested
+     only; the first hardware check is a Windows laptop on the bike
+     (read-only: info, dump, live, codes) before any write on it.
+     macOS classic-Bluetooth serial has been flaky on recent releases:
+     USB cable may be the supported Mac path.
 
 ## Next steps
 
