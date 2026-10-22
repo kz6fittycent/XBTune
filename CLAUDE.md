@@ -680,7 +680,24 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 ## Next steps
 
-Resume here (2026-10-22).
+Resume here (2026-10-22, end of day): WAITING FOR FEEDBACK. Nothing is
+in progress; continue as reports come in from the owner (Phase 9
+checklist below on the laptop), testers (issues; call for testing #6 =
+0.1.1 revision 4), Michel (EcmDroid maintainer; the owner shared the repo
+and asked for his input: note anything relevant in PROVENANCE) and the
+owner's friend with the LC-2 wideband. State at the pause:
+- Store: `latest/candidate` = 0.1.1 rev 4 (built from 7174ce1); stable
+  empty until the owner's `/promote`. Next release = 0.1.2
+  (`tools/bump_version.sh`). Revs 2-4 and issues #4-#6 came from the
+  history rewrite: a rebuilt 0.1.0 commit replaced 0.1.1 (rev 3, #5) and
+  the rerun put it back. The gate now uploads only a version newer than
+  everything in the store, and only from the tip of main.
+- History rewritten 2026-10-22 twice (BuellTooth MAC, then the owner's
+  Gmail -> noreply in all 108 commits + the wiki). The owner ran the email
+  one (`git filter-branch` + force-push are blocked for Claude by auto
+  mode; give the owner a script to run with `!`). A GitHub Support purge
+  of the old SHAs is optional (risk explained as low; owner undecided).
+- Phase 11 (Windows, then macOS last) waits for the owner's go.
 
 0. 2026-10-22: splash screen (`splash.rs`: tach needle sweep, name
    fades in, ~2.4 s, click/key skips; Settings -> Startup "Show the

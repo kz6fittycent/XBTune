@@ -46,9 +46,20 @@ jobs:
           info="$(snap info "$SNAP_NAME")"
           published="$(awk '$1 ~ /^[a-z0-9.-]+\/[a-z]+:$/ && $2 != "--" && $2 != "^" {print $2}' <<< "$info" | sort -u)"
           echo "Store versions:"; echo "${published:-(none)}"
-          if grep -qxF "$version" <<< "$published"; then
+          # Only a version NEWER than everything in the store goes out (old
+          # ones had a +git suffix): an older commit's build must never
+          # replace a newer candidate (2026-10-22, after a history rewrite
+          # rebuilt a 0.1.0 commit over 0.1.1).
+          newest="$(sed 's/+.*//' <<< "$published" | sort -V | tail -n1)"
+          # And only from the tip of main: a late run for an older push skips.
+          tip="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [[ "$tip" != "${{ github.event.workflow_run.head_sha }}" ]]; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Version ${version} is already in the store; not uploading. Bump it with tools/bump_version.sh to release."
+            echo "::notice::This commit is no longer the tip of main (${tip:0:7}); not uploading."
+          elif [[ -n "$newest" && "$(printf '%s\n%s\n' "$newest" "$version" | sort -V | tail -n1)" != "$version" ]] \
+               || [[ "$version" == "$newest" ]]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Version ${version} is not newer than the store's ${newest}; not uploading. Bump it with tools/bump_version.sh to release."
           else
             echo "publish=true" >> "$GITHUB_OUTPUT"
             echo "Version ${version} is new; publishing to candidate."
