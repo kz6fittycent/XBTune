@@ -5198,7 +5198,7 @@ checksum = "ea6fc2961e4ef194dcbfe56bb845534d0dc8098940c7e5c012a258bfec6701bd"
 
 [[package]]
 name = "xbtune-ai"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "rustls",
  "serde",
@@ -5214,7 +5214,7 @@ dependencies = [
 
 [[package]]
 name = "xbtune-app"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "eframe",
@@ -5244,7 +5244,7 @@ dependencies = [
 
 [[package]]
 name = "xbtune-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -5263,7 +5263,7 @@ dependencies = [
 
 [[package]]
 name = "xbtune-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "directories",
  "serde",
@@ -5279,7 +5279,7 @@ dependencies = [
 
 [[package]]
 name = "xbtune-defs"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "thiserror 2.0.21",
@@ -5289,7 +5289,7 @@ dependencies = [
 
 [[package]]
 name = "xbtune-link"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bluer",
  "futures",
@@ -5303,14 +5303,14 @@ dependencies = [
 
 [[package]]
 name = "xbtune-proto"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "xbtune-remote"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chacha20poly1305",
  "futures",
@@ -5328,7 +5328,7 @@ dependencies = [
 
 [[package]]
 name = "xbtune-sim"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "clap",

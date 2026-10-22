@@ -11,9 +11,8 @@ on:
     types: [completed]
     branches: [main]
 
-# Store publishing is OFF until the repo may go public (docs/KICKOFF.md
-# section 2, and ecmdroid.db licensing in docs/PROVENANCE.md). Set the
-# repository variable XBTUNE_STORE_PUBLISH=true to turn it on.
+# Store publishing is switched by the repository variable
+# XBTUNE_STORE_PUBLISH (true since 2026-10-22).
 permissions:
   contents: read
 
@@ -21,11 +20,46 @@ env:
   SNAP_NAME: xbtune
 
 jobs:
+  # Only a new version is released: a push to main that didn't bump the
+  # workspace version (tools/bump_version.sh) is built and checked but not
+  # uploaded. Versions count 0.1.0 -> 0.1.1 -> 0.1.2 -> 0.2.0 (owner,
+  # 2026-10-22).
+  gate:
+    if: vars.XBTUNE_STORE_PUBLISH == 'true' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
+    steps:
+      - name: Checkout Cargo.toml of the built commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          sparse-checkout: Cargo.toml
+          sparse-checkout-cone-mode: false
+
+      - name: Is this version already in the store?
+        id: check
+        run: |
+          version="$(grep -m1 -oP '^version = "\K[^"]+' Cargo.toml)"
+          # Every version on any channel, e.g. "latest/candidate: 0.1.1 2026-10-22 (2) 14MB -".
+          # A failed lookup fails the job: better no release than a duplicate.
+          info="$(snap info "$SNAP_NAME")"
+          published="$(awk '$1 ~ /^[a-z0-9.-]+\/[a-z]+:$/ && $2 != "--" && $2 != "^" {print $2}' <<< "$info" | sort -u)"
+          echo "Store versions:"; echo "${published:-(none)}"
+          if grep -qxF "$version" <<< "$published"; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Version ${version} is already in the store; not uploading. Bump it with tools/bump_version.sh to release."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${version} is new; publishing to candidate."
+          fi
+
   # Rebuilds from scratch rather than reusing an artifact from the
   # triggering run, since snap-builds.yml (deliberately left untouched)
   # doesn't publish one - same commit though, checked out via head_sha.
   publish-candidate:
-    if: vars.XBTUNE_STORE_PUBLISH == 'true' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    needs: gate
+    if: needs.gate.outputs.publish == 'true'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}

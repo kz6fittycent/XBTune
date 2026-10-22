@@ -57,7 +57,7 @@ logs go in `~/XBTune`, which stays put through updates and even removal.
 
 | Channel | What's there |
 |---|---|
-| `latest/candidate` | Each build from `main` that passes CI; a testing issue is opened for it |
+| `latest/candidate` | Each new version (0.1.1, 0.1.2, 0.2.0, ...); a testing issue is opened for it |
 | `latest/stable` | Candidates promoted after testing |
 
 **Full guide: the [wiki](https://github.com/kz6fittycent/XBTune/wiki)**

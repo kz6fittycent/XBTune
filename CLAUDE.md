@@ -198,10 +198,14 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   (23ea31c, a1bd3e7, ...) are pre-rewrite SHAs. NEVER put the owner's
   personal email anywhere public (snap `contact:` is the issues URL;
   repo-local git `user.email` is the GitHub noreply address).
-  Store publishing ON since 2026-10-22 (docs/STORE.md): pushes to main
-  that pass Snap Builds go to `latest/candidate`; stable needs the
-  owner's `/promote` + approval. So every push to main now publishes a
-  candidate: push only when that's wanted.
+  Store publishing ON since 2026-10-22 (docs/STORE.md): a push to main
+  that passes Snap Builds AND carries a version not yet in the store goes
+  to `latest/candidate` (call-for-testing.yml `gate` job); stable needs
+  the owner's `/promote` + approval.
+- Versions (owner, 2026-10-22): plain `0.x.y`, no `+git` suffix; releases
+  count in threes, 0.1.0 -> 0.1.1 -> 0.1.2 -> 0.2.0. `tools/bump_version.sh`
+  bumps (Cargo.toml + lock); bump once per release, in the commit pushed.
+  Pushes without a bump are built and checked but not uploaded.
 
 ### Phase 7 contents
 
@@ -626,6 +630,11 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 Resume here (2026-10-22).
 
+0. 2026-10-22: splash screen (`splash.rs`: tach needle sweep, name
+   fades in, ~2.4 s, click/key skips; Settings -> Startup "Show the
+   splash screen" = `settings.show_splash`; hook `XBTUNE_SHOT_SPLASH=<s>`
+   freezes it at that time). Owner previewed and approved it. Released
+   as 0.1.1 with the new versioning.
 0. 2026-10-22 (later): repo PUBLIC, wiki written, README rewritten
    (install, snap connections, channels, screenshots), snap
    `grade: stable` + store links, publishing switched on. Left: the

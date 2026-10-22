@@ -139,6 +139,7 @@ pub struct XbApp {
     permitted: bool,
     egui_ctx: egui::Context,
     shot: Option<Shot>,
+    splash: Option<crate::splash::Splash>,
 }
 
 /// Test hook: `XBTUNE_SCREENSHOT=out.ppm [XBTUNE_VIEW=charts]
@@ -187,6 +188,7 @@ impl XbApp {
             }
         }
         theme::apply(&cc.egui_ctx, settings.theme);
+        let splash = crate::splash::Splash::new(settings.show_splash, shot.is_some());
         let catalog = Arc::new(Catalog::builtin().expect("built-in definitions load"));
         let mut app = Self {
             rt,
@@ -227,6 +229,7 @@ impl XbApp {
             permitted: false,
             egui_ctx: cc.egui_ctx.clone(),
             shot,
+            splash,
         };
         if let Some(p) =
             std::env::var_os("XBTUNE_TUNE").map(PathBuf::from).or_else(|| app.settings.last_tune.clone())
@@ -1210,6 +1213,13 @@ impl eframe::App for XbApp {
         crate::ai_view::show(self, ui);
         crate::ai_wizard::show(self, ui);
         crate::remote_view::dialogs(self, ui);
+        // The splash covers everything until it's done; the dialogs wait.
+        if let Some(s) = &self.splash {
+            if !s.show(ui) {
+                self.splash = None;
+            }
+            return;
+        }
         // One dialog at a time: the warning, then a report (or crash offer),
         // then the guide.
         if self.disclaimer_open {

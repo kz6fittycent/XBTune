@@ -112,7 +112,8 @@ parts:
     override-pull: |
       craftctl default
       version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
-      craftctl set version="${version}+git$(git rev-parse --short HEAD 2>/dev/null || echo local)"
+      # Plain 0.x.y (tools/bump_version.sh), no git suffix (owner, 2026-10-22).
+      craftctl set version="${version}"
     override-build: |
       unset LD_LIBRARY_PATH PKG_CONFIG_PATH PYTHONPATH
       cargo() { /usr/bin/rustup run stable cargo "$@"; }

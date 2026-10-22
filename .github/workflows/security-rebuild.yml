@@ -99,7 +99,8 @@ jobs:
         id: commit
         run: |
           # The newest commit that set the workspace version to exactly the
-          # released version (the snap version is "<version>+git<sha>").
+          # released version (the snap version is "<version>"; older
+          # releases were "<version>+git<sha>").
           released="${{ steps.stable.outputs.version }}"
           released="${released%%+*}"
           for c in $(git log --format=%H -- Cargo.toml); do

@@ -140,6 +140,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             ui.label(RichText::new("Startup").font(theme::strong_font(17.0)));
             let mut changed =
                 ui.checkbox(&mut app.settings.show_wizard, "Show the Getting started guide").changed();
+            changed |= ui.checkbox(&mut app.settings.show_splash, "Show the splash screen").changed();
             changed |= ui
                 .checkbox(&mut app.settings.auto_connect, "Connect to the last adapter when XBTune starts")
                 .changed();

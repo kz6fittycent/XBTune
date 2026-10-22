@@ -4,8 +4,9 @@ The name `xbtune` was registered by the owner on 2026-10-14. On
 2026-10-22 the repo went public and publishing was switched on
 (`XBTUNE_STORE_PUBLISH=true`, secret `SNAPCRAFT_STORE_CREDENTIALS`,
 environment `promote-stable` with the owner as required reviewer): every
-green "🧪 Snap Builds" run on `main` uploads to `latest/candidate` and
-opens a testing issue; `/promote <rev> stable` on it, plus approval,
+green "🧪 Snap Builds" run on `main` whose version isn't in the store yet
+uploads to `latest/candidate` and opens a testing issue (the `gate` job
+skips versions already published); `/promote <rev> stable` on it, plus approval,
 releases to stable.
 
 ## Auto-connect request (draft, for the snapcraft forum "store-requests" category)
