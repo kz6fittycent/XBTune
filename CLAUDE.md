@@ -634,20 +634,21 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
    from the same version.
    - Distribution: installers live on **GitHub Releases**; Windows also
      via **winget** (PR to microsoft/winget-pkgs, automated with
-     winget-releaser) and **Chocolatey** (community repo, moderated, API
-     key); macOS via a **Homebrew tap** (`kz6fittycent/homebrew-tap`).
+     winget-releaser); macOS via a **Homebrew tap**
+     (`kz6fittycent/homebrew-tap`). **No Chocolatey** (owner, 2026-10-22):
+     we don't publish there; someone else may package it if they want.
      No paid code signing or notarization to start: winget installs
      trigger far fewer SmartScreen prompts than browser downloads;
      on macOS start with a formula installing a prebuilt binary (a
      non-notarized cask hits Gatekeeper; re-check current Homebrew
-     behaviour before building). Check the `xbtune` name is free on all
-     three first.
+     behaviour before building). Check the `xbtune` name is free on
+     winget and Homebrew first.
    - Releases: one version for every platform. The version the
      call-for-testing `gate` finds new also builds Windows (x64 zip,
      "portable" for winget; MSI later if needed) and macOS (arm64 + x64)
      in Actions and attaches them to a GitHub **pre-release** `v0.x.y`.
      `/promote` to stable makes it the latest full release and only then
-     updates winget, Chocolatey and the tap. Windows/macOS jobs failing
+     updates winget and the tap. Windows/macOS jobs failing
      must not block the snap.
    - Updates (owner): the Windows/macOS builds check GitHub Releases and
      tell the user; they never download or install anything themselves.
@@ -655,8 +656,8 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
      api.github.com/repos/kz6fittycent/XBTune/releases/latest` (stable
      only; unauthenticated, ureq); newer semver -> a dismissible banner
      with the version, a link to the release notes and the right command
-     for how it was installed (`winget upgrade xbtune`, `choco upgrade
-     xbtune`, `brew upgrade xbtune`, or the release page for a zip);
+     for how it was installed (`winget upgrade xbtune`, `brew upgrade
+     xbtune`, or the release page for a zip or any other package);
      "Skip this version"; a Settings switch to turn the check off;
      failures are silent (logged). The snap does NOT check (snapd
      updates it); a non-snap Linux build may use the same notice.
@@ -670,8 +671,8 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
      serialport's `libudev` feature. `env::Dirs`: `Documents\XBTune` /
      `~/XBTune` via `directories`. `deny.toml` gains the new targets.
      CI: windows-latest and macos-latest build + test jobs.
-   - Order: Windows + winget first (most riders' garage laptops), then
-     Chocolatey, then the Homebrew tap. Each starts simulator-tested
+   - Order: Windows + winget first (most riders' garage laptops); macOS
+     + the Homebrew tap **last** of the other OSes (owner). Each starts simulator-tested
      only; the first hardware check is a Windows laptop on the bike
      (read-only: info, dump, live, codes) before any write on it.
      macOS classic-Bluetooth serial has been flaky on recent releases:
