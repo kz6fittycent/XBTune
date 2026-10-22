@@ -189,10 +189,19 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 - Phase 1 hardware result (laptop, snap git b5fa645): `info` OK, 23/23
   requests, 0 retries, RTT avg 65 ms (min 50, max 147).
 - Snap confinement checks on this PC: see "Snap notes" below.
-- Remote: private GitHub repo `git@github.com:kz6fittycent/XBTune.git`
-  (origin, added 2026-10-15; owner OK'd pushing). Keep it private.
-  Don't publish to the store. The snap name `xbtune` is registered (owner,
-  2026-10-14); registration only, nothing uploaded.
+- Remote: GitHub repo `git@github.com:kz6fittycent/XBTune.git` (origin).
+  PUBLIC since 2026-10-22, with a wiki (pages + screenshots in
+  `XBTune.wiki.git`, images under `images/`; screenshots made with the
+  hooks in demo mode, scratch paths painted over to `/home/rider/...`).
+  Before going public the history was rewritten to replace the owner's
+  BuellTooth MAC with `00:11:22:33:44:55`, so snap hashes noted below
+  (23ea31c, a1bd3e7, ...) are pre-rewrite SHAs. NEVER put the owner's
+  personal email anywhere public (snap `contact:` is the issues URL;
+  repo-local git `user.email` is the GitHub noreply address).
+  Store publishing ON since 2026-10-22 (docs/STORE.md): pushes to main
+  that pass Snap Builds go to `latest/candidate`; stable needs the
+  owner's `/promote` + approval. So every push to main now publishes a
+  candidate: push only when that's wanted.
 
 ### Phase 7 contents
 
@@ -617,6 +626,12 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 Resume here (2026-10-22).
 
+0. 2026-10-22 (later): repo PUBLIC, wiki written, README rewritten
+   (install, snap connections, channels, screenshots), snap
+   `grade: stable` + store links, publishing switched on. Left: the
+   auto-connect forum request (docs/STORE.md; owner's post), store page
+   screenshots/categories by hand, and possibly rewriting the old
+   commits' author email (owner to decide).
 0. 2026-10-22: owner got approval to publish (ecmdroid.db licence
    cleared). AI features HIDDEN, not removed (owner: riders won't trust a
    model with tuning): `xbtune_ai::enabled()` (env `XBTUNE_AI=1`) gates

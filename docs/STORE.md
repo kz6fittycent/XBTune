@@ -1,11 +1,12 @@
 # Snap Store notes
 
-The name `xbtune` was registered by the owner on 2026-10-14 (reserved only;
-nothing has been uploaded).
-
-Nothing is uploaded until the repo can go public (KICKOFF §2 and the
-ecmdroid.db question in `PROVENANCE.md`). The publishing workflows are
-switched off by the `XBTUNE_STORE_PUBLISH` repository variable.
+The name `xbtune` was registered by the owner on 2026-10-14. On
+2026-10-22 the repo went public and publishing was switched on
+(`XBTUNE_STORE_PUBLISH=true`, secret `SNAPCRAFT_STORE_CREDENTIALS`,
+environment `promote-stable` with the owner as required reviewer): every
+green "🧪 Snap Builds" run on `main` uploads to `latest/candidate` and
+opens a testing issue; `/promote <rev> stable` on it, plus approval,
+releases to stable.
 
 ## Auto-connect request (draft, for the snapcraft forum "store-requests" category)
 
@@ -31,7 +32,7 @@ switched off by the `XBTUNE_STORE_PUBLISH` repository variable.
 > Like comparable tools in the store, it uses no other privileged
 > interfaces. It does not use `bluetooth-control`.
 >
-> Source: <repo URL once public>
+> Source: https://github.com/kz6fittycent/XBTune
 
 ## Listing
 
@@ -65,9 +66,10 @@ account. The store description is `description:` in `snap/snapcraft.yaml`
 
 ## Before the first upload
 
-1. The ecmdroid.toml licence answer (PROVENANCE, "ecmdroid.db"). Nothing is
-   uploaded before it.
-2. Repo public (KICKOFF §2), so the auto-connect request can link the source.
-3. `grade: stable` in `snapcraft.yaml`.
-4. Post the auto-connect request above; until it's granted the Getting
+1. DONE 2026-10-22: the ecmdroid.toml licence answer (PROVENANCE).
+2. DONE 2026-10-22: repo public.
+3. DONE 2026-10-22: `grade: stable` in `snapcraft.yaml`.
+4. Screenshots: made for the wiki (`images/` in the wiki repo) and the
+   README (`docs/screenshots/`); upload some on the store page by hand.
+5. Post the auto-connect request above; until it's granted the Getting
    started guide shows the `snap connect` commands.
