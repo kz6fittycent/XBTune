@@ -16,8 +16,6 @@ pub const POINTS: &[&str] = &[
     "XBTune's suggestions (auto-tune, the AFV fold) are only estimates from your logs, and a \
      remote tuner's edits are someone else's judgement. Either can be wrong. Check every change \
      before you write it to the ECM, change a little at a time, and watch the engine afterwards.",
-    "The AI advisor is a language model: it can be confidently wrong about your engine. Treat what it \
-     says as a suggestion to check against the numbers, never as a safe setting.",
     "Keep a backup of the ECM's original tune somewhere safe. XBTune saves one before every \
      write, but you are responsible for what you write and when you ride.",
     "Modifying the engine's tune may break emissions or road-use rules where you live, and may \
@@ -25,6 +23,12 @@ pub const POINTS: &[&str] = &[
     "XBTune is free software and comes with NO WARRANTY, to the extent permitted by law \
      (GNU GPL v3, sections 15 and 16). You use it at your own risk.",
 ];
+
+/// Shown after the second point only while the AI advisor is visible
+/// (`xbtune_ai::enabled`). Bump `VERSION` if it is shown to everyone again.
+pub const AI_POINT: &str = "The AI advisor is a language model: it can be confidently wrong about your \
+                            engine. Treat what it says as a suggestion to check against the numbers, \
+                            never as a safe setting.";
 
 /// One line for places where the full text was already accepted.
 pub const SHORT: &str = "A bad tune can damage the engine. Check every change before writing it; you are \

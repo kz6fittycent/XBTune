@@ -113,7 +113,8 @@ enum Cmd {
     #[command(subcommand)]
     Remote(remote::RemoteCmd),
     /// AI tuning advisor (any model, local or hosted; docs/AI.md). Answers only.
-    #[command(subcommand)]
+    /// Hidden from --help since 2026-10-22, like the app's AI features.
+    #[command(subcommand, hide = true)]
     Ai(ai::AiCmd),
     /// The ECM Setup screen (EcmDroid's named settings) for a tune: switches and values.
     Setup {

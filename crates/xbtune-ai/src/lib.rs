@@ -26,5 +26,12 @@ pub mod journal;
 pub mod memory;
 pub mod triage;
 
+/// Whether the app shows the AI features. Hidden since 2026-10-22 (the
+/// owner: riders won't trust a model with tuning); the code stays and is
+/// still built and tested. `XBTUNE_AI=1` shows them again for development.
+pub fn enabled() -> bool {
+    std::env::var_os("XBTUNE_AI").is_some_and(|v| v == "1")
+}
+
 pub use client::{AiError, Prepared, Reply, Role, Turn};
 pub use config::{Adapter, AiConfig, PRESETS, Preset};

@@ -112,7 +112,9 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     let mut send = false;
     let mut discard = false;
     // "Check with the AI first", when an AI advisor is set up.
-    let ai = xbtune_ai::AiConfig::path()
+    let ai = xbtune_ai::enabled()
+        .then(xbtune_ai::AiConfig::path)
+        .flatten()
         .and_then(|p| xbtune_ai::AiConfig::load(&p).ok())
         .filter(|c| c.missing().is_none());
     let checked = facts(app);

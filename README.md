@@ -47,23 +47,6 @@ xbtune.cli log-convert ride.csv -o ride.msl  # MegaLogViewer; reads EcmDroid .bi
 xbtune                                  # the desktop app
 ```
 
-## AI advisor
-
-Ask a language model about a fuel or spark map (Tune → **Ask the AI
-advisor…**, or `xbtune.cli ai ask`). Any model works: one on your own
-computer (Ollama, LM Studio, llama.cpp, ...), or a hosted provider with
-your own API key (OpenAI, Anthropic, Gemini, OpenRouter, and others: see
-`xbtune.cli ai presets`). Set it up under Settings → AI advisor. Every
-request is shown in full before it's sent. The advisor only answers; it
-never changes your tune or touches the ECM. Models can be wrong, so check
-their answers against the numbers. Design: `docs/AI.md`.
-
-```
-xbtune.cli ai setup --preset Ollama --model qwen3:14b
-xbtune.cli ai test
-xbtune.cli ai ask --tune tune.xbt ride.csv -q "Where is it rich at cruise?"
-```
-
 ## Wideband
 
 An Innovate LC-2 (or another Innovate MTS device) connects with its own USB

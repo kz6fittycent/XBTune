@@ -1,5 +1,14 @@
 # AI-assisted tuning (phase 10): design for approval
 
+**HIDDEN since 2026-10-22 (owner's decision).** The owner doesn't trust a
+model with tuning and expects riders won't either. Nothing is removed: the
+crate, CLI and app code stay, are built and tested. `xbtune_ai::enabled()`
+is false unless `XBTUNE_AI=1`; then the app shows the Settings card, Tune
+"Ask the AI advisor…", the bug-report "Check with the AI first" and the
+disclaimer's AI point (`disclaimer::AI_POINT`). `xbtune.cli ai` still
+works but is left out of `--help`. Not mentioned in the README or store
+listing.
+
 Status: **APPROVED 2026-10-19** (owner's §10 answers below). **A1 built
 2026-10-19**: `crates/xbtune-ai` (config + presets, both adapters, prompt
 and data block, journal), CLI `ai presets|setup|models|test|ask`, app

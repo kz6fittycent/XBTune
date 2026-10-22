@@ -456,7 +456,8 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
     });
     // The AI advisor, on fuel and spark maps.
     let advisable = v.name.starts_with("Tab_Fuel") || v.name.starts_with("Tab_Spark");
-    let ask_ai = advisable
+    let ask_ai = xbtune_ai::enabled()
+        && advisable
         && matches!(v.shape, Shape::Grid { .. })
         && ui
             .button("Ask the AI advisor…")

@@ -378,7 +378,7 @@ crates/xbtune-remote remote tuning: code, SPAKE2/HKDF/ChaCha20 crypto, relay cli
 crates/xbtune-ai     AI advisor: provider presets, ai.toml, OpenAI-compatible + Anthropic clients, prompt, journal
 relay/bug-report/    Cloudflare Worker: app reports -> GitHub issues (not in the snap)
 relay/remote/        Cloudflare Worker + Durable Object: remote-tuning relay (not in the snap)
-data/                ecmdroid.toml (ED-DB derived, RESTRICTED), ecm_models.toml (ours)
+data/                ecmdroid.toml (ED-DB derived; cleared 2026-10-22), ecm_models.toml (ours)
 tools/               extract_ecmdroid_db.py
 tests/fixtures/      EcmDroid test images and runtime frame
 snap/snapcraft.yaml  core24, rust plugin, apps: xbtune (gnome ext), cli, sim; snap/gui desktop+icon
@@ -409,7 +409,7 @@ Regenerating the data file needs EcmDroid's db (it is not in the repo):
 - Ported from EcmDroid commit `2f17d29f`. Every ported file has a header
   citing the Java file and commit. Every fact is listed in `docs/PROVENANCE.md`.
 - All ecmdroid.db-derived data lives in `data/ecmdroid.toml` and nowhere else.
-  It is **restricted** until the owner confirms the GPL permission covers us.
+  It was restricted until 2026-10-22, when the owner got approval to publish.
 - Decoder resyncs on SOH. It ignores echoes and other-address frames.
 - Retries: reads up to 3 attempts, then a 150 ms settle drain. **Actuator
   commands are never retried** (`Request::is_idempotent`).
@@ -615,7 +615,15 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 ## Next steps
 
-Resume here (2026-10-19).
+Resume here (2026-10-22).
+
+0. 2026-10-22: owner got approval to publish (ecmdroid.db licence
+   cleared). AI features HIDDEN, not removed (owner: riders won't trust a
+   model with tuning): `xbtune_ai::enabled()` (env `XBTUNE_AI=1`) gates
+   the Settings card, Tune "Ask the AI advisor…", bug-report "Check with
+   the AI first" and the disclaimer's AI point; CLI `ai` hidden from
+   --help; README section removed; docs/AI.md says so. Next: store
+   (docs/STORE.md "Before the first upload").
 
 0. Owner tried snap dedb0f4 on this desktop 2026-10-19: "okay better"
    (AI dialog without the review step). Drag and drop WORKS on his GNOME
@@ -653,9 +661,9 @@ Resume here (2026-10-19).
 3. RUSTSEC-2026-0370/0371/0372 ("unmaintained" zvariant, zbus_names,
    zvariant_derive, via eframe -> accesskit_unix and zbus) are ignored in
    deny.toml with reasons (2026-10-19). Drop the ignores when egui moves on.
-4. Licence: still waiting for the EcmDroid maintainer about ecmdroid.db
-   (PROVENANCE); also ask whether it allows commercial use if that ever
-   matters. Data stays restricted; no public repo or upload until then.
+4. Licence: CLEARED 2026-10-22 (owner got approval to publish, "no
+   issues at all"; PROVENANCE). Making the repo public and the store
+   upload are still the owner's call: ask before either.
 5. Store: docs/STORE.md "Before the first upload".
 6. Untracked `app.log` / `fatal.log` in the repo root are the owner's
    copies from the laptop; not committed.

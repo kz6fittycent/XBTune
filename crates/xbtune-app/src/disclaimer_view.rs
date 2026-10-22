@@ -20,9 +20,13 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         ui.set_width(560.0);
         ui.label(RichText::new(disclaimer::TITLE).font(theme::strong_font(19.0)).color(p.bad));
         ui.add_space(8.0);
-        for point in disclaimer::POINTS {
+        for (i, point) in disclaimer::POINTS.iter().enumerate() {
             crate::wizard::bullet(ui, point);
             ui.add_space(4.0);
+            if i == 1 && xbtune_ai::enabled() {
+                crate::wizard::bullet(ui, disclaimer::AI_POINT);
+                ui.add_space(4.0);
+            }
         }
         ui.add_space(4.0);
         ui.checkbox(&mut app.disclaimer_ticked, "I have read this and accept the risk");
