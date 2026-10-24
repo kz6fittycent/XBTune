@@ -762,8 +762,10 @@ checklist below on the laptop), testers (issues; call for testing #6 =
 0.1.1 revision 4), Michel (EcmDroid maintainer; the owner shared the repo
 and asked for his input: note anything relevant in PROVENANCE) and the
 owner's friend with the LC-2 wideband. State at the pause:
-- Store: `latest/candidate` = 0.1.1 rev 4 (built from 7174ce1); stable
-  empty until the owner's `/promote`. Next release = 0.1.2
+- Store: `latest/candidate` = 0.1.2 rev 5 (a8eb7d8, 2026-10-24: Windows
+  port, update notice, UI refresh; call for testing #7); stable empty
+  until the owner's `/promote`. Next release = 0.2.0 (was: 0.1.1 rev 4 from
+  7174ce1; next release then = 0.1.2
   (`tools/bump_version.sh`). Revs 2-4 and issues #4-#6 came from the
   history rewrite: a rebuilt 0.1.0 commit replaced 0.1.1 (rev 3, #5) and
   the rerun put it back. The gate now uploads only a version newer than
