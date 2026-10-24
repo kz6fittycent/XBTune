@@ -807,7 +807,8 @@ owner's friend with the LC-2 wideband. State at the pause:
   off the gauge circle). CI green on windows-latest (1037b39). Public
   pre-release `v0.1.1-windows-test.1` (zip from CI run 40126429676) for
   the friend with the LC-2, made 2026-10-24 (owner chose a pre-release).
-  WAITING for his report. Done since: the update notice (link to the release page; no
+  Second: `v0.1.2-windows-test.1` (7d58899, CI run 40139928972: lambda,
+  RPM low-high, .msl wideband, hints, sidebar). WAITING for his report. Done since: the update notice (link to the release page; no
   winget), then the UI refresh (owner asked for modern UX; Lucide icons
   approved 2026-10-24: see "UI refresh").
 
