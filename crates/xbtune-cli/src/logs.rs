@@ -54,7 +54,8 @@ pub struct AutotuneArgs {
     /// (logged with --wideband) instead of the ECM's EGO correction.
     #[arg(long)]
     wideband: bool,
-    /// Wideband: target AFR by load, as load:AFR pairs (straight lines between).
+    /// Wideband: target by load, as load:AFR or load:lambda pairs (straight lines
+    /// between), e.g. 40:14.7,80:13.5 or 40:1.00,80:0.92.
     #[arg(long, value_name = "LOAD:AFR,...", requires = "wideband")]
     target: Option<String>,
     /// Wideband: seconds from a sample to the reading that matches it.

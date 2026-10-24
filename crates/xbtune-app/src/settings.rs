@@ -114,9 +114,48 @@ pub struct Settings {
     pub update_latest: Option<crate::update::Release>,
     /// "Skip this version".
     pub update_skip: String,
+    /// How wideband readings and targets are shown and typed.
+    pub wb_unit: WbUnit,
     /// The window as it was left (size only: a remembered position can be
     /// off-screen once a monitor is unplugged).
     pub window: Option<WindowSize>,
+}
+
+/// Air/fuel ratio or lambda, for everything wideband the user sees or
+/// types. Readings are kept as lambda and targets as AFR inside; this is
+/// only how they're shown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum WbUnit {
+    #[default]
+    Afr,
+    Lambda,
+}
+
+impl WbUnit {
+    /// "AFR" or "λ", before a number.
+    pub fn short(self) -> &'static str {
+        match self {
+            Self::Afr => "AFR",
+            Self::Lambda => "λ",
+        }
+    }
+
+    /// "AFR" or "lambda", in sentences.
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Afr => "AFR",
+            Self::Lambda => "lambda",
+        }
+    }
+
+    /// An AFR shown in this unit: "14.7" or "1.00".
+    pub fn fmt(self, afr: f64) -> String {
+        match self {
+            Self::Afr => format!("{afr:.1}"),
+            Self::Lambda => format!("{:.2}", afr / xbtune_core::autotune::STOICH),
+        }
+    }
 }
 
 /// The main window's size, in points.
@@ -158,6 +197,7 @@ impl Default for Settings {
             update_latest: None,
             update_skip: String::new(),
             window: None,
+            wb_unit: WbUnit::Afr,
         }
     }
 }
@@ -198,6 +238,13 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn wideband_unit_formats() {
+        assert_eq!(WbUnit::Afr.fmt(13.23), "13.2");
+        assert_eq!(WbUnit::Lambda.fmt(14.7), "1.00");
+        assert_eq!(WbUnit::Lambda.fmt(13.23), "0.90");
+    }
 
     #[test]
     fn round_trip_and_partial_files() {

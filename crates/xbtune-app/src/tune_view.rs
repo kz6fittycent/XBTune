@@ -412,6 +412,8 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
     let (rows, cols) = (values.len(), values.first().map_or(0, |r| r.len()));
     let xs = axis_labels(t, &v.x_axis);
     let ys = axis_labels(t, &v.y_axis);
+    // The ECM stores RPM high to low; show it rising to the right.
+    let flip = matches!(&xs, Some((x, _)) if x.len() >= 2 && x[0] > x[x.len() - 1]);
     let col_labels = match (&v.shape, &xs) {
         (_, Some((_, l))) => l.clone(),
         _ => (0..cols).map(|c| format!("{}", c + 1)).collect(),
@@ -494,7 +496,8 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
             // Always shown, so it's clear the option exists and what it needs.
             let why_not = crate::autotune_view::wideband_missing(app);
             ui.add_enabled_ui(why_not.is_none(), |ui| {
-                ui.selectable_value(&mut app.autotune.overlay, Overlay::Afr, "Average AFR (wideband)")
+                let label = format!("Average {} (wideband)", app.settings.wb_unit.word());
+                ui.selectable_value(&mut app.autotune.overlay, Overlay::Afr, label)
                     .on_disabled_hover_text(why_not.clone().unwrap_or_default());
             });
             if ui.button("Auto-tune…").clicked() {
@@ -650,7 +653,7 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
 
     if app.tune_ui.view3d && matches!(v.shape, Shape::Grid { .. }) {
         ui.add_space(4.0);
-        surface(ui, &values, &app.tune_ui.sel, &mut app.tune_ui.view, 300.0);
+        surface(ui, &values, &app.tune_ui.sel, &mut app.tune_ui.view, 300.0, flip);
     }
     ui.add_space(4.0);
     let spec = GridSpec {
@@ -670,6 +673,8 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         live,
         log: log_stats.as_ref().map(|a| a.cells.as_slice()),
         min_hits: app.autotune.settings.min_hits,
+        flip_cols: flip,
+        wb_unit: app.settings.wb_unit,
     };
     egui::ScrollArea::horizontal().id_salt("grid").show(ui, |ui| {
         grid(ui, &spec, &mut app.tune_ui.sel);
@@ -720,18 +725,26 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
             paste = true;
         }
         if arrows != (0, 0) {
-            app.tune_ui.sel.step(arrows.0, arrows.1, rows, cols);
+            // Left/right as seen on screen.
+            let dc = if flip { -arrows.1 } else { arrows.1 };
+            app.tune_ui.sel.step(arrows.0, dc, rows, cols);
         }
     }
 
     let cells = app.tune_ui.sel.list();
-    if copy && let Some(clip) = Clip::copy(&values, &cells) {
+    // The clipboard holds cells as seen on screen (a spreadsheet paste
+    // lands the way it looks); `vc` maps a column both ways.
+    let vc = |c: usize| crate::grid::view_col(c, cols, flip);
+    let seen: Vec<Vec<f64>> = values.iter().map(|row| (0..row.len()).map(|c| row[vc(c)]).collect()).collect();
+    let seen_cells: Vec<(usize, usize)> = cells.iter().map(|&(r, c)| (r, vc(c))).collect();
+    if copy && let Some(clip) = Clip::copy(&seen, &seen_cells) {
         ui.ctx().copy_text(clip.to_tsv(decimals));
         app.tune_ui.clip = Some(clip);
         app.tune_ui.status = Some((format!("Copied {} cells", cells.len()), false));
     }
-    if paste && let (Some(at), Some(clip)) = (cells.first().copied(), app.tune_ui.clip.clone()) {
-        let changes = clip.paste_at(at, rows, cols);
+    if paste && let (Some(at), Some(clip)) = (seen_cells.iter().min().copied(), app.tune_ui.clip.clone()) {
+        let changes: Vec<_> =
+            clip.paste_at(at, rows, cols).into_iter().map(|((r, c), x)| ((r, vc(c)), x)).collect();
         apply_changes(app, v, &changes, "paste");
     }
     if let Some(op) = op {

@@ -379,6 +379,10 @@ impl XbApp {
             if let Ok(which) = std::env::var("XBTUNE_SHOT_UNLOCK") {
                 app.settings_ui.ask(&which);
             }
+            // XBTUNE_SHOT_WBUNIT=lambda: wideband shown as lambda.
+            if std::env::var("XBTUNE_SHOT_WBUNIT").as_deref() == Ok("lambda") {
+                app.settings.wb_unit = crate::settings::WbUnit::Lambda;
+            }
             // XBTUNE_SHOT_UPDATE=<version>: the "new version" banner.
             if let Ok(v) = std::env::var("XBTUNE_SHOT_UPDATE") {
                 let url = format!("{}/tag/v{v}", crate::update::RELEASES_PAGE);
@@ -457,6 +461,24 @@ impl XbApp {
             tracing::info!("shown to user: {text}");
         }
         self.messages.push(Message { text, error, at: Instant::now() });
+    }
+
+    /// Show wideband readings as AFR or lambda: everywhere at once, the
+    /// dashboard gauge and charted channel included.
+    pub fn set_wb_unit(&mut self, unit: crate::settings::WbUnit) {
+        use xbtune_core::wideband::{AFR, LAMBDA};
+        let (from, to) = match unit {
+            crate::settings::WbUnit::Afr => (LAMBDA, AFR),
+            crate::settings::WbUnit::Lambda => (AFR, LAMBDA),
+        };
+        for list in [&mut self.settings.gauges, &mut self.settings.chart_channels] {
+            for name in list.iter_mut().filter(|n| n.as_str() == from) {
+                *name = to.to_string();
+            }
+        }
+        self.settings.wb_unit = unit;
+        crate::autotune_view::unit_changed(self);
+        self.save_settings();
     }
 
     /// Remember the window's size (saved with the settings at exit). While
@@ -923,9 +945,10 @@ impl XbApp {
                 let (r, painter) = ui.allocate_painter(egui::vec2(10.0, 10.0), egui::Sense::hover());
                 painter.circle_filled(r.rect.center(), 4.0, color);
                 let text = match self.history.latest().and_then(|s| s.wb) {
-                    Some(w) => match w.afr() {
-                        Some(a) => format!("AFR {a:.1}"),
-                        None => format!("WB {}", w.status.text()),
+                    Some(w) => match (self.settings.wb_unit, w.lambda, w.afr()) {
+                        (crate::settings::WbUnit::Lambda, Some(l), _) => format!("λ {l:.2}"),
+                        (crate::settings::WbUnit::Afr, _, Some(a)) => format!("AFR {a:.1}"),
+                        _ => format!("WB {}", w.status.text()),
                     },
                     None => "WB".into(),
                 };

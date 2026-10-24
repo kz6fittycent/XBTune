@@ -78,6 +78,18 @@ pub struct GridSpec<'a> {
     pub log: Option<&'a [Vec<xbtune_core::autotune::CellStat>]>,
     /// Cells with fewer hits are drawn faded in the log modes.
     pub min_hits: f64,
+    /// How AFR overlay cells are shown (AFR or lambda).
+    pub wb_unit: crate::settings::WbUnit,
+    /// Draw columns right to left: the map stores RPM high to low, and
+    /// riders (and other tuning tools) read RPM rising to the right.
+    /// Everything else keeps storage order; only drawing and the mouse map
+    /// through this.
+    pub flip_cols: bool,
+}
+
+/// On-screen column of storage column `c` (its own inverse).
+pub fn view_col(c: usize, cols: usize, flip: bool) -> usize {
+    if flip { cols - 1 - c } else { c }
 }
 
 /// Heatmap colour for `t` in 0..=1 (blue, cyan, green, yellow, red).
@@ -139,7 +151,9 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> bool {
     let (rect, response) = ui.allocate_exact_size(size, Sense::click_and_drag());
     let painter = ui.painter_at(rect);
     let origin = rect.min + vec2(header_w, header_h);
+    // Storage cell (r, c) -> its place on screen.
     let cell_rect = |r: usize, c: usize| {
+        let c = view_col(c, cols, spec.flip_cols);
         Rect::from_min_size(origin + vec2(c as f32 * cell_w, r as f32 * cell_h), vec2(cell_w, cell_h))
     };
 
@@ -203,13 +217,15 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> bool {
     }
     // Live operating point.
     if let Some((lr, lc)) = spec.live {
+        let lc = if spec.flip_cols { (cols - 1) as f32 - lc } else { lc };
         let at = origin + vec2((lc + 0.5) * cell_w, (lr + 0.5) * cell_h);
         painter.circle(at, 7.0, Color32::from_black_alpha(80), Stroke::new(2.5, Color32::WHITE));
     }
     // Headers.
     let hfont = FontId::proportional(11.5);
     for (c, l) in spec.col_labels.iter().enumerate().take(cols) {
-        let cr = Rect::from_min_size(pos2(origin.x + c as f32 * cell_w, rect.min.y), vec2(cell_w, header_h));
+        let vc = view_col(c, cols, spec.flip_cols);
+        let cr = Rect::from_min_size(pos2(origin.x + vc as f32 * cell_w, rect.min.y), vec2(cell_w, header_h));
         painter.text(cr.center(), Align2::CENTER_CENTER, l, hfont.clone(), p.muted);
     }
     for (r, l) in spec.row_labels.iter().enumerate().take(rows) {
@@ -223,7 +239,10 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> bool {
     let hit = |pos: Pos2| -> Option<(Option<usize>, Option<usize>)> {
         let d = pos - origin;
         let r = (d.y >= 0.0).then(|| (d.y / cell_h) as usize).filter(|r| *r < rows);
-        let c = (d.x >= 0.0).then(|| (d.x / cell_w) as usize).filter(|c| *c < cols);
+        let c = (d.x >= 0.0)
+            .then(|| (d.x / cell_w) as usize)
+            .filter(|c| *c < cols)
+            .map(|c| view_col(c, cols, spec.flip_cols));
         let in_rows = d.y < rows as f32 * cell_h;
         let in_cols = d.x < cols as f32 * cell_w;
         (in_rows && in_cols).then_some((if d.y < 0.0 { None } else { r }, if d.x < 0.0 { None } else { c }))
@@ -304,7 +323,7 @@ fn draw_log(
                     heat(if max_hits > 0.0 { (s.hits.ln_1p() / max_hits.ln_1p()) as f32 } else { 0.0 }),
                     format!("{:.0}", s.hits),
                 ),
-                CellMode::LogAfr => (diff_colour(s.afr - s.target, 1.0), format!("{:.1}", s.afr)),
+                CellMode::LogAfr => (diff_colour(s.afr - s.target, 1.0), spec.wb_unit.fmt(s.afr)),
                 _ => (diff_colour(s.ego - 100.0, max_dev.max(2.0)), format!("{:.1}", s.ego)),
             };
             let enough = s.hits >= spec.min_hits;
@@ -318,7 +337,15 @@ fn draw_log(
 
 /// A rotatable 3D surface of the grid. `view` is (yaw, pitch) in radians,
 /// changed by dragging.
-pub fn surface(ui: &mut Ui, values: &[Vec<f64>], sel: &Selection, view: &mut (f32, f32), height: f32) {
+/// `flip_cols` as in [`GridSpec`], so the surface reads the same way.
+pub fn surface(
+    ui: &mut Ui,
+    values: &[Vec<f64>],
+    sel: &Selection,
+    view: &mut (f32, f32),
+    height: f32,
+    flip_cols: bool,
+) {
     let rows = values.len();
     let cols = values.first().map_or(0, |r| r.len());
     if rows < 2 || cols < 2 {
@@ -340,7 +367,7 @@ pub fn surface(ui: &mut Ui, values: &[Vec<f64>], sel: &Selection, view: &mut (f3
     let center = rect.center() + vec2(0.0, rect.height() * 0.12);
     // World: x across columns, z across rows (both -1..1), y up 0..0.8.
     let project = |r: usize, c: usize| -> (Pos2, f32) {
-        let x = c as f32 / (cols - 1) as f32 * 2.0 - 1.0;
+        let x = view_col(c, cols, flip_cols) as f32 / (cols - 1) as f32 * 2.0 - 1.0;
         let z = r as f32 / (rows - 1) as f32 * 2.0 - 1.0;
         let y = ((values[r][c] - lo) / span) as f32 * 0.8;
         let (xs, zs) = (x * yaw.cos() - z * yaw.sin(), x * yaw.sin() + z * yaw.cos());
@@ -398,6 +425,15 @@ pub fn surface(ui: &mut Ui, values: &[Vec<f64>], sel: &Selection, view: &mut (f3
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn flipped_columns_map_both_ways() {
+        // 13 RPM columns stored 8000..0: the 0 rpm column is drawn first.
+        assert_eq!(view_col(12, 13, true), 0);
+        assert_eq!(view_col(0, 13, true), 12);
+        assert!((0..13).all(|c| view_col(view_col(c, 13, true), 13, true) == c));
+        assert_eq!(view_col(4, 13, false), 4);
+    }
 
     #[test]
     fn heat_endpoints_and_selection() {

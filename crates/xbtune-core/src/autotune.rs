@@ -138,6 +138,9 @@ pub const DEFAULT_LAG: f64 = 0.2;
 
 /// Measured AFR above this at load >= [`LEAN_LOAD`] is flagged.
 pub const LEAN_AFR: f64 = 14.0;
+
+/// Petrol's stoichiometric AFR: lambda 1.00.
+pub const STOICH: f64 = 14.7;
 pub const LEAN_LOAD: f64 = 80.0;
 
 /// Target AFR by load (the fuel map's load axis), straight lines between
@@ -172,21 +175,36 @@ impl TargetAfr {
 
     /// "40:14.7,60:14.0,..." (the CLI's --target form).
     pub fn text(&self) -> String {
-        self.points.iter().map(|(l, a)| format!("{l}:{a}")).collect::<Vec<_>>().join(",")
+        // Two decimals at most: lambda targets come back as long fractions.
+        let short = |x: f64| format!("{x:.2}").trim_end_matches('0').trim_end_matches('.').to_string();
+        self.points.iter().map(|(l, a)| format!("{}:{}", short(*l), short(*a))).collect::<Vec<_>>().join(",")
     }
 
+    /// The same in lambda: "40:1.00,60:0.95,...".
+    pub fn lambda_text(&self) -> String {
+        self.points.iter().map(|(l, a)| format!("{l}:{:.2}", a / STOICH)).collect::<Vec<_>>().join(",")
+    }
+
+    /// load:target pairs, the targets all AFR (9-17) or all lambda
+    /// (0.6-1.2, stored as AFR at petrol's 14.7).
     pub fn parse(s: &str) -> Result<Self, String> {
         let mut points = Vec::new();
         for part in s.split(',').map(str::trim).filter(|p| !p.is_empty()) {
-            let (l, a) = part.split_once(':').ok_or_else(|| format!("'{part}': say load:AFR"))?;
+            let (l, a) =
+                part.split_once(':').ok_or_else(|| format!("'{part}': say load:AFR or load:lambda"))?;
             let (l, a): (f64, f64) = (
                 l.trim().parse().map_err(|_| format!("'{l}' isn't a load"))?,
-                a.trim().parse().map_err(|_| format!("'{a}' isn't an AFR"))?,
+                a.trim().parse().map_err(|_| format!("'{a}' isn't an AFR or lambda"))?,
             );
-            if !(9.0..=17.0).contains(&a) {
-                return Err(format!("target AFR {a} is outside 9-17"));
-            }
             points.push((l, a));
+        }
+        let lambda = points.iter().all(|&(_, a)| (0.6..=1.2).contains(&a));
+        for (_, a) in &mut points {
+            if lambda {
+                *a *= STOICH;
+            } else if !(9.0..=17.0).contains(a) {
+                return Err(format!("target {a} is neither an AFR (9-17) nor a lambda (0.60-1.20)"));
+            }
         }
         if points.is_empty() {
             return Err("no targets given".into());
@@ -849,6 +867,12 @@ mod tests {
         assert_eq!(t.at(255.0), 13.0);
         assert_eq!(TargetAfr::parse(&t.text()).unwrap(), t);
         assert!(TargetAfr::parse("60:20").is_err());
+        // Lambda targets, as some tuners think in lambda.
+        let l = TargetAfr::parse("40:1.0, 80:0.9").unwrap();
+        assert_eq!(l.points, vec![(40.0, 14.7), (80.0, 0.9 * 14.7)]);
+        assert!((TargetAfr::parse(&t.lambda_text()).unwrap().at(60.0) - t.at(60.0)).abs() < 0.08);
+        // Mixed units are refused rather than guessed.
+        assert!(TargetAfr::parse("40:1.0,80:13.2").is_err());
         assert!(TargetAfr::parse("x").is_err());
     }
 

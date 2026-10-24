@@ -263,8 +263,15 @@ the wideband (median decides lambda vs AFR, stoich 14.7), other columns
 listed in `Log::unread_columns` (Logs view, amber); auto-tune names
 missing required channels (`Analysis::missing_channels`: RPM, Load, EGO
 Corr.); CLI `--maps` only takes front|rear|both. He is writing a list
-of questions. Open question for the owner: show RPM ascending
-left-to-right (ECMSpy/TunerStudio habit) instead of storage order?
+of questions. Owner 2026-10-24: RPM low to high, and lambda as an option
+(the friend tunes in lambda). BUILT: `GridSpec::flip_cols` (+ surface)
+when the X axis is stored descending; selection/undo stay in storage
+order, arrows and clipboard follow the screen (`grid::view_col`).
+`settings.wb_unit` (Afr|Lambda; Connect wideband card, auto-tune dialog;
+`app.set_wb_unit` swaps wb_afr/wb_lambda gauges and charts): header,
+overlay label + cells, targets typed in the unit (`TargetAfr::parse`
+takes AFR 9-17 or lambda 0.6-1.2, mixed refused; `lambda_text`),
+proposals, lean list. Hook `XBTUNE_SHOT_WBUNIT=lambda`.
 
 ### UI refresh (owner asked 2026-10-24: "modern UX/UI"; he's not the judge)
 

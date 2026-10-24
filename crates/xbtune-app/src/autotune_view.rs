@@ -12,6 +12,7 @@ use xbtune_core::autotune::{self, Analysis, Filters, Proposal, Settings};
 use xbtune_core::logfile::Log;
 
 use crate::app::XbApp;
+use crate::settings::WbUnit;
 use crate::theme::{self, Palette};
 
 /// What the fuel-map overlay shows.
@@ -40,8 +41,10 @@ pub struct AutotuneUi {
     cache: Vec<(String, u64, Filters, Arc<Analysis>)>,
     /// Wideband: correct toward a target AFR (needs wideband logs).
     pub wideband: bool,
-    /// The target AFR as typed ("load:AFR,..."), and why it doesn't parse.
+    /// The targets as typed ("load:AFR,..." or "load:lambda,...") in
+    /// `target_unit`, and why they don't parse.
     target_text: String,
+    target_unit: WbUnit,
     target_error: Option<String>,
     lag: f64,
     /// Wideband: cells measured lean at high load, as text.
@@ -109,10 +112,34 @@ pub fn open(app: &mut XbApp) {
         }
         if a.target_text.is_empty() {
             a.target_text = autotune::TargetAfr::default().text();
+            a.target_unit = WbUnit::Afr;
             a.lag = autotune::DEFAULT_LAG;
         }
         a.wideband = have_wb;
     }
+    let unit = app.settings.wb_unit;
+    retarget(&mut app.autotune, unit);
+}
+
+/// The user switched AFR/lambda (here, in Connect or in Settings).
+pub fn unit_changed(app: &mut XbApp) {
+    let unit = app.settings.wb_unit;
+    retarget(&mut app.autotune, unit);
+    app.autotune.target_error = autotune::TargetAfr::parse(&app.autotune.target_text).err();
+}
+
+/// Rewrite the typed targets in `unit` (the user switched AFR/lambda).
+fn retarget(a: &mut AutotuneUi, unit: WbUnit) {
+    if a.target_unit == unit {
+        return;
+    }
+    if let Ok(t) = autotune::TargetAfr::parse(&a.target_text) {
+        a.target_text = match unit {
+            WbUnit::Afr => t.text(),
+            WbUnit::Lambda => t.lambda_text(),
+        };
+    }
+    a.target_unit = unit;
 }
 
 fn logs(app: &XbApp) -> Vec<Log> {
@@ -144,6 +171,7 @@ pub fn analyse_now(app: &mut XbApp) {
 }
 
 fn run(app: &mut XbApp) {
+    let unit = app.settings.wb_unit;
     let mut s = app.autotune.settings.clone();
     s.filters = filters(app, app.autotune.wideband);
     let Some(tune) = &app.tune else { return };
@@ -193,10 +221,11 @@ fn run(app: &mut XbApp) {
                     (axis(v.and_then(|v| v.y_axis.as_ref())), axis(v.and_then(|v| v.x_axis.as_ref())));
                 for &(r, c) in &a.lean {
                     lean.push(format!(
-                        "{label}: load {} at {} rpm averaged AFR {:.1}",
+                        "{label}: load {} at {} rpm averaged {} {}",
                         ys.get(r).map_or("?".into(), |x| x.to_string()),
                         xs.get(c).map_or("?".into(), |x| x.to_string()),
-                        a.cells[r][c].afr
+                        unit.short(),
+                        unit.fmt(a.cells[r][c].afr)
                     ));
                 }
                 all.extend(p.into_iter().map(|p| (p, true)));
@@ -237,6 +266,12 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     let rear_axes = axes(&app.tune, "Tab_Fuel_Rear");
     let wb_why = wideband_missing(app);
     let have_wb = wb_why.is_none();
+    let unit = app.settings.wb_unit;
+    let mut new_unit = unit;
+    // The typed targets follow the unit, however it was changed.
+    if app.autotune.target_unit != unit {
+        unit_changed(app);
+    }
     let modal = egui::Modal::new(egui::Id::new("autotune")).show(ui.ctx(), |ui| {
         ui.set_width(640.0);
         // Taller than a small window once proposals are listed: scroll.
@@ -244,20 +279,25 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         egui::ScrollArea::vertical().max_height(max_h).min_scrolled_height(max_h).show(ui, |ui| {
             let a = &mut app.autotune;
             a.wideband &= have_wb;
-            let title = if a.wideband { "Auto-tune (wideband, target AFR)" } else { "Auto-tune (EGO, narrowband)" };
+            let title = if a.wideband {
+                format!("Auto-tune (wideband, target {})", unit.word())
+            } else {
+                "Auto-tune (EGO, narrowband)".into()
+            };
             ui.label(RichText::new(title).font(theme::strong_font(19.0)));
             ui.horizontal(|ui| {
                 ui.radio_value(&mut a.wideband, false, "Narrowband (the ECM's EGO correction)");
                 ui.add_enabled_ui(have_wb, |ui| {
-                    ui.radio_value(&mut a.wideband, true, "Wideband (target AFR)")
+                    ui.radio_value(&mut a.wideband, true, format!("Wideband (target {})", unit.word()))
                         .on_disabled_hover_text(wb_why.clone().unwrap_or_default());
                 });
             });
             let how = if a.wideband {
-                "Each cell is corrected so the measured AFR would reach the target AFR for its load \
+                "Each cell is corrected so the measured mixture would reach the target for its load \
                  (new = old × EGO ÷ 100 × measured λ ÷ target λ), in open and closed loop. Only cells with \
-                 enough steady, warm data change. In closed loop the ECM still aims for 14.7, so keep \
-                 light-load targets at 14.7. This edits the open tune only; burning it is a separate step."
+                 enough steady, warm data change. In closed loop the ECM still aims for stoichiometric \
+                 (AFR 14.7, λ 1.00), so keep light-load targets there. This edits the open tune only; \
+                 burning it is a separate step."
             } else {
                 "Where the ECM had to trim the fuel in closed loop, the map is corrected by the same amount \
                  (new = old × EGO ÷ 100). Only cells with enough steady, warm, closed-loop data change. \
@@ -296,10 +336,19 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 });
                 ui.end_row();
                 if a.wideband {
-                    ui.label("Target AFR by load");
+                    ui.label("Show and type as");
+                    ui.horizontal(|ui| {
+                        ui.radio_value(&mut new_unit, WbUnit::Afr, "AFR");
+                        ui.radio_value(&mut new_unit, WbUnit::Lambda, "Lambda (λ)");
+                    });
+                    ui.end_row();
+                    ui.label(format!("Target {} by load", unit.word()));
                     if ui
                         .add(egui::TextEdit::singleline(&mut a.target_text).desired_width(320.0))
-                        .on_hover_text("load:AFR pairs; straight lines between them, flat beyond the ends")
+                        .on_hover_text(format!(
+                            "load:{} pairs; straight lines between them, flat beyond the ends",
+                            unit.word()
+                        ))
                         .changed()
                     {
                         a.target_error = autotune::TargetAfr::parse(&a.target_text).err();
@@ -345,7 +394,11 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     });
                     egui::ScrollArea::vertical().max_height(260.0).show(ui, |ui| {
                         egui::Grid::new("at-props").num_columns(7).striped(true).spacing([12.0, 3.0]).show(ui, |ui| {
-                            let why = if props.first().is_some_and(|(x, _)| x.afr.is_some()) { "AFR / target" } else { "EGO" };
+                            let why = if props.first().is_some_and(|(x, _)| x.afr.is_some()) {
+                                if unit == WbUnit::Lambda { "λ / target" } else { "AFR / target" }
+                            } else {
+                                "EGO"
+                            };
                             for h in ["", "Map", "Load", "RPM", "Change", why, "Samples"] {
                                 ui.label(RichText::new(h).strong());
                             }
@@ -364,7 +417,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                                 let txt = format!("{:.1} -> {:.1} ({pct:+.1}%){}", x.old, x.new, if x.limited { " capped" } else { "" });
                                 ui.label(RichText::new(txt).color(if pct < 0.0 { p.good } else { p.warn }));
                                 match x.afr {
-                                    Some((afr, target)) => ui.label(format!("{afr:.1} / {target:.1}")),
+                                    Some((afr, target)) => ui.label(format!("{} / {}", unit.fmt(afr), unit.fmt(target))),
                                     None => ui.label(format!("{:.1}%", x.ego)),
                                 };
                                 ui.label(format!("{:.0}", x.hits));
@@ -399,6 +452,9 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             });
         });
     });
+    if new_unit != unit {
+        app.set_wb_unit(new_unit);
+    }
     if analyse {
         run(app);
     }

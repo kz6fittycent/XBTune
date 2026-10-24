@@ -382,11 +382,25 @@ fn wideband(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
             }
             ui.radio_value(&mut pick, Some(WidebandPref::Demo), "Simulated LC-2");
         });
+        ui.horizontal(|ui| {
+            use crate::settings::WbUnit;
+            ui.label("Show readings and targets as");
+            let mut unit = app.settings.wb_unit;
+            ui.radio_value(&mut unit, WbUnit::Afr, "AFR");
+            ui.radio_value(&mut unit, WbUnit::Lambda, "Lambda (λ)");
+            if unit != app.settings.wb_unit {
+                app.set_wb_unit(unit);
+            }
+        });
         if pick != before {
-            // A first wideband gets a dashboard gauge.
-            let afr = xbtune_core::wideband::AFR.to_string();
-            if before.is_none() && pick.is_some() && !app.settings.gauges.contains(&afr) {
-                app.settings.gauges.push(afr);
+            // A first wideband gets a dashboard gauge, in the chosen unit.
+            let gauge = match app.settings.wb_unit {
+                crate::settings::WbUnit::Afr => xbtune_core::wideband::AFR,
+                crate::settings::WbUnit::Lambda => xbtune_core::wideband::LAMBDA,
+            }
+            .to_string();
+            if before.is_none() && pick.is_some() && !app.settings.gauges.contains(&gauge) {
+                app.settings.gauges.push(gauge);
             }
             app.settings.wideband = pick;
             app.save_settings();
