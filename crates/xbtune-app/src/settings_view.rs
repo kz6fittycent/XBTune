@@ -150,6 +150,11 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         });
         ui.add_space(8.0);
 
+        if crate::update::applies() {
+            updates_card(app, ui);
+            ui.add_space(8.0);
+        }
+
         theme::card(ui).show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.label(RichText::new("Appearance").font(theme::strong_font(17.0)));
@@ -381,4 +386,41 @@ fn confirm(app: &mut XbApp, ui: &mut Ui, p: &Palette, current: Unlocks) {
     } else {
         app.settings_ui.confirm = Some((lock, understood));
     }
+}
+
+/// New versions: a daily look at GitHub's latest release (never in the snap).
+fn updates_card(app: &mut XbApp, ui: &mut Ui) {
+    let p = Palette::for_visuals(ui.visuals());
+    theme::card(ui).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.label(RichText::new("Updates").font(theme::strong_font(17.0)));
+        ui.label(
+            RichText::new(
+                "Once a day XBTune asks GitHub whether a newer version is out, and if so shows a link to it. \
+                 It never downloads or installs anything by itself.",
+            )
+            .color(p.muted),
+        );
+        if ui.checkbox(&mut app.settings.update_check, "Tell me when a new version is out").changed() {
+            app.save_settings();
+        }
+        ui.horizontal(|ui| {
+            ui.label(format!("This is version {}.", env!("CARGO_PKG_VERSION")));
+            if crate::update::checking(app) {
+                ui.spinner();
+            } else if ui.button("Check now").clicked() {
+                crate::update::check_now(app);
+            }
+            match &app.settings.update_latest {
+                Some(r) if crate::update::is_newer(&r.version, env!("CARGO_PKG_VERSION")) => {
+                    ui.hyperlink_to(format!("{} is available", r.version), &r.url);
+                }
+                Some(_) if app.settings.update_checked_at > 0 => {
+                    ui.label(RichText::new("You have the latest.").color(p.good));
+                }
+                _ => {}
+            }
+        });
+        ui.hyperlink_to("All releases", crate::update::RELEASES_PAGE);
+    });
 }

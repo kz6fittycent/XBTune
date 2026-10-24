@@ -34,6 +34,7 @@ mod splash;
 mod table;
 mod theme;
 mod tune_view;
+mod update;
 #[cfg(target_os = "linux")]
 mod wayland_dnd;
 mod wizard;

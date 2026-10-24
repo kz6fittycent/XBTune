@@ -235,7 +235,15 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   `CC_x86_64_pc_windows_gnu=<stub that emits empty objects>
   AR_x86_64_pc_windows_gnu=llvm-ar-21 cargo clippy --target
   x86_64-pc-windows-gnu` (nothing links; CI is the real build).
-- Not yet: release/pre-release workflow, update notice, Windows
+- Update notice (`update.rs`, owner 2026-10-24: link to the release page,
+  no winget): not in the snap; at start, once a day (settings
+  `update_checked_at`), GET api.github.com/.../releases/latest (ureq via
+  `report::agent`, stable only), newer than CARGO_PKG_VERSION and not
+  `update_skip` -> banner above every view: Download (opens the release's
+  html_url) / Skip this version / ×. Settings "Updates" card: switch,
+  Check now, All releases link. Failures logged only. Hook
+  `XBTUNE_SHOT_UPDATE=<version>`.
+- Not yet: release/pre-release workflow, Windows
   crash handler (SetUnhandledExceptionFilter), installer.
 
 ### UI refresh (owner asked 2026-10-24: "modern UX/UI"; he's not the judge)

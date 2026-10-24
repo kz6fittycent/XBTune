@@ -106,6 +106,14 @@ pub struct Settings {
     pub wideband: Option<WidebandPref>,
     /// AI advisor: "Got it" on its first-use guide.
     pub ai_guide_seen: bool,
+    /// Check GitHub for a newer release once a day (not in the snap).
+    pub update_check: bool,
+    /// When it last checked (Unix seconds).
+    pub update_checked_at: u64,
+    /// The latest stable release it found.
+    pub update_latest: Option<crate::update::Release>,
+    /// "Skip this version".
+    pub update_skip: String,
 }
 
 impl Default for Settings {
@@ -127,6 +135,10 @@ impl Default for Settings {
             disclaimer_accepted: 0,
             wideband: None,
             ai_guide_seen: false,
+            update_check: true,
+            update_checked_at: 0,
+            update_latest: None,
+            update_skip: String::new(),
         }
     }
 }

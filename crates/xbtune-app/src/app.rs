@@ -105,6 +105,7 @@ pub struct XbApp {
     pub history: History,
     pub plugs: Vec<PlugState>,
     pub messages: Vec<Message>,
+    pub update: crate::update::Updater,
     pub chart_paused: Option<f64>,
     pub diag: crate::diagnostics::DiagUi,
     /// The tune being edited, and an image to compare it with.
@@ -202,6 +203,7 @@ impl XbApp {
             history: History::default(),
             plugs: xbtune_core::env::plug_states(),
             messages: Vec::new(),
+            update: Default::default(),
             chart_paused: None,
             diag: Default::default(),
             tune: None,
@@ -370,6 +372,11 @@ impl XbApp {
             if let Ok(which) = std::env::var("XBTUNE_SHOT_UNLOCK") {
                 app.settings_ui.ask(&which);
             }
+            // XBTUNE_SHOT_UPDATE=<version>: the "new version" banner.
+            if let Ok(v) = std::env::var("XBTUNE_SHOT_UPDATE") {
+                let url = format!("{}/tag/v{v}", crate::update::RELEASES_PAGE);
+                app.settings.update_latest = Some(crate::update::Release { version: v, url });
+            }
             // XBTUNE_SHOT_DISCLAIMER=1: the engine-damage warning.
             if std::env::var_os("XBTUNE_SHOT_DISCLAIMER").is_some() {
                 app.disclaimer_open = true;
@@ -423,6 +430,7 @@ impl XbApp {
         if !files.is_empty() && app.shot.is_none() {
             crate::import::open_paths(&mut app, &files);
         }
+        crate::update::start(&mut app);
         app
     }
 
@@ -1169,6 +1177,7 @@ impl eframe::App for XbApp {
             crate::import::open_paths(self, &files);
         }
         self.connect.poll();
+        crate::update::poll(self);
         crate::remote_view::poll(self);
         crate::logs_view::tick(self);
         // A panic the app survived (a background task): offer a report now.
@@ -1193,6 +1202,7 @@ impl eframe::App for XbApp {
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(ui.visuals().extreme_bg_color).inner_margin(18))
             .show(ui, |ui| {
+                crate::update::banner(self, ui);
                 self.messages(ui);
                 match self.view {
                     View::Connect => crate::connect::show(self, ui),

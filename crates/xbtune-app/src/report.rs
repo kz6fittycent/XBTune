@@ -659,7 +659,7 @@ pub fn classify(status: u16, body: &str) -> Outcome {
     }
 }
 
-fn agent() -> ureq::Agent {
+pub fn agent() -> ureq::Agent {
     use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
     // The crypto provider for rustls (ureq is built without its own).
     let _ = rustls::crypto::ring::default_provider().install_default();
