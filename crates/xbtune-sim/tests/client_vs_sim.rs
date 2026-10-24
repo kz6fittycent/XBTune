@@ -56,7 +56,10 @@ async fn garbage_fragments_and_echo_are_tolerated() {
     let mut sim = Simulator::bueib();
     sim.script([Fault::Garbage(7), Fault::Fragment(1), Fault::Fragment(3)]);
     let sim = shared(sim);
-    let mut c = client(&sim);
+    // Fragment(1) sleeps 3 ms per byte, which Windows' ~15.6 ms timer
+    // stretches past fast_policy's 200 ms for a whole version reply.
+    let slow = xbtune_proto::RetryPolicy { timeout: Duration::from_secs(1), ..fast_policy() };
+    let mut c = EcmClient::new(in_process(sim.clone()), EcmAddress::Stock).with_policy(slow);
     for _ in 0..3 {
         assert_eq!(c.version().await.unwrap(), "BUEIB310 12-11-03");
     }
