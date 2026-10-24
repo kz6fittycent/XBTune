@@ -78,6 +78,9 @@ pub struct Log {
     /// The wideband controller named in the header, if the log has its
     /// columns.
     pub wideband: Option<String>,
+    /// Columns of an imported log that XBTune couldn't use (`.msl`
+    /// columns that are no channel of the ECM's definition).
+    pub unread_columns: Vec<String>,
 }
 
 impl Log {
@@ -195,6 +198,7 @@ impl Log {
             skipped,
             source: LogSource::Xbtune,
             wideband,
+            unread_columns: Vec::new(),
         })
     }
 

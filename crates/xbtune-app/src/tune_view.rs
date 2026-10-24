@@ -491,9 +491,12 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
             ui.selectable_value(&mut app.autotune.overlay, Overlay::Off, "Off");
             ui.selectable_value(&mut app.autotune.overlay, Overlay::Hits, "Samples per cell");
             ui.selectable_value(&mut app.autotune.overlay, Overlay::Ego, "Average EGO");
-            if crate::autotune_view::logs_have_wideband(app) {
-                ui.selectable_value(&mut app.autotune.overlay, Overlay::Afr, "Average AFR (wideband)");
-            }
+            // Always shown, so it's clear the option exists and what it needs.
+            let why_not = crate::autotune_view::wideband_missing(app);
+            ui.add_enabled_ui(why_not.is_none(), |ui| {
+                ui.selectable_value(&mut app.autotune.overlay, Overlay::Afr, "Average AFR (wideband)")
+                    .on_disabled_hover_text(why_not.clone().unwrap_or_default());
+            });
             if ui.button("Auto-tune…").clicked() {
                 crate::autotune_view::open(app);
             }
@@ -504,8 +507,30 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
             crate::autotune_view::analysis(app, &v.name)
         }
     } else {
+        if is_fuel {
+            // A tune holds no logged data (AFR included): say where it comes from.
+            ui.label(
+                RichText::new(
+                    "Open a data log in Logs to see samples, EGO or wideband AFR on this map, and to auto-tune it.",
+                )
+                .small()
+                .color(p.muted),
+            );
+        }
         None
     };
+    if let Some(a) = &log_stats
+        && !a.missing_channels.is_empty()
+    {
+        ui.colored_label(
+            p.warn,
+            format!(
+                "The open log has no {} channel, so no sample can be placed on this map (needs RPM, Load and \
+                 EGO Corr.).",
+                a.missing_channels.join(", ")
+            ),
+        );
+    }
     if other.is_some() {
         ui.horizontal_wrapped(|ui| {
             ui.label("Show:");

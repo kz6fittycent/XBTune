@@ -39,7 +39,7 @@ pub struct AutotuneArgs {
     #[arg(long)]
     in_place: bool,
     /// Which fuel maps: front, rear or both.
-    #[arg(long, default_value = "both")]
+    #[arg(long, default_value = "both", value_parser = ["front", "rear", "both"])]
     maps: String,
     /// Minimum sample weight per cell (~6.5 per second spent in a cell).
     #[arg(long, default_value_t = 30.0)]
@@ -172,6 +172,12 @@ pub fn autotune(a: AutotuneArgs) -> Result<()> {
             println!(
                 "{map}: {} of {} samples used (left out: {} open loop, {} cold, {} changing, {} enrichment, {} after a gap, {} missing)",
                 an.used, an.samples, r.open_loop, r.cold, r.transient, r.enrichment, r.gap, r.missing
+            );
+        }
+        if !an.missing_channels.is_empty() {
+            println!(
+                "  a log has no {} channel: auto-tune needs RPM, Load and EGO Corr. in every sample",
+                an.missing_channels.join(", ")
             );
         }
         let ys = tune.var(map).ok().and_then(|v| v.y_axis.clone()).and_then(|n| tune.elements(&n).ok());

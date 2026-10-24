@@ -312,9 +312,32 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     s.push_str(&format!(" · {} unreadable record(s) left out", log.skipped));
                 }
                 if log.source == xbtune_core::logfile::LogSource::Msl {
-                    s.push_str(&format!(" · {} of the ECM's channels in the file", log.channels.len()));
+                    let ecm =
+                        log.channels.iter().filter(|c| !xbtune_core::wideband::is_wideband(c)).count();
+                    s.push_str(&format!(" · {ecm} of the ECM's channels in the file"));
                 }
                 ui.label(RichText::new(s).color(p.muted));
+            }
+            match &log.wideband {
+                Some(w) => {
+                    ui.label(format!("Wideband: {w}"));
+                }
+                None => {
+                    ui.label(RichText::new("Wideband: none in this log").color(p.muted));
+                }
+            }
+            if !log.unread_columns.is_empty() {
+                ui.label(
+                    RichText::new(format!(
+                        "Not read (not channels XBTune knows): {}",
+                        log.unread_columns.join(", ")
+                    ))
+                    .color(p.warn),
+                )
+                .on_hover_text(
+                    "These columns are in the file but match none of the ECM's channels, and aren't a \
+                     wideband AFR or lambda reading. Please report them if one should be read.",
+                );
             }
             if let Some(n) = &log.note {
                 ui.label(format!("Note: {n}"));

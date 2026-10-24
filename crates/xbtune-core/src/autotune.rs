@@ -267,6 +267,9 @@ pub struct Analysis {
     /// Wideband: cells at load >= `LEAN_LOAD` measured leaner than
     /// `LEAN_AFR` on average, as (row, col).
     pub lean: Vec<(usize, usize)>,
+    /// Channels every sample needs that a log doesn't have at all (logs
+    /// from other tools may lack them): then nothing from that log counts.
+    pub missing_channels: Vec<String>,
 }
 
 fn grid_of(v: &EeVar) -> Result<(usize, usize), String> {
@@ -308,6 +311,7 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
         afv: None,
         wideband: wb.is_some(),
         lean: Vec::new(),
+        missing_channels: Vec::new(),
     };
     for log in logs {
         if log.ecm.id != tune.ecm.id {
@@ -317,6 +321,11 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
                 log.ecm.id,
                 tune.ecm.id
             ));
+        }
+        for name in [xch, ych, "EGO Corr."] {
+            if log.channel(name).is_none() && !a.missing_channels.iter().any(|m| m == name) {
+                a.missing_channels.push(name.to_string());
+            }
         }
         let series = |n: &str| log.series(n);
         let (x, y, ego, clt, tpd) =
@@ -810,6 +819,7 @@ mod tests {
             skipped: 0,
             source: Default::default(),
             wideband: None,
+            unread_columns: Vec::new(),
         };
         let a = analyze(std::slice::from_ref(&log), &tune, "Tab_Fuel_Front", &Filters::default()).unwrap();
         assert_eq!(a.used, 199, "{:?}", a.rejected);
@@ -905,6 +915,7 @@ mod tests {
             skipped: 0,
             source: Default::default(),
             wideband: Some("test".into()),
+            unread_columns: Vec::new(),
         };
         let f =
             Filters { mode: Mode::Wideband { target: TargetAfr::default(), lag: 0.3 }, ..Default::default() };

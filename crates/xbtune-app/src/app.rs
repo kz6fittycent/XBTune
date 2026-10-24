@@ -1027,16 +1027,24 @@ impl XbApp {
                 &[(View::Diagnostics, i::DIAGNOSTICS, "Diagnostics"), (View::Resets, i::RESETS, "Resets")],
             ),
         ];
-        for (title, items) in groups {
-            if let Some(t) = title {
-                theme::nav_group(ui, t);
-            }
-            for &(v, icon, label) in items {
-                if theme::nav_item(ui, self.view == v, icon, label).clicked() {
-                    self.view = v;
+        // The views scroll when the window is short, so they never run
+        // under the bottom group (seen on a 768 px laptop screen).
+        let bottom = 3.0 * 36.0 + 48.0;
+        egui::ScrollArea::vertical()
+            .max_height((ui.available_height() - bottom).max(36.0))
+            .auto_shrink([false, true])
+            .show(ui, |ui| {
+                for (title, items) in groups {
+                    if let Some(t) = title {
+                        theme::nav_group(ui, t);
+                    }
+                    for &(v, icon, label) in items {
+                        if theme::nav_item(ui, self.view == v, icon, label).clicked() {
+                            self.view = v;
+                        }
+                    }
                 }
-            }
-        }
+            });
         ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
             ui.add_space(6.0);
             let p = Palette::for_visuals(ui.visuals());

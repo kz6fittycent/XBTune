@@ -246,6 +246,26 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 - Not yet: release/pre-release workflow, Windows
   crash handler (SetUnhandledExceptionFilter), installer.
 
+### Friend's files (2026-10-24; Windows tester with the LC-2)
+
+He has no bike: he opened a tune from a wideband-tuned bike
+(`~/XBTune/Logs/BUEIB340_20260524-1107 (1).xpr`, BUEIB, opens fine)
+and an ECMSpy tune `~/XBTune/Tunes/dhtunerevision3.msq` (XML: veBins,
+advTable, afrBins = per-cell target AFR, own axes; a DIFFERENT tune).
+.msq import is NOT built: KICKOFF section 2 puts ECMSpy's files off
+limits; OWNER TO DECIDE. His .msl log (20261017-1324.msl, "single CL
+firmware", 100% O2 "sensor error") was not sent. Done for him:
+sidebar scrolls on short windows (`XBTUNE_SHOT_SIZE=WxH` hook);
+"Average AFR (wideband)" always shown, greyed with the reason
+(`autotune_view::wideband_missing`); hint under fuel maps with no logs;
+.msl: a column named AFR/lambda/wideband (not an ECM channel) is read as
+the wideband (median decides lambda vs AFR, stoich 14.7), other columns
+listed in `Log::unread_columns` (Logs view, amber); auto-tune names
+missing required channels (`Analysis::missing_channels`: RPM, Load, EGO
+Corr.); CLI `--maps` only takes front|rear|both. He is writing a list
+of questions. Open question for the owner: show RPM ascending
+left-to-right (ECMSpy/TunerStudio habit) instead of storage order?
+
 ### UI refresh (owner asked 2026-10-24: "modern UX/UI"; he's not the judge)
 
 BUILT 2026-10-24 (all 8 below). `icons.rs` (Lucide consts; `// lucide:`

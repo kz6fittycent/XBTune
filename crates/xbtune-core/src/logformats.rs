@@ -24,7 +24,10 @@
 //! both use the database's channel names). Values are rounded in the file,
 //! so a rebuilt frame matches the original only to the column's precision;
 //! the log keeps only the channels the file has, so missing ones read as
-//! missing, not 0.
+//! missing, not 0. A column named like a wideband reading (AFR, lambda)
+//! that is no ECM channel becomes the log's wideband; its numbers decide
+//! whether it is lambda or AFR. Columns left over are listed in
+//! `Log::unread_columns`, so the user sees what wasn't read.
 
 use std::io::{self, Write};
 use std::path::Path;
@@ -88,6 +91,7 @@ pub fn parse_bin(path: &Path, bytes: &[u8], catalog: &Catalog) -> Result<Log, Lo
         skipped,
         source: LogSource::EcmDroidBin,
         wideband: None,
+        unread_columns: Vec::new(),
     })
 }
 
@@ -120,13 +124,21 @@ pub fn parse_msl(path: &Path, text: &str, catalog: &Catalog) -> Result<Log, LogE
     // are rounded, so the one with the largest scale is the most exact in
     // raw terms: write it last.
     cols.sort_by(|a, b| a.1.scale.abs().total_cmp(&b.1.scale.abs()));
+    let used = |i: usize| i == time || cols.iter().any(|(c, _)| *c == i);
+    let wb_col = (0..names.len()).find(|&i| !used(i) && is_wideband_name(&names[i]));
+    let rows: Vec<Vec<&str>> =
+        lines.filter(|l| !l.trim().is_empty()).map(|l| l.split('\t').collect()).collect();
+    let wb = wb_col.and_then(|i| {
+        let values: Vec<f64> = rows.iter().filter_map(|r| r.get(i)?.trim().parse().ok()).collect();
+        Some((i, wideband_unit(&values)?))
+    });
+    let unread: Vec<String> = (0..names.len())
+        .filter(|&i| !used(i) && wb.is_none_or(|(w, _)| w != i) && !names[i].is_empty())
+        .map(|i| names[i].clone())
+        .collect();
     let mut samples = Vec::new();
     let mut skipped = 0;
-    for (n, line) in lines.enumerate() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let cells: Vec<&str> = line.split('\t').collect();
+    for (n, cells) in rows.iter().enumerate() {
         let Some(t) = cells.get(time).and_then(|c| c.trim().parse::<f64>().ok()) else {
             // The first row may be units (MegaLogViewer allows one).
             skipped += usize::from(n > 0);
@@ -138,10 +150,30 @@ pub fn parse_msl(path: &Path, text: &str, catalog: &Catalog) -> Result<Log, LogE
                 put(&mut frame, v, x);
             }
         }
-        samples.push(Sample { t, wall: SystemTime::UNIX_EPOCH, frame, wb: None });
+        let wb = wb.and_then(|(i, unit)| {
+            let x: f64 = cells.get(i)?.trim().parse().ok()?;
+            let lambda = match unit {
+                WbUnit::Lambda => x,
+                WbUnit::Afr => x / STOICH,
+            };
+            Some(crate::wideband::Sensor {
+                status: crate::wideband::Status::Normal,
+                lambda: Some(lambda),
+                stoich: STOICH,
+            })
+        });
+        samples.push(Sample { t, wall: SystemTime::UNIX_EPOCH, frame, wb });
     }
-    let channels: Vec<RtVar> =
+    let mut channels: Vec<RtVar> =
         all.into_iter().filter(|v| cols.iter().any(|(_, c)| c.name == v.name)).collect();
+    let wideband = wb.map(|(i, unit)| {
+        channels.extend(crate::wideband::channels());
+        let unit = match unit {
+            WbUnit::Lambda => "lambda",
+            WbUnit::Afr => "AFR",
+        };
+        format!("column \"{}\" ({unit})", names[i])
+    });
     Ok(Log {
         path: p(),
         version: ecm.id.clone(),
@@ -154,8 +186,48 @@ pub fn parse_msl(path: &Path, text: &str, catalog: &Catalog) -> Result<Log, LogE
         events: Vec::new(),
         skipped,
         source: LogSource::Msl,
-        wideband: None,
+        wideband,
+        unread_columns: unread,
     })
+}
+
+/// Petrol's stoichiometric AFR, to turn a logged AFR into lambda.
+const STOICH: f64 = 14.7;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum WbUnit {
+    Lambda,
+    Afr,
+}
+
+/// A column name that reads like a wideband: "AFR", "Lambda", "WB AFR",
+/// "Wideband O2", "LC-2", "AFR1"...
+fn is_wideband_name(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    n.contains("afr")
+        || n.contains("lambda")
+        || n.contains("wideband")
+        || n.contains("wbo2")
+        || n.contains("lc-2")
+        || n.contains("lc2")
+        || n == "wb"
+        || n.starts_with("wb ")
+}
+
+/// Lambda (around 0.6-1.6) or AFR (around 9-22), from the median of the
+/// column's plausible values; `None` if it's neither (zeros, junk).
+fn wideband_unit(values: &[f64]) -> Option<WbUnit> {
+    let mut v: Vec<f64> = values.iter().copied().filter(|x| x.is_finite() && *x > 0.0).collect();
+    if v.len() < values.len().max(1) / 4 {
+        return None;
+    }
+    v.sort_by(f64::total_cmp);
+    let median = *v.get(v.len() / 2)?;
+    match median {
+        m if (0.5..=2.0).contains(&m) => Some(WbUnit::Lambda),
+        m if (7.0..=30.0).contains(&m) => Some(WbUnit::Afr),
+        _ => None,
+    }
 }
 
 /// Store `value` (engineering units) into the frame at `var`'s place.
@@ -273,6 +345,36 @@ mod tests {
         }
         assert!(bad.is_empty(), "{bad:#?}");
         assert!((msl.samples[10].t * 10.0 - bin.samples[10].t).abs() < 0.01);
+    }
+
+    fn msl(columns: &str, rows: &[&str]) -> Log {
+        let mut text = format!("\"Some logger BUEIB\"\n{columns}\n");
+        for r in rows {
+            text.push_str(r);
+            text.push('\n');
+        }
+        parse_msl(Path::new("x.msl"), &text, &Catalog::builtin().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn msl_wideband_column_is_read_as_afr_or_lambda() {
+        let log = msl("Time\tRPM\tAFR\tMystery", &["0.0\t1000\t14.7\t1", "0.2\t1100\t13.2\t2"]);
+        assert_eq!(log.wideband.as_deref(), Some("column \"AFR\" (AFR)"));
+        assert_eq!(log.unread_columns, ["Mystery"]);
+        let afr = log.channel(crate::wideband::AFR).expect("wideband AFR channel");
+        let got: Vec<f64> = log.samples.iter().map(|s| s.value(afr).unwrap()).collect();
+        assert!((got[0] - 14.7).abs() < 0.01 && (got[1] - 13.2).abs() < 0.01, "{got:?}");
+
+        let log = msl("Time\tRPM\tLambda", &["0.0\t1000\t1.00", "0.2\t1100\t0.90"]);
+        assert_eq!(log.wideband.as_deref(), Some("column \"Lambda\" (lambda)"));
+        let lambda = log.channel(crate::wideband::LAMBDA).unwrap();
+        assert!((log.samples[1].value(lambda).unwrap() - 0.90).abs() < 0.001);
+
+        // A column of zeros (no sensor fitted) is not a wideband reading.
+        let log = msl("Time\tRPM\tAFR", &["0.0\t1000\t0", "0.2\t1100\t0"]);
+        assert!(log.wideband.is_none());
+        assert_eq!(log.unread_columns, ["AFR"]);
+        assert!(log.samples.iter().all(|s| s.wb.is_none()));
     }
 
     #[test]

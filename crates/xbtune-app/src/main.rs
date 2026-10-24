@@ -56,7 +56,9 @@ fn main() -> eframe::Result {
         viewport: egui::ViewportBuilder::default()
             .with_title("XBTune")
             .with_app_id("xbtune")
-            .with_inner_size(saved.map_or([1180.0, 780.0], settings::WindowSize::clamped))
+            .with_inner_size(
+                shot_size().or(saved.map(settings::WindowSize::clamped)).unwrap_or([1180.0, 780.0]),
+            )
             .with_maximized(saved.is_some_and(|w| w.maximized))
             .with_min_inner_size([760.0, 520.0])
             .with_icon(window_icon()),
@@ -70,6 +72,14 @@ fn main() -> eframe::Result {
     rt.shutdown_timeout(std::time::Duration::from_secs(1));
     report::clean_exit();
     result
+}
+
+/// `XBTUNE_SHOT_SIZE=1000x560`: a window size for UI checks (small
+/// laptop screens).
+fn shot_size() -> Option<[f32; 2]> {
+    let v = std::env::var("XBTUNE_SHOT_SIZE").ok()?;
+    let (w, h) = v.split_once('x')?;
+    Some([w.parse().ok()?, h.parse().ok()?])
 }
 
 /// The tach icon for the title bar and taskbar (Linux desktops use the

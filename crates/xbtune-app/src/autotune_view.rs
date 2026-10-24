@@ -50,7 +50,36 @@ pub struct AutotuneUi {
 
 /// Whether every open log has wideband readings.
 pub fn logs_have_wideband(app: &XbApp) -> bool {
-    !app.logs.logs.is_empty() && app.logs.logs.iter().all(|l| l.log.wideband.is_some())
+    wideband_missing(app).is_none()
+}
+
+/// Why the wideband options are off, or `None` when every open log has
+/// wideband readings. A tune file holds no AFR: it comes from logs.
+pub fn wideband_missing(app: &XbApp) -> Option<String> {
+    let logs = &app.logs.logs;
+    let without: Vec<String> = logs
+        .iter()
+        .filter(|l| l.log.wideband.is_none())
+        .map(|l| l.log.path.file_name().unwrap_or_default().to_string_lossy().into_owned())
+        .collect();
+    if logs.is_empty() {
+        Some("Needs a log recorded with a wideband connected: open one in Logs".into())
+    } else if without.len() == logs.len() {
+        Some(format!(
+            "The open log{} {} no wideband readings. Record with Connect > Wideband O2 set, then open that log",
+            if logs.len() == 1 { "" } else { "s" },
+            if logs.len() == 1 { "has" } else { "have" },
+        ))
+    } else if !without.is_empty() {
+        Some(format!(
+            "{} of {} open logs have no wideband readings ({}): close them in Logs",
+            without.len(),
+            logs.len(),
+            without.join(", ")
+        ))
+    } else {
+        None
+    }
 }
 
 /// The filters to use: the dialog's, in wideband mode when chosen (or
@@ -151,6 +180,13 @@ fn run(app: &mut XbApp) {
                     r.gap,
                     p.len()
                 ));
+                if !a.missing_channels.is_empty() {
+                    summary.push(format!(
+                        "{label}: a log has no {} channel, so its samples can't be used (auto-tune needs RPM, \
+                         Load and EGO Corr.)",
+                        a.missing_channels.join(", ")
+                    ));
+                }
                 let v = tune.var(map).ok();
                 let axis = |n: Option<&String>| n.and_then(|n| tune.elements(n).ok()).unwrap_or_default();
                 let (ys, xs) =
@@ -199,7 +235,8 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     };
     let front_axes = axes(&app.tune, "Tab_Fuel_Front");
     let rear_axes = axes(&app.tune, "Tab_Fuel_Rear");
-    let have_wb = logs_have_wideband(app);
+    let wb_why = wideband_missing(app);
+    let have_wb = wb_why.is_none();
     let modal = egui::Modal::new(egui::Id::new("autotune")).show(ui.ctx(), |ui| {
         ui.set_width(640.0);
         // Taller than a small window once proposals are listed: scroll.
@@ -213,7 +250,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 ui.radio_value(&mut a.wideband, false, "Narrowband (the ECM's EGO correction)");
                 ui.add_enabled_ui(have_wb, |ui| {
                     ui.radio_value(&mut a.wideband, true, "Wideband (target AFR)")
-                        .on_disabled_hover_text("Needs logs recorded with a wideband connected");
+                        .on_disabled_hover_text(wb_why.clone().unwrap_or_default());
                 });
             });
             let how = if a.wideband {

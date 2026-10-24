@@ -115,6 +115,7 @@ fn log(tune: &Tune, points: &[(f64, f64, f64)], seconds: f64) -> Log {
         skipped: 0,
         source: Default::default(),
         wideband: None,
+        unread_columns: Vec::new(),
     }
 }
 
