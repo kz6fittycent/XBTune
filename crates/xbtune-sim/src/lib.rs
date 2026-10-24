@@ -14,6 +14,7 @@
 //! relied on outside tests, is marked "ASSUMED" (see docs/PROVENANCE.md).
 
 pub mod engine;
+#[cfg(unix)]
 pub mod pty;
 pub mod wideband;
 

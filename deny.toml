@@ -1,9 +1,14 @@
 # cargo-deny policy. Allowed licenses are fixed by docs/KICKOFF.md section 2.
 [graph]
 all-features = true
-# XBTune is Linux-only (KICKOFF section 3); dependencies that exist only for
-# other platforms (e.g. clipboard-win) are never built or shipped.
-targets = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+# Linux first; Windows builds since phase 10 (owner, 2026-10-24), so its
+# dependencies are checked too. macOS targets join when that work starts.
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    # Phase 10 (Windows, then macOS).
+    "x86_64-pc-windows-msvc",
+]
 
 [advisories]
 version = 2
@@ -33,6 +38,17 @@ allow = [
     "Unicode-DFS-2016",
 ]
 confidence-threshold = 0.9
+
+# egui's clipboard on Windows (arboard -> clipboard-win -> error-code).
+# BSL-1.0 is permissive and GPL-compatible; the owner allowed it for these
+# two crates only, 2026-10-24.
+[[licenses.exceptions]]
+crate = "clipboard-win"
+allow = ["BSL-1.0"]
+
+[[licenses.exceptions]]
+crate = "error-code"
+allow = ["BSL-1.0"]
 
 [bans]
 multiple-versions = "warn"

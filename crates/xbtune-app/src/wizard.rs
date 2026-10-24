@@ -77,12 +77,22 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                         "XBTune needs an adapter on the bike's diagnostic connector: a Bluetooth one \
                      (like the BuellTooth) or a USB cable.",
                     );
-                    bullet(
-                        ui,
-                        "Bluetooth: pair the adapter once in your system's Bluetooth settings, with \
-                     the PIN from the adapter's instructions. XBTune then lists it under Paired devices.",
-                    );
-                    bullet(ui, "USB: plug it in; it shows under USB serial ports.");
+                    if xbtune_link::bluetooth::AVAILABLE {
+                        bullet(
+                            ui,
+                            "Bluetooth: pair the adapter once in your system's Bluetooth settings, with \
+                         the PIN from the adapter's instructions. XBTune then lists it under Paired devices.",
+                        );
+                        bullet(ui, "USB: plug it in; it shows under USB serial ports.");
+                    } else {
+                        bullet(
+                            ui,
+                            "Bluetooth: pair the adapter once in your system's Bluetooth settings, with \
+                         the PIN from the adapter's instructions. The system then gives it a serial port, \
+                         which XBTune lists under Connect.",
+                        );
+                        bullet(ui, "USB: plug it in; it shows up as a serial port too.");
+                    }
                     if !app.plugs.is_empty() {
                         ui.add_space(6.0);
                         ui.label("The snap also needs permission to use them:");

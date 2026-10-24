@@ -8,14 +8,24 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-bluer.workspace = true
 futures.workspace = true
-libc.workspace = true
 serialport.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 xbtune-proto.workspace = true
+
+# BlueZ (RFCOMM sockets, D-Bus discovery) and udev port enumeration are
+# Linux only; elsewhere a paired Bluetooth adapter is a serial port.
+[target.'cfg(target_os = "linux")'.dependencies]
+bluer.workspace = true
+serialport = { workspace = true, features = ["libudev"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

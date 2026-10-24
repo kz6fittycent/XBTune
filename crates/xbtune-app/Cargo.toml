@@ -35,6 +35,9 @@ xbtune-proto.workspace = true
 xbtune-remote.workspace = true
 xbtune-sim.workspace = true
 
+[build-dependencies]
+embed-resource.workspace = true
+
 [target.'cfg(target_os = "linux")'.dependencies]
 smithay-client-toolkit.workspace = true
 wayland-client.workspace = true

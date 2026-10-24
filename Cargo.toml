@@ -22,6 +22,8 @@ anyhow = "1"
 bluer = { version = "0.17", features = ["bluetoothd", "rfcomm"] }
 clap = { version = "4", features = ["derive"] }
 directories = "6"
+# Puts the icon into xbtune.exe (build script; Windows targets only).
+embed-resource = "3"
 # GUI. egui's bundled fonts are off (their licenses fail cargo-deny); the app
 # ships Inter (OFL-1.1) itself.
 # Files dropped on the window under Wayland (winit 0.30 only handles X11
@@ -41,8 +43,11 @@ futures = "0.3"
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-serialport = { version = "4", default-features = false, features = ["libudev"] }
+serialport = { version = "4", default-features = false }
 thiserror = "2"
+# Windows COM port names (SetupAPI, registry). Same version serialport uses;
+# owner OK'd 2026-10-24.
+windows-sys = { version = "0.52", features = ["Win32_Devices_DeviceAndDriverInstallation", "Win32_Foundation", "Win32_System_Registry"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "time", "sync", "fs", "signal"] }
 toml = "0.9"
 tracing = "0.1"

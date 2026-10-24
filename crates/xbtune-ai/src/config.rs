@@ -193,8 +193,10 @@ impl AiConfig {
         }
     }
 
-    /// Write with mode 0600 (temporary file, then rename).
+    /// Write with mode 0600 (temporary file, then rename). Windows has no
+    /// mode bits; `%APPDATA%` is already private to the user there.
     pub fn save(&self, path: &Path) -> Result<(), ConfigError> {
+        #[cfg(unix)]
         use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
         let io = |e| ConfigError::Io(path.into(), e);
         let text =
@@ -204,15 +206,20 @@ impl AiConfig {
         }
         let tmp = path.with_extension("toml.tmp");
         let _ = std::fs::remove_file(&tmp);
-        let mut f =
-            std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&tmp).map_err(io)?;
+        let mut open = std::fs::OpenOptions::new();
+        open.write(true).create_new(true);
+        #[cfg(unix)]
+        open.mode(0o600);
+        let mut f = open.open(&tmp).map_err(io)?;
         f.write_all(b"# XBTune AI advisor (docs/AI.md). Holds your API key: keep it private.\n")
             .map_err(io)?;
         f.write_all(text.as_bytes()).map_err(io)?;
         f.sync_all().map_err(io)?;
         std::fs::rename(&tmp, path).map_err(io)?;
         // An older file may have had wider permissions.
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).map_err(io)
+        #[cfg(unix)]
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).map_err(io)?;
+        Ok(())
     }
 
     /// The key to send: `XBTUNE_AI_KEY`, else the stored one.
@@ -273,15 +280,18 @@ mod tests {
 
     #[test]
     fn saves_private_and_reads_back() {
-        use std::os::unix::fs::PermissionsExt;
         let path = tmp();
         let mut c = AiConfig::default();
         c.apply_preset(preset("anthropic (claude)").unwrap());
         c.model = "claude-opus-5-5".into();
         c.api_key = "sk-test-0123456789".into();
         c.save(&path).unwrap();
-        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
-        assert_eq!(mode, 0o600);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600);
+        }
         assert_eq!(AiConfig::load(&path).unwrap(), c);
         assert!(!format!("{c:?}").contains("0123456789"));
         assert_eq!(AiConfig::load(&path.with_file_name("none.toml")).unwrap(), AiConfig::default());

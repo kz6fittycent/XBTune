@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! The real serial transport against the simulator on a pty.
+#![cfg(unix)]
 
 use xbtune_link::EcmClient;
 use xbtune_link::client::fast_policy;

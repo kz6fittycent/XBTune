@@ -207,6 +207,37 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   bumps (Cargo.toml + lock); bump once per release, in the commit pushed.
   Pushes without a bump are built and checked but not uploaded.
 
+### Phase 10 (Windows) contents
+
+- Approved 2026-10-24: windows-sys 0.52 (serialport's version) for COM
+  port names, embed-resource (build dep) for the .exe icon; BSL-1.0 as a
+  deny.toml exception for clipboard-win + error-code only (egui clipboard).
+- `xbtune-link`: own `BtAddress` (Target::Rfcomm/settings unchanged);
+  `bluetooth` = common API + `bluetooth/bluez.rs` (Linux only; bluer and
+  udev are Linux target deps). Elsewhere `bluetooth::AVAILABLE` is false
+  and connect/scan return "pair it, pick its serial port". `list_ports`:
+  Linux USB only; other OSes every port; Windows labels them via
+  `win_ports` (SetupAPI instance ID: BTHENUM ...&<addr>_C... = Outgoing,
+  000000000000 = Incoming; paired name from BTHPORT\...\Devices\<addr>
+  \Name), outgoing BT first. macOS keeps only `/dev/cu.*`.
+- `env`: files in `Documents\XBTune` on Windows, config/data in
+  `%APPDATA%\xbtune`; non-Linux permission hint = "another program has
+  the port open". AI config: 0600 on Unix only.
+- Sim: pty mode Unix only (`xbtune-sim` says use `--sim`/demo).
+- App: `windows_subsystem = "windows"`; window icon from
+  `assets/icon-128.rgba`, exe icon `assets/xbtune.ico` (both made by
+  `tools/render_icon.py` from snap/gui/xbtune.svg); Connect view: BlueZ
+  card only where AVAILABLE, "Bluetooth or USB cable" card with pairing
+  help elsewhere; wizard text; fatal-signal handler Unix only (panics
+  still caught); report masking also hides `/Users/x` and `C:\Users\x`.
+- CI: `windows` job in ci.yml (clippy, tests, release build, zip artifact
+  `xbtune-windows-x64-<sha>`). Local type-check without mingw:
+  `CC_x86_64_pc_windows_gnu=<stub that emits empty objects>
+  AR_x86_64_pc_windows_gnu=llvm-ar-21 cargo clippy --target
+  x86_64-pc-windows-gnu` (nothing links; CI is the real build).
+- Not yet: release/pre-release workflow, winget, update notice, Windows
+  crash handler (SetUnhandledExceptionFilter), installer.
+
 ### Phase 7 contents
 
 - `xbtune-core::logfile`: reads `xbtune-log 1` CSVs back (time_s + raw
@@ -588,7 +619,8 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
    - burn.txt lists the changed variables (old -> new) and "verified: yes".
      BUILT 2026-10-16: `burn::history_lines` + `ecm:` version line in
      `Worker::save_history` (only verified burns get a history folder).
-10. **AI-assisted tuning** (owner slated it 2026-10-16). Ground rules
+11. **AI-assisted tuning** (was phase 10; owner swapped it with Windows/
+   macOS 2026-10-24) (owner slated it 2026-10-16). Ground rules
    agreed when slating it: the AI is an advisor, never an actor. Its
    suggestions arrive as proposals through the same path as a remote
    tuner's (R3 review: Accept/Reject, one undo step), bounded by the
@@ -626,7 +658,9 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
    Ollama qwen3-coder (findings in AI.md). Next: A2 (structured
    proposals + checker + review), A3 (eval), A4 (bug-report helper).
    HIDDEN 2026-10-22 (owner): `xbtune_ai::enabled()`, see Next steps.
-11. **Windows and macOS** (owner's plan, 2026-10-22; NOT started: wait
+10. **Windows and macOS** (was phase 11; owner moved it ahead of AI and
+   said GO for Windows 2026-10-24: the friend with the LC-2 wideband
+   wants to test, so Windows first) (owner's plan, 2026-10-22; was: wait
    for the owner's go). **Linux is and stays the first-class platform**:
    features land and are tested there first, the snap is the reference
    build, and Windows/macOS must never hold back or complicate a Linux
@@ -697,7 +731,11 @@ owner's friend with the LC-2 wideband. State at the pause:
   one (`git filter-branch` + force-push are blocked for Claude by auto
   mode; give the owner a script to run with `!`). A GitHub Support purge
   of the old SHAs is optional (risk explained as low; owner undecided).
-- Phase 11 (Windows, then macOS last) waits for the owner's go.
+- 2026-10-24: owner swapped phases 10/11 and said GO for Windows (phase
+  10 now). See "Phase 10 (Windows) contents". Icon fixed (orange arc was
+  off the gauge circle). Next: CI green on windows-latest, then a public
+  GitHub PRE-RELEASE zip for the friend with the LC-2 (owner chose that
+  2026-10-24), then winget + update notice.
 
 0. 2026-10-22: splash screen (`splash.rs`: tach needle sweep, name
    fades in, ~2.4 s, click/key skips; Settings -> Startup "Show the

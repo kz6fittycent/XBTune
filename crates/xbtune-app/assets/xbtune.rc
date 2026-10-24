@@ -1,0 +1,2 @@
+// Windows resources for xbtune.exe (build.rs compiles this on Windows only).
+1 ICON "xbtune.ico"

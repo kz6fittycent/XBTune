@@ -164,6 +164,7 @@ pub fn init() -> Option<Crash> {
 
     if let Some(d) = &dir {
         let _ = DIR.set(d.clone());
+        #[cfg(unix)]
         install_signal_handlers(d);
     }
     install_panic_hook();
@@ -400,9 +401,14 @@ fn floor_char(s: &str, max: usize) -> usize {
     (0..=max).rev().find(|&i| s.is_char_boundary(i)).unwrap_or(0)
 }
 
+// Fatal signals (Unix). Windows would need SetUnhandledExceptionFilter;
+// panics are caught by the panic hook on every system.
+
 /// The fd the signal handler writes to (-1: none).
+#[cfg(unix)]
 static FATAL_FD: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
 
+#[cfg(unix)]
 const FATAL_SIGNALS: [(libc::c_int, &[u8]); 5] = [
     (libc::SIGSEGV, b"fatal signal SIGSEGV\n"),
     (libc::SIGBUS, b"fatal signal SIGBUS\n"),
@@ -413,8 +419,10 @@ const FATAL_SIGNALS: [(libc::c_int, &[u8]); 5] = [
 
 /// The handlers Rust's runtime (stack-overflow detection) or a library had
 /// installed, called after ours.
+#[cfg(unix)]
 static PREVIOUS: OnceLock<Vec<(libc::c_int, libc::sigaction)>> = OnceLock::new();
 
+#[cfg(unix)]
 fn install_signal_handlers(dir: &Path) {
     use std::os::fd::IntoRawFd;
     let Ok(f) = OpenOptions::new().create(true).append(true).open(dir.join("fatal.log")) else { return };
@@ -440,6 +448,7 @@ fn install_signal_handlers(dir: &Path) {
     let _ = PREVIOUS.set(previous);
 }
 
+#[cfg(unix)]
 extern "C" fn fatal_handler(sig: libc::c_int, info: *mut libc::siginfo_t, ctx: *mut libc::c_void) {
     let fd = FATAL_FD.load(Ordering::SeqCst);
     if fd >= 0
@@ -548,16 +557,29 @@ fn read_log(max: usize) -> String {
 }
 
 /// Masks what identifies the user: home-folder paths (they contain the
-/// account name) become "~", and Bluetooth addresses become
+/// account name: `/home/jane`, macOS `/Users/jane`, Windows
+/// `C:\Users\jane`) become "~", and Bluetooth addresses become
 /// "XX:XX:XX:XX:XX:XX".
 pub fn mask(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
-    while let Some(i) = rest.find("/home/") {
-        out.push_str(&rest[..i]);
-        let after = &rest[i + 6..];
+    while let Some((i, len)) = home_prefix(rest) {
+        let mut start = i;
+        // Windows: drop the drive letter too ("C:\Users\jane" -> "~"). Account
+        // names there may contain spaces, so the name runs to the next `\`.
+        let windows = rest[i..].starts_with('\\');
+        let b = rest.as_bytes();
+        if windows && i >= 2 && b[i - 1] == b':' && b[i - 2].is_ascii_alphabetic() {
+            start -= 2;
+        }
+        out.push_str(&rest[..start]);
+        let after = &rest[i + len..];
         let end = after
-            .find(|c: char| c == '/' || c.is_whitespace() || "\"'`)]".contains(c))
+            .find(|c: char| match c {
+                '\\' | '\n' | '"' | '\'' | '`' => true,
+                ' ' | '\t' | '/' | ')' | ']' => !windows,
+                _ => false,
+            })
             .unwrap_or(after.len());
         out.push('~');
         rest = &after[end..];
@@ -572,6 +594,13 @@ pub fn mask(text: &str) -> String {
         Some(k) => out.replace(&k, "[API key]"),
         None => out,
     }
+}
+
+/// The first home-folder prefix in `text`: (byte index, length).
+fn home_prefix(text: &str) -> Option<(usize, usize)> {
+    // ASCII lowercase keeps byte offsets.
+    let lower = text.to_ascii_lowercase();
+    ["/home/", "/users/", "\\users\\"].iter().filter_map(|p| lower.find(p).map(|i| (i, p.len()))).min()
 }
 
 fn mask_mac(text: &str) -> String {
@@ -768,6 +797,11 @@ mod tests {
         let t = "opened /home/jane/snap/xbtune/common/data/a.xbt; target rfcomm:00:11:22:AA:BB:CC ch 1";
         assert_eq!(mask(t), "opened ~/snap/xbtune/common/data/a.xbt; target rfcomm:XX:XX:XX:XX:XX:XX ch 1");
         assert_eq!(mask("\"/home/jane\" ok"), "\"~\" ok");
+        assert_eq!(mask("at /Users/jane/XBTune/Logs/a.csv"), "at ~/XBTune/Logs/a.csv");
+        assert_eq!(
+            mask(r"saved C:\Users\Jane Doe\Documents\XBTune\a.xbt and c:\users\jane\AppData"),
+            r"saved ~\Documents\XBTune\a.xbt and ~\AppData"
+        );
         // Times and hex dumps aren't addresses.
         assert_eq!(mask("12:30:45 frame 01:02:03"), "12:30:45 frame 01:02:03");
     }

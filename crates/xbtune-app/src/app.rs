@@ -1150,6 +1150,7 @@ impl eframe::App for XbApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.drain_events();
         // Dropped files: egui's events (X11), our own listener (Wayland).
+        #[cfg_attr(not(target_os = "linux"), allow(unused_mut))]
         let mut files: Vec<PathBuf> = ctx.input(|i| {
             i.raw
                 .dropped_files

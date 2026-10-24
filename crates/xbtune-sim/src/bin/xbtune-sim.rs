@@ -73,10 +73,24 @@ fn main() -> Result<()> {
     };
     let version = cfg.version.clone();
     let sim = shared(Simulator::new(cfg, &image));
+    serve(sim, &version, a.wideband)
+}
+
+/// No pseudo-terminals here: the app's demo and `xbtune-cli --sim` run the
+/// same simulator in-process.
+#[cfg(not(unix))]
+fn serve(_sim: xbtune_sim::SharedSim, _version: &str, _wideband: bool) -> Result<()> {
+    anyhow::bail!(
+        "xbtune-sim needs a pseudo-terminal (Linux, macOS). Use `xbtune-cli ... --sim` or the app's demo"
+    )
+}
+
+#[cfg(unix)]
+fn serve(sim: xbtune_sim::SharedSim, version: &str, wideband: bool) -> Result<()> {
     let pty = xbtune_sim::pty::open().context("opening a pty")?;
     println!("Simulated ECM {version} on {}", pty.path);
     println!("Try: xbtune-cli info --serial {}", pty.path);
-    if a.wideband {
+    if wideband {
         let wb = xbtune_sim::pty::open().context("opening a pty")?;
         println!("Simulated Innovate LC-2 (ISP2) on {}", wb.path);
         println!("Try: xbtune-cli live --serial {} --wideband {}", pty.path, wb.path);

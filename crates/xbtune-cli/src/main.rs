@@ -517,7 +517,10 @@ fn print_stats(s: &LinkStats) {
 fn ports() {
     let ports = xbtune_link::serial::list_ports();
     if ports.is_empty() {
-        println!("No USB serial ports found (/dev/ttyUSB*, /dev/ttyACM*).");
+        println!(
+            "No serial ports found{}.",
+            if cfg!(target_os = "linux") { " (/dev/ttyUSB*, /dev/ttyACM*)" } else { "" }
+        );
         if env::in_snap() {
             println!("If an adapter is plugged in, check: {}", env::permission_hint("raw-usb"));
         }

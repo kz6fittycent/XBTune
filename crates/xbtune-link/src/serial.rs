@@ -133,28 +133,22 @@ pub struct PortInfo {
     pub description: String,
 }
 
-/// List USB serial ports. Falls back to globbing `/dev` when udev
-/// enumeration is unavailable (it can be inside a confined snap).
+/// List serial ports that could be an ECM adapter.
+///
+/// Linux: USB serial ports only (a Bluetooth adapter is reached over RFCOMM
+/// instead). Falls back to globbing `/dev` when udev enumeration is
+/// unavailable (it can be inside a confined snap).
+///
+/// Windows and macOS: every port, because a paired Bluetooth adapter is a
+/// serial port there. Windows makes two per adapter and only the
+/// "Outgoing" one connects: [`crate::win_ports`] tells them apart.
 pub fn list_ports() -> Vec<PortInfo> {
     let mut out: Vec<PortInfo> = serialport::available_ports()
         .unwrap_or_default()
         .into_iter()
-        .filter_map(|p| match p.port_type {
-            serialport::SerialPortType::UsbPort(u) => Some(PortInfo {
-                path: p.port_name,
-                description: format!(
-                    "{:04x}:{:04x} {} {}",
-                    u.vid,
-                    u.pid,
-                    u.manufacturer.unwrap_or_default(),
-                    u.product.unwrap_or_default()
-                )
-                .trim()
-                .to_string(),
-            }),
-            _ => None,
-        })
+        .filter_map(|p| Some(PortInfo { description: describe(p.port_type)?, path: p.port_name }))
         .collect();
+    #[cfg(target_os = "linux")]
     if let Ok(dir) = std::fs::read_dir("/dev") {
         for e in dir.flatten() {
             let name = e.file_name().to_string_lossy().into_owned();
@@ -166,6 +160,69 @@ pub fn list_ports() -> Vec<PortInfo> {
             }
         }
     }
-    out.sort_by(|a, b| a.path.cmp(&b.path));
+    // macOS lists each port twice; the call-out (`cu.`) side is the one to open.
+    #[cfg(target_os = "macos")]
+    out.retain(|p| !p.path.starts_with("/dev/tty."));
+    out.sort_by_key(|p| port_order(&p.path));
+    #[cfg(windows)]
+    windows_names(&mut out);
     out
+}
+
+/// Say which COM port is which, outgoing Bluetooth ports first.
+#[cfg(windows)]
+fn windows_names(out: &mut [PortInfo]) {
+    use crate::win_ports::{self, PortKind};
+    let kinds = win_ports::ports();
+    for p in out.iter_mut() {
+        match kinds.get(&p.path) {
+            Some(PortKind::BluetoothOut { address, name }) => {
+                let name = name.as_deref().unwrap_or("adapter");
+                p.description = format!("Bluetooth {name} ({address}), outgoing: use this one");
+            }
+            Some(PortKind::BluetoothIn) => p.description = "Bluetooth, incoming: not this one".into(),
+            Some(PortKind::Other { friendly: Some(f) }) if p.description.is_empty() => {
+                p.description = f.clone()
+            }
+            _ => {}
+        }
+    }
+    out.sort_by_key(|p| !matches!(kinds.get(&p.path), Some(PortKind::BluetoothOut { .. })));
+}
+
+/// What to show next to a port, or `None` to leave it out.
+fn describe(t: serialport::SerialPortType) -> Option<String> {
+    match t {
+        serialport::SerialPortType::UsbPort(u) => Some(
+            format!(
+                "{:04x}:{:04x} {} {}",
+                u.vid,
+                u.pid,
+                u.manufacturer.unwrap_or_default(),
+                u.product.unwrap_or_default()
+            )
+            .trim()
+            .to_string(),
+        ),
+        serialport::SerialPortType::BluetoothPort if !cfg!(target_os = "linux") => Some("Bluetooth".into()),
+        _ if !cfg!(target_os = "linux") => Some(String::new()),
+        _ => None,
+    }
+}
+
+/// Sort key: `COM2` before `COM10`.
+fn port_order(path: &str) -> (String, u32) {
+    let digits = path.len() - path.trim_end_matches(|c: char| c.is_ascii_digit()).len();
+    let (stem, num) = path.split_at(path.len() - digits);
+    (stem.to_string(), num.parse().unwrap_or(0))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn port_order_is_numeric() {
+        let mut v = ["COM10", "COM2", "/dev/ttyUSB1", "COM1", "/dev/ttyUSB0"];
+        v.sort_by_key(|p| super::port_order(p));
+        assert_eq!(v, ["/dev/ttyUSB0", "/dev/ttyUSB1", "COM1", "COM2", "COM10"]);
+    }
 }

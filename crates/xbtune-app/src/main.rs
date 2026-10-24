@@ -4,6 +4,9 @@
 //! codes and TPS reset, and writes to the ECM, are each locked on real
 //! hardware until the owner unlocks them in Settings.
 
+// No console window beside the app on Windows.
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
 mod afv_fold_view;
 mod ai_view;
 mod ai_wizard;
@@ -49,7 +52,8 @@ fn main() -> eframe::Result {
             .with_title("XBTune")
             .with_app_id("xbtune")
             .with_inner_size([1180.0, 780.0])
-            .with_min_inner_size([760.0, 520.0]),
+            .with_min_inner_size([760.0, 520.0])
+            .with_icon(window_icon()),
         ..Default::default()
     };
     let result = eframe::run_native(
@@ -60,4 +64,13 @@ fn main() -> eframe::Result {
     rt.shutdown_timeout(std::time::Duration::from_secs(1));
     report::clean_exit();
     result
+}
+
+/// The tach icon for the title bar and taskbar (Linux desktops use the
+/// .desktop file's SVG). `tools/render_icon.py` makes the file.
+fn window_icon() -> egui::IconData {
+    const SIZE: u32 = 128;
+    let rgba = include_bytes!("../assets/icon-128.rgba").to_vec();
+    debug_assert_eq!(rgba.len(), (SIZE * SIZE * 4) as usize);
+    egui::IconData { rgba, width: SIZE, height: SIZE }
 }

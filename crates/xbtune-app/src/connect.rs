@@ -163,127 +163,13 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             ui.add_space(8.0);
         }
 
-        // Bluetooth
-        theme::card(ui).show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            ui.horizontal(|ui| {
-                ui.label(RichText::new("Bluetooth (BuellTooth)").font(theme::strong_font(16.0)));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if app.connect.scanning.is_some() {
-                        ui.spinner();
-                        ui.label("Scanning…");
-                    } else {
-                        if ui.button("Scan").on_hover_text("Discover nearby devices for 8 seconds").clicked()
-                        {
-                            let ctx = ui.ctx().clone();
-                            app.connect.scan(&app.rt, &ctx, 8);
-                        }
-                        if ui.button("Paired devices").clicked() {
-                            let ctx = ui.ctx().clone();
-                            app.connect.scan(&app.rt, &ctx, 0);
-                        }
-                    }
-                });
-            });
-            if let Some(e) = &app.connect.scan_error {
-                ui.colored_label(p.bad, e);
-            }
-            let mut chosen = None;
-            if app.connect.devices.is_empty() && app.connect.scanning.is_none() {
-                ui.label(
-                    RichText::new("Press Scan with the ignition on. BuellTooth shows up as an SPP device.")
-                        .color(p.muted),
-                );
-            }
-            egui::Grid::new("bt").num_columns(4).spacing([16.0, 6.0]).striped(true).show(ui, |ui| {
-                for d in &app.connect.devices {
-                    ui.label(RichText::new(d.name.clone().unwrap_or_else(|| "(no name)".into())).strong());
-                    ui.label(RichText::new(d.address.to_string()).color(p.muted));
-                    ui.horizontal(|ui| {
-                        if d.has_spp {
-                            crate::gauge::chip(ui, "serial (SPP)", true);
-                        }
-                        if d.paired {
-                            crate::gauge::chip(ui, "paired", false);
-                        }
-                        if let Some(r) = d.rssi {
-                            ui.label(RichText::new(format!("{r} dBm")).small().color(p.muted));
-                        }
-                    });
-                    if ui.button("Connect").clicked() {
-                        chosen = Some(SavedTarget::Bluetooth {
-                            address: d.address.to_string(),
-                            channel: bluetooth::DEFAULT_CHANNEL,
-                            name: d.name.clone(),
-                            race,
-                        });
-                    }
-                    ui.end_row();
-                }
-            });
-            ui.add_space(4.0);
-            ui.collapsing("Enter an address", |ui| {
-                ui.horizontal(|ui| {
-                    ui.add(
-                        egui::TextEdit::singleline(&mut app.connect.manual_address)
-                            .hint_text("XX:XX:XX:XX:XX:XX")
-                            .desired_width(170.0),
-                    );
-                    ui.label("Channel");
-                    ui.add(egui::DragValue::new(&mut app.connect.manual_channel).range(1..=30));
-                    let valid = xbtune_link::parse_bt_address(app.connect.manual_address.trim()).is_ok();
-                    if ui.add_enabled(valid, egui::Button::new("Connect")).clicked() {
-                        chosen = Some(SavedTarget::Bluetooth {
-                            address: app.connect.manual_address.trim().to_uppercase(),
-                            channel: app.connect.manual_channel,
-                            name: None,
-                            race,
-                        });
-                    }
-                });
-                ui.label(
-                    RichText::new("Pair first if needed: bluetoothctl pair <address> (PIN usually 1234).")
-                        .small()
-                        .color(p.muted),
-                );
-            });
-            if let Some(t) = chosen {
-                app.start(t);
-            }
-        });
-        ui.add_space(8.0);
-
-        // USB serial
-        theme::card(ui).show(ui, |ui| {
-            ui.set_width(ui.available_width());
-            ui.horizontal(|ui| {
-                ui.label(RichText::new("USB serial cable").font(theme::strong_font(16.0)));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Refresh").clicked() {
-                        app.connect.ports = serial::list_ports();
-                    }
-                });
-            });
-            if app.connect.ports.is_empty() {
-                ui.label(
-                    RichText::new("No USB serial adapters found (/dev/ttyUSB*, /dev/ttyACM*).")
-                        .color(p.muted),
-                );
-            }
-            let mut chosen = None;
-            for port in &app.connect.ports {
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(&port.path).strong());
-                    ui.label(RichText::new(&port.description).color(p.muted));
-                    if ui.button("Connect").clicked() {
-                        chosen = Some(SavedTarget::Serial { path: port.path.clone(), race });
-                    }
-                });
-            }
-            if let Some(t) = chosen {
-                app.start(t);
-            }
-        });
+        // Bluetooth through BlueZ (Linux). Elsewhere a paired adapter is a
+        // serial port, listed in the card below.
+        if bluetooth::AVAILABLE {
+            bluetooth_card(app, ui, &p, race);
+            ui.add_space(8.0);
+        }
+        serial_card(app, ui, &p, race);
         ui.add_space(8.0);
         wideband(app, ui, &p);
         ui.add_space(8.0);
@@ -311,6 +197,147 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 });
             });
         });
+    });
+}
+
+/// The Bluetooth card: BlueZ scan, paired devices, a typed address.
+fn bluetooth_card(app: &mut XbApp, ui: &mut Ui, p: &Palette, race: bool) {
+    theme::card(ui).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Bluetooth (BuellTooth)").font(theme::strong_font(16.0)));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if app.connect.scanning.is_some() {
+                    ui.spinner();
+                    ui.label("Scanning…");
+                } else {
+                    if ui.button("Scan").on_hover_text("Discover nearby devices for 8 seconds").clicked() {
+                        let ctx = ui.ctx().clone();
+                        app.connect.scan(&app.rt, &ctx, 8);
+                    }
+                    if ui.button("Paired devices").clicked() {
+                        let ctx = ui.ctx().clone();
+                        app.connect.scan(&app.rt, &ctx, 0);
+                    }
+                }
+            });
+        });
+        if let Some(e) = &app.connect.scan_error {
+            ui.colored_label(p.bad, e);
+        }
+        let mut chosen = None;
+        if app.connect.devices.is_empty() && app.connect.scanning.is_none() {
+            ui.label(
+                RichText::new("Press Scan with the ignition on. BuellTooth shows up as an SPP device.")
+                    .color(p.muted),
+            );
+        }
+        egui::Grid::new("bt").num_columns(4).spacing([16.0, 6.0]).striped(true).show(ui, |ui| {
+            for d in &app.connect.devices {
+                ui.label(RichText::new(d.name.clone().unwrap_or_else(|| "(no name)".into())).strong());
+                ui.label(RichText::new(d.address.to_string()).color(p.muted));
+                ui.horizontal(|ui| {
+                    if d.has_spp {
+                        crate::gauge::chip(ui, "serial (SPP)", true);
+                    }
+                    if d.paired {
+                        crate::gauge::chip(ui, "paired", false);
+                    }
+                    if let Some(r) = d.rssi {
+                        ui.label(RichText::new(format!("{r} dBm")).small().color(p.muted));
+                    }
+                });
+                if ui.button("Connect").clicked() {
+                    chosen = Some(SavedTarget::Bluetooth {
+                        address: d.address.to_string(),
+                        channel: bluetooth::DEFAULT_CHANNEL,
+                        name: d.name.clone(),
+                        race,
+                    });
+                }
+                ui.end_row();
+            }
+        });
+        ui.add_space(4.0);
+        ui.collapsing("Enter an address", |ui| {
+            ui.horizontal(|ui| {
+                ui.add(
+                    egui::TextEdit::singleline(&mut app.connect.manual_address)
+                        .hint_text("XX:XX:XX:XX:XX:XX")
+                        .desired_width(170.0),
+                );
+                ui.label("Channel");
+                ui.add(egui::DragValue::new(&mut app.connect.manual_channel).range(1..=30));
+                let valid = xbtune_link::parse_bt_address(app.connect.manual_address.trim()).is_ok();
+                if ui.add_enabled(valid, egui::Button::new("Connect")).clicked() {
+                    chosen = Some(SavedTarget::Bluetooth {
+                        address: app.connect.manual_address.trim().to_uppercase(),
+                        channel: app.connect.manual_channel,
+                        name: None,
+                        race,
+                    });
+                }
+            });
+            ui.label(
+                RichText::new("Pair first if needed: bluetoothctl pair <address> (PIN usually 1234).")
+                    .small()
+                    .color(p.muted),
+            );
+        });
+        if let Some(t) = chosen {
+            app.start(t);
+        }
+    });
+}
+
+#[cfg(target_os = "windows")]
+const PAIRING_HELP: &str = "BuellTooth: pair it first in Settings > Bluetooth & devices > Add device (PIN \
+     usually 1234). Windows gives it two COM ports; use the Outgoing one (More Bluetooth settings > COM \
+     Ports tab). A USB cable shows up as a COM port too.";
+#[cfg(target_os = "macos")]
+const PAIRING_HELP: &str = "BuellTooth: pair it first in System Settings > Bluetooth (PIN usually 1234). It \
+     then shows up here as /dev/cu.<its name>. A USB cable shows up as /dev/cu.usbserial-...";
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+const PAIRING_HELP: &str = "";
+
+#[cfg(target_os = "linux")]
+const NO_PORTS: &str = "No USB serial adapters found (/dev/ttyUSB*, /dev/ttyACM*).";
+#[cfg(not(target_os = "linux"))]
+const NO_PORTS: &str = "No serial ports found. Pair the adapter or plug in the cable, then press Refresh.";
+
+/// Serial ports: USB cables; on Windows and macOS also paired Bluetooth
+/// adapters.
+fn serial_card(app: &mut XbApp, ui: &mut Ui, p: &Palette, race: bool) {
+    theme::card(ui).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.horizontal(|ui| {
+            let title = if bluetooth::AVAILABLE { "USB serial cable" } else { "Bluetooth or USB cable" };
+            ui.label(RichText::new(title).font(theme::strong_font(16.0)));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.button("Refresh").clicked() {
+                    app.connect.ports = serial::list_ports();
+                }
+            });
+        });
+        if !bluetooth::AVAILABLE {
+            ui.label(RichText::new(PAIRING_HELP).small().color(p.muted));
+        }
+        if app.connect.ports.is_empty() {
+            ui.label(RichText::new(NO_PORTS).color(p.muted));
+        }
+        let mut chosen = None;
+        for port in &app.connect.ports {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(&port.path).strong());
+                ui.label(RichText::new(&port.description).color(p.muted));
+                if ui.button("Connect").clicked() {
+                    chosen = Some(SavedTarget::Serial { path: port.path.clone(), race });
+                }
+            });
+        }
+        if let Some(t) = chosen {
+            app.start(t);
+        }
     });
 }
 

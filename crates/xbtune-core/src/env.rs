@@ -4,12 +4,13 @@
 //! Two kinds of storage:
 //! - The user's files (tunes read from the ECM, backups, data logs, burn
 //!   history) go in a folder the user can see: `~/XBTune` by default
-//!   (the real home, not the snap's), or wherever they choose in the app's
+//!   (the real home, not the snap's; `Documents\XBTune` on Windows), or wherever they choose in the app's
 //!   Settings (saved in `<config>/folders.toml`, read by the CLI too).
 //! - XBTune's own files (settings, unlocks, the app log, unsent reports)
 //!   stay out of the way: `$SNAP_USER_COMMON/{config,data}` in the snap,
 //!   which survives refreshes and reverts (`$SNAP_USER_DATA` is per
-//!   revision and never used), else the XDG directories.
+//!   revision and never used), else the XDG directories (`%APPDATA%\xbtune`
+//!   on Windows).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -58,7 +59,7 @@ impl Dirs {
             (common.join("config"), common.join("data"), real_home()?.join("XBTune"))
         } else {
             let d = directories::ProjectDirs::from("", "", "xbtune")?;
-            (d.config_dir().to_path_buf(), d.data_dir().to_path_buf(), real_home()?.join("XBTune"))
+            (d.config_dir().to_path_buf(), d.data_dir().to_path_buf(), standard_files_dir()?)
         };
         let files = chosen_files_dir(&config).unwrap_or(default_files);
         Some(Self { config, data, files })
@@ -94,9 +95,20 @@ impl Dirs {
     pub fn default_files(&self) -> Option<PathBuf> {
         match std::env::var_os("XBTUNE_HOME") {
             Some(home) => Some(PathBuf::from(home).join("files")),
-            None => real_home().map(|h| h.join("XBTune")),
+            None if in_snap() => real_home().map(|h| h.join("XBTune")),
+            None => standard_files_dir(),
         }
     }
+}
+
+/// `~/XBTune`; on Windows `Documents\XBTune`, where people look for files
+/// (a folder straight in the profile is unusual there).
+fn standard_files_dir() -> Option<PathBuf> {
+    #[cfg(windows)]
+    if let Some(docs) = directories::UserDirs::new().and_then(|u| u.document_dir().map(Path::to_path_buf)) {
+        return Some(docs.join("XBTune"));
+    }
+    real_home().map(|h| h.join("XBTune"))
 }
 
 /// The user's real home folder (in the snap, `$HOME` is the snap's own).
@@ -302,6 +314,10 @@ pub fn permission_hint(plug: &str) -> String {
             "The snap is not allowed to use this device. Run:\n    sudo snap connect {}:{plug}",
             snap_name().unwrap_or_else(|| "xbtune".into())
         )
+    } else if !cfg!(target_os = "linux") {
+        "The system refused to open the port. Another program (EcmDroid, TunerPro, a terminal) may \
+         have it open: close it and try again."
+            .to_string()
     } else if plug == "raw-usb" {
         "Your user cannot open the serial port. Add yourself to the 'dialout' group:\n    \
          sudo usermod -aG dialout $USER   (then log out and back in)"

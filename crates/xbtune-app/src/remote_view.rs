@@ -453,9 +453,12 @@ fn start_ui(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
 /// Local wall-clock time, "14:05".
 pub fn hhmm(t: SystemTime) -> String {
     let secs = t.duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs()) as libc::time_t;
-    // SAFETY: localtime_r only writes the `tm` we pass; zeroed is a valid tm.
+    // SAFETY: localtime_r/_s only write the `tm` we pass; zeroed is a valid tm.
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    #[cfg(unix)]
     let ok = unsafe { !libc::localtime_r(&secs, &mut tm).is_null() };
+    #[cfg(windows)]
+    let ok = unsafe { libc::localtime_s(&mut tm, &secs) == 0 };
     if ok { format!("{:02}:{:02}", tm.tm_hour, tm.tm_min) } else { String::new() }
 }
 
