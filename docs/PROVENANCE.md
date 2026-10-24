@@ -221,6 +221,8 @@ known-good source:**
 | File | Source |
 |---|---|
 | `fonts/Inter-Regular.ttf`, `fonts/Inter-SemiBold.ttf`, `fonts/Inter-OFL.txt` | Inter 4.1, official release `Inter-4.1.zip` from github.com/rsms/inter (sha256 `9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e`), files `extras/ttf/*` and `LICENSE.txt`. SIL Open Font License 1.1. |
+| `fonts/lucide.ttf`, `fonts/Lucide-LICENSE.txt` | Lucide icons, npm package `lucide-static@1.54.0` (tarball sha256 `e902c38c3b0b132c90c26cd24e7021068e278a53c4c72fc3e49ef53dfe9d35fa`), `font/lucide.ttf` subset by `tools/subset_lucide.py` to the icons `src/icons.rs` names (codepoints checked against the package's `font/codepoints.json`), and `LICENSE`. ISC; icons derived from Feather are MIT (same file). Owner chose Lucide 2026-10-24. |
+| `icon-128.rgba`, `xbtune.ico` | Rendered from `snap/gui/xbtune.svg` (ours) by `tools/render_icon.py`. |
 
 Gauge ranges in the app (`gauge.rs`) are XBTune display choices, not ECM data.
 

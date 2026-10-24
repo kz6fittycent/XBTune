@@ -114,6 +114,24 @@ pub struct Settings {
     pub update_latest: Option<crate::update::Release>,
     /// "Skip this version".
     pub update_skip: String,
+    /// The window as it was left (size only: a remembered position can be
+    /// off-screen once a monitor is unplugged).
+    pub window: Option<WindowSize>,
+}
+
+/// The main window's size, in points.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct WindowSize {
+    pub width: f32,
+    pub height: f32,
+    pub maximized: bool,
+}
+
+impl WindowSize {
+    /// The size to open at, kept within sane bounds.
+    pub fn clamped(self) -> [f32; 2] {
+        [self.width.clamp(760.0, 7680.0), self.height.clamp(520.0, 4320.0)]
+    }
 }
 
 impl Default for Settings {
@@ -139,6 +157,7 @@ impl Default for Settings {
             update_checked_at: 0,
             update_latest: None,
             update_skip: String::new(),
+            window: None,
         }
     }
 }

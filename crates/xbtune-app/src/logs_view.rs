@@ -228,7 +228,10 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 ui.label(format!("{:.0} s · {:.1} Hz", l.log.duration(), l.log.rate()));
                 let playing = app.logs.play.as_ref().is_some_and(|pb| pb.log == i);
                 let can = app.link.state.is_none() || playing || app.logs.play.is_some();
-                let b = ui.add_enabled(can && !playing, egui::Button::new("Play").small());
+                let b = ui.add_enabled(
+                    can && !playing,
+                    egui::Button::new(crate::icons::with(crate::icons::PLAY, "Play")).small(),
+                );
                 if !can {
                     b.on_disabled_hover_text("Disconnect from the ECM to play a log");
                 } else if b.clicked() {
@@ -380,7 +383,12 @@ fn playback_bar(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             ui.label(RichText::new(format!("Playing {name}")).strong());
-            if ui.button(if playing { "Pause" } else { "Play" }).clicked() {
+            let label = if playing {
+                crate::icons::with(crate::icons::PAUSE, "Pause")
+            } else {
+                crate::icons::with(crate::icons::PLAY, "Play")
+            };
+            if ui.button(label).clicked() {
                 if !playing && t >= t1 {
                     seek_to = Some(t0);
                 }

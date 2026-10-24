@@ -31,7 +31,12 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         }
         ui.separator();
         let paused = app.chart_paused.is_some();
-        if ui.button(if paused { "Resume" } else { "Pause" }).clicked() {
+        let label = if paused {
+            crate::icons::with(crate::icons::PLAY, "Resume")
+        } else {
+            crate::icons::with(crate::icons::PAUSE, "Pause")
+        };
+        if ui.button(label).clicked() {
             app.chart_paused = if paused { None } else { app.history.latest().map(|s| s.t) };
         }
         ui.menu_button("Channels", |ui| {

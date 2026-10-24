@@ -231,16 +231,8 @@ pub fn confirm_dialog(app: &mut XbApp, ui: &mut Ui) {
             );
         }
         ui.add_space(8.0);
-        ui.horizontal(|ui| {
-            let label = if remote && !direct { "Ask" } else { "Run" };
-            let run = egui::Button::new(RichText::new(label).color(egui::Color32::WHITE)).fill(p.accent);
-            if ui.add_enabled(app.diag.safe, run).clicked() {
-                go = true;
-            }
-            if ui.button("Cancel").clicked() {
-                cancel = true;
-            }
-        });
+        let label = if remote && !direct { "Ask" } else { "Run" };
+        (go, cancel) = theme::dialog_buttons(ui, theme::primary(label), app.diag.safe, "Cancel");
     });
     if modal.should_close() || cancel {
         app.diag.confirm = None;

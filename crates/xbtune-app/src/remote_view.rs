@@ -880,14 +880,11 @@ pub fn dialogs(app: &mut XbApp, ui: &mut Ui) {
             });
             ui.add(egui::TextEdit::singleline(&mut note).hint_text("Note (goes into the burn history)").desired_width(420.0));
             ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                if ui.button(if direct { "Start" } else { "Ask" }).clicked() {
-                    act = Some(true);
-                }
-                if ui.button("Cancel").clicked() {
-                    act = Some(false);
-                }
-            });
+            match theme::dialog_buttons(ui, theme::primary(if direct { "Start" } else { "Ask" }), true, "Cancel") {
+                (true, _) => act = Some(true),
+                (_, true) => act = Some(false),
+                _ => {}
+            }
         });
         match act {
             Some(true) => {
@@ -917,15 +914,12 @@ pub fn dialogs(app: &mut XbApp, ui: &mut Ui) {
                 }
             });
             ui.checkbox(&mut ticked, "I've checked these changes");
-            ui.horizontal(|ui| {
-                let b = egui::Button::new(RichText::new("Burn").color(egui::Color32::WHITE)).fill(p.bad);
-                if ui.add_enabled(ticked && !lines.is_empty(), b).clicked() {
-                    act = Some(true);
-                }
-                if ui.button("Cancel").clicked() {
-                    act = Some(false);
-                }
-            });
+            let b = egui::Button::new(RichText::new("Burn").color(egui::Color32::WHITE)).fill(p.bad);
+            match theme::dialog_buttons(ui, b, ticked && !lines.is_empty(), "Cancel") {
+                (true, _) => act = Some(true),
+                (_, true) => act = Some(false),
+                _ => {}
+            }
         });
         app.remote.guest.review = Some((id, lines, ticked));
         match act {

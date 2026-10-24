@@ -701,10 +701,7 @@ fn review_table(ui: &mut Ui, p: &Palette, r: &mut Review, i: usize) -> bool {
             if r.applied {
                 ui.colored_label(p.good, "Applied to the tune (Undo reverts it).");
             } else {
-                let b = egui::Button::new(
-                    RichText::new(format!("Apply {n} change(s) to the tune")).color(egui::Color32::WHITE),
-                )
-                .fill(p.accent);
+                let b = theme::primary(format!("Apply {n} change(s) to the tune"));
                 if ui.add_enabled(n > 0, b).clicked() {
                     apply = true;
                 }
@@ -916,7 +913,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     .desired_width(f32::INFINITY),
             );
             ui.horizontal(|ui| {
-                let b = egui::Button::new(RichText::new("Send").color(egui::Color32::WHITE)).fill(p.accent);
+                let b = theme::primary("Send");
                 if ui.add_enabled(!a.question.trim().is_empty(), b).clicked() {
                     ask = true;
                 }

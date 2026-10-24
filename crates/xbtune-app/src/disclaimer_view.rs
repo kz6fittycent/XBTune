@@ -32,7 +32,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         ui.checkbox(&mut app.disclaimer_ticked, "I have read this and accept the risk");
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            let b = egui::Button::new(RichText::new("Continue").color(egui::Color32::WHITE)).fill(p.accent);
+            let b = theme::primary("Continue");
             if ui.add_enabled(app.disclaimer_ticked, b).clicked() {
                 accept = true;
             }

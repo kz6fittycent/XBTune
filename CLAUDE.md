@@ -248,6 +248,22 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
 
 ### UI refresh (owner asked 2026-10-24: "modern UX/UI"; he's not the judge)
 
+BUILT 2026-10-24 (all 8 below). `icons.rs` (Lucide consts; `// lucide:`
+names drive `tools/subset_lucide.py`, needs fontTools + `npm pack
+lucide-static@1.54.0`), Lucide FIRST in every font family (Inter has its
+own private-use glyphs; tests: subset maps only PUA, every const is in
+it). `theme`: `primary` (ACCENT_FILL d95600, white text), `icon_button`,
+`toggle` (switch), `nav_item`/`nav_group`, `dialog_buttons` (Windows:
+main first; else last; right-aligned), `progress`; radius 6, checkbox
+18 px, hairline borders, tinted selection, inactive bg_fill = page bg
+(empty checkboxes/radios), menu_margin 14 (dialogs). `apply` also sends
+ViewportCommand::SetTheme (Windows title bar). Settings `window`
+(size + maximized; no position) restored in main.rs except in
+screenshot mode. Sidebar: Connect / RIDE / TUNE / SERVICE, bottom:
+Getting started, Report a problem, Settings, version + lock state.
+Header: link stats in the status tooltip (error % only when > 0),
+sun/moon theme icon. Tune: title row, file row (Burn last), cell-op
+icon buttons, "?" popover with how-to + shortcuts.
 Review of every view (demo screenshots, both themes) found, in order:
 1. Windows title bar follows the app theme (else white over dark).
 2. Remember window size/position/maximized.

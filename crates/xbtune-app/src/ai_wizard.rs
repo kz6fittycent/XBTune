@@ -337,14 +337,14 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 _ => false,
             };
             if w.step < 3 {
-                let b = egui::Button::new(RichText::new("Next").color(egui::Color32::WHITE)).fill(p.accent);
+                let b = theme::primary("Next");
                 if ui.add_enabled(can_next, b).clicked() {
                     w.step += 1;
                     w.error = None;
                 }
             } else {
                 let ok = matches!(w.result, Some(Ok(_)));
-                let b = egui::Button::new(RichText::new("Finish").color(egui::Color32::WHITE)).fill(p.accent);
+                let b = theme::primary("Finish");
                 if ui.add_enabled(ok, b).clicked() {
                     finish = true;
                 }

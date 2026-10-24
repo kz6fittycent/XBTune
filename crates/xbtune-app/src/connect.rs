@@ -151,7 +151,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                                     | LinkState::Reconnecting { .. }
                             )
                         );
-                        if ui.add_enabled(!busy, egui::Button::new("Connect")).clicked() {
+                        if ui.add_enabled(!busy, theme::primary("Connect")).clicked() {
                             app.start(last.clone());
                         }
                         if ui.checkbox(&mut app.settings.auto_connect, "Connect on start").changed() {
@@ -191,7 +191,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     );
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Start demo").clicked() {
+                    if ui.button(crate::icons::with(crate::icons::DEMO, "Start demo")).clicked() {
                         app.start(SavedTarget::Demo { race });
                     }
                 });
@@ -205,7 +205,10 @@ fn bluetooth_card(app: &mut XbApp, ui: &mut Ui, p: &Palette, race: bool) {
     theme::card(ui).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
-            ui.label(RichText::new("Bluetooth (BuellTooth)").font(theme::strong_font(16.0)));
+            ui.label(
+                RichText::new(crate::icons::with(crate::icons::BLUETOOTH, "Bluetooth (BuellTooth)"))
+                    .font(theme::strong_font(16.0)),
+            );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if app.connect.scanning.is_some() {
                     ui.spinner();
@@ -311,10 +314,14 @@ fn serial_card(app: &mut XbApp, ui: &mut Ui, p: &Palette, race: bool) {
     theme::card(ui).show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
-            let title = if bluetooth::AVAILABLE { "USB serial cable" } else { "Bluetooth or USB cable" };
+            let title = if bluetooth::AVAILABLE {
+                crate::icons::with(crate::icons::USB, "USB serial cable")
+            } else {
+                crate::icons::with(crate::icons::BLUETOOTH, "Bluetooth or USB cable")
+            };
             ui.label(RichText::new(title).font(theme::strong_font(16.0)));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("Refresh").clicked() {
+                if ui.button(crate::icons::with(crate::icons::REFRESH, "Refresh")).clicked() {
                     app.connect.ports = serial::list_ports();
                 }
             });
@@ -347,7 +354,10 @@ fn wideband(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
     use crate::settings::WidebandPref;
     theme::card(ui).show(ui, |ui| {
         ui.set_width(ui.available_width());
-        ui.label(RichText::new("Wideband O2 (optional)").font(theme::strong_font(16.0)));
+        ui.label(
+            RichText::new(crate::icons::with(crate::icons::WIDEBAND, "Wideband O2 (optional)"))
+                .font(theme::strong_font(16.0)),
+        );
         ui.label(
             RichText::new(
                 "An Innovate LC-2 (or another Innovate MTS device) on its own USB serial cable, plugged into \

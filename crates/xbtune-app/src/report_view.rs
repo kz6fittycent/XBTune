@@ -263,17 +263,8 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     }
                 }
                 ui.add_space(8.0);
-                ui.horizontal(|ui| {
-                    let b = egui::Button::new(RichText::new("Send report").color(egui::Color32::WHITE))
-                        .fill(p.accent);
-                    if ui.add(b).clicked() {
-                        send = true;
-                    }
-                    let cancel = if crash.is_some() { "Don't send" } else { "Cancel" };
-                    if ui.button(cancel).clicked() {
-                        discard = true;
-                    }
-                });
+                let cancel = if crash.is_some() { "Don't send" } else { "Cancel" };
+                (send, discard) = theme::dialog_buttons(ui, theme::primary("Send report"), true, cancel);
             }
             ReportUi::Sending { .. } => {
                 ui.label(RichText::new("Sending…").font(theme::strong_font(19.0)));

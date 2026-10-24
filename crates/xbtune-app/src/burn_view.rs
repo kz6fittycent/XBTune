@@ -292,7 +292,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             BurnUi::Closed => {}
             BurnUi::Preparing { progress, .. } => {
                 ui.label("Checking the engine is stopped and the link is good, then reading and saving a backup of the whole EEPROM.");
-                ui.add(egui::ProgressBar::new(*progress).show_percentage());
+                ui.add(theme::progress(*progress).show_percentage());
                 ui.label(RichText::new("Nothing is written until you confirm.").color(p.muted));
             }
             BurnUi::Review { mode, path, link, changes, chosen, note, confirmed, .. } => {
@@ -385,16 +385,13 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     );
                 }
                 ui.checkbox(confirmed, format!("Write {} variable(s) to the ECM", chosen.len()));
-                ui.horizontal(|ui| {
-                    let ok = *confirmed && !chosen.is_empty();
-                    let b = egui::Button::new(RichText::new("Write to ECM").color(egui::Color32::WHITE)).fill(p.bad);
-                    if ui.add_enabled(ok, b).clicked() {
-                        action = Some(Action::Burn);
-                    }
-                    if ui.button("Cancel").clicked() {
-                        action = Some(Action::Close);
-                    }
-                });
+                let ok = *confirmed && !chosen.is_empty();
+                let b = egui::Button::new(RichText::new("Write to ECM").color(egui::Color32::WHITE)).fill(p.bad);
+                match theme::dialog_buttons(ui, b, ok, "Cancel") {
+                    (true, _) => action = Some(Action::Burn),
+                    (_, true) => action = Some(Action::Close),
+                    _ => {}
+                }
             }
             BurnUi::Burning { step, .. } => {
                 let (f, text) = match step {
@@ -404,7 +401,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     }
                     Some(BurnStep::Verifying { page }) => (0.9, format!("reading back page {page}")),
                 };
-                ui.add(egui::ProgressBar::new(f).text(text));
+                ui.add(theme::progress(f).text(text));
                 ui.colored_label(p.warn, "Don't switch off the ignition or move away from the bike.");
             }
             BurnUi::Done(s) => {

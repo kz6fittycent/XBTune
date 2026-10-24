@@ -184,15 +184,21 @@ fn toolbar(app: &mut XbApp, ui: &mut Ui) {
             );
             ui.label(RichText::new(format!("{} · {}", t.ecm.id, t.ecm.family)).color(p.muted));
         }
-        ui.separator();
-        if ui.button("Open…").clicked() {
+    });
+    // File actions on a row of their own; the most dangerous one last.
+    ui.horizontal_wrapped(|ui| {
+        use crate::icons as i;
+        if ui.button(i::with(i::OPEN, "Open…")).clicked() {
             app.tune_ui.pick = Some(Pick::Open);
         }
         let live = app.link.live();
         // On the tuner's side the bike owner shares the tune instead.
         let can_read = live && app.link.remote.is_none();
         if ui
-            .add_enabled(can_read && app.tune_ui.read_progress.is_none(), egui::Button::new("Read from ECM"))
+            .add_enabled(
+                can_read && app.tune_ui.read_progress.is_none(),
+                egui::Button::new(i::with(i::READ, "Read from ECM")),
+            )
             .on_hover_text(
                 "Read and verify the whole EEPROM (read-only); saved as a backup in the images folder",
             )
@@ -202,9 +208,42 @@ fn toolbar(app: &mut XbApp, ui: &mut Ui) {
             app.send(Command::ReadEeprom);
         }
         let has = app.tune.is_some();
+        let may_save = has && !crate::remote_sync::save_blocked(app);
+        let blocked = "The bike owner hasn't allowed saving a copy of their tune";
+        if ui
+            .add_enabled(may_save, egui::Button::new(i::with(i::SAVE, "Save")))
+            .on_hover_text("Ctrl+S")
+            .on_disabled_hover_text(blocked)
+            .clicked()
+        {
+            save(app, false);
+        }
+        if ui.add_enabled(may_save, egui::Button::new("Save as…")).on_disabled_hover_text(blocked).clicked()
+        {
+            app.tune_ui.pick = Some(Pick::SaveAs);
+        }
+        ui.separator();
+        let (cu, cr) = app.tune.as_ref().map_or((false, false), |t| (t.can_undo(), t.can_redo()));
+        let ul = app.tune.as_ref().and_then(|t| t.undo_label().map(str::to_string)).unwrap_or_default();
+        let rl = app.tune.as_ref().and_then(|t| t.redo_label().map(str::to_string)).unwrap_or_default();
+        if theme::icon_button(ui, cu, i::UNDO, &tip("Undo", &ul, "Ctrl+Z")).clicked() {
+            undo(app, false);
+        }
+        if theme::icon_button(ui, cr, i::REDO, &tip("Redo", &rl, "Ctrl+Y")).clicked() {
+            undo(app, true);
+        }
+        ui.separator();
+        if ui.add_enabled(has, egui::Button::new(i::with(i::COMPARE, "Compare with…"))).clicked() {
+            app.tune_ui.pick = Some(Pick::Compare);
+        }
+        ui.separator();
         let can_burn = has && live && app.writes_permitted() && !app.burn.is_open();
         let burn_btn =
-            egui::Button::new(RichText::new("Burn to ECM…").color(if can_burn { p.bad } else { p.muted }));
+            egui::Button::new(RichText::new(i::with(i::BURN, "Burn to ECM…")).color(if can_burn {
+                p.bad
+            } else {
+                p.muted
+            }));
         let r = ui.add_enabled(can_burn, burn_btn);
         let r = if !app.writes_permitted() {
             r.on_disabled_hover_text(xbtune_core::diag::write_locked_message())
@@ -216,37 +255,7 @@ fn toolbar(app: &mut XbApp, ui: &mut Ui) {
         if r.clicked() {
             start_burn(app);
         }
-        let may_save = has && !crate::remote_sync::save_blocked(app);
-        let blocked = "The bike owner hasn't allowed saving a copy of their tune";
-        if ui.add_enabled(may_save, egui::Button::new("Save")).on_disabled_hover_text(blocked).clicked() {
-            save(app, false);
-        }
-        if ui.add_enabled(may_save, egui::Button::new("Save as…")).on_disabled_hover_text(blocked).clicked()
-        {
-            app.tune_ui.pick = Some(Pick::SaveAs);
-        }
-        ui.separator();
-        let (cu, cr) = app.tune.as_ref().map_or((false, false), |t| (t.can_undo(), t.can_redo()));
-        let ul = app.tune.as_ref().and_then(|t| t.undo_label().map(str::to_string)).unwrap_or_default();
-        let rl = app.tune.as_ref().and_then(|t| t.redo_label().map(str::to_string)).unwrap_or_default();
-        if ui
-            .add_enabled(cu, egui::Button::new("Undo"))
-            .on_hover_text(format!("Undo {ul} (Ctrl+Z)"))
-            .clicked()
-        {
-            undo(app, false);
-        }
-        if ui
-            .add_enabled(cr, egui::Button::new("Redo"))
-            .on_hover_text(format!("Redo {rl} (Ctrl+Y)"))
-            .clicked()
-        {
-            undo(app, true);
-        }
-        ui.separator();
-        if ui.add_enabled(has, egui::Button::new("Compare with…")).clicked() {
-            app.tune_ui.pick = Some(Pick::Compare);
-        }
+
         if let Some((path, _)) = &app.compare {
             ui.label(
                 RichText::new(format!("vs {}", path.file_name().unwrap_or_default().to_string_lossy()))
@@ -259,11 +268,7 @@ fn toolbar(app: &mut XbApp, ui: &mut Ui) {
         }
         if let Some((done, total)) = app.tune_ui.read_progress {
             ui.separator();
-            ui.add(
-                egui::ProgressBar::new(done as f32 / total.max(1) as f32)
-                    .desired_width(160.0)
-                    .show_percentage(),
-            );
+            ui.add(theme::progress(done as f32 / total.max(1) as f32).desired_width(160.0).show_percentage());
             if ui.small_button("Cancel").clicked() {
                 app.send(Command::CancelRead);
             }
@@ -276,7 +281,7 @@ fn var_list(app: &mut XbApp, ui: &mut Ui, modified: &[String], differs: &[String
     let Some(t) = &app.tune else { return };
     ui.add(
         egui::TextEdit::singleline(&mut app.tune_ui.filter)
-            .hint_text("Search variables")
+            .hint_text(crate::icons::with(crate::icons::SEARCH, "Search variables"))
             .desired_width(f32::INFINITY),
     );
     let f = app.tune_ui.filter.to_lowercase();
@@ -517,16 +522,87 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         });
     }
 
-    // How-to line and shortcuts help.
+    // Operations toolbar: value, then what to do with it; the how-to and
+    // the shortcuts live behind "?".
+    let mut op: Option<Op> = None;
+    let mut copy = false;
+    let mut paste = false;
     ui.horizontal_wrapped(|ui| {
+        use crate::icons as i;
+        let n = app.tune_ui.sel.cells.len();
         ui.label(
-            RichText::new(
-                "1. Select cells: click; drag or Shift-click for a block; Ctrl-click to add; click a row or column heading for the whole line.   2. Type a number.   3. Press an action.",
-            )
-            .small()
-            .color(p.muted),
+            RichText::new(if n == 0 { "Select cells".into() } else { format!("{n} selected") })
+                .color(p.muted),
         );
-        ui.menu_button(RichText::new("Shortcuts").small(), |ui| {
+        let resp = ui.add(
+            egui::TextEdit::singleline(&mut app.tune_ui.value_text).hint_text("number").desired_width(70.0),
+        );
+        let num: Option<f64> = app.tune_ui.value_text.trim().parse().ok();
+        let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
+        let can = n > 0;
+        let with_num = can && num.is_some();
+        if (ui
+            .add_enabled(with_num, egui::Button::new(i::with(i::EQUAL, "Set")))
+            .on_hover_text("Set the selected cells to the value (Enter)")
+            .clicked()
+            || (enter && can))
+            && let Some(x) = num
+        {
+            op = Some(Op::Set(x));
+        }
+        for (icon, tip, make) in [
+            (i::PLUS, "Add the value", Op::Add as fn(f64) -> Op),
+            (i::MINUS, "Subtract the value", |x| Op::Add(-x)),
+            ("×", "Multiply by the value", Op::Multiply),
+            (i::PERCENT, "Change by the value in percent (5 = +5%)", Op::Percent),
+        ] {
+            if theme::icon_button(ui, with_num, icon, tip).clicked() {
+                op = num.map(make);
+            }
+        }
+        ui.separator();
+        if theme::icon_button(ui, can, i::SMOOTH, "Smooth: average each cell with its neighbours").clicked() {
+            op = Some(Op::Smooth);
+        }
+        if theme::icon_button(ui, can, i::ACROSS, "Fill across: a straight line across each selected row")
+            .clicked()
+        {
+            op = Some(Op::InterpolateRows);
+        }
+        if theme::icon_button(ui, can, i::DOWN, "Fill down: a straight line down each selected column")
+            .clicked()
+        {
+            op = Some(Op::InterpolateCols);
+        }
+        ui.separator();
+        copy = theme::icon_button(ui, can, i::COPY, "Copy (Ctrl+C); pastes into spreadsheets too").clicked();
+        let can_paste = app.tune_ui.sel.anchor.is_some() && app.tune_ui.clip.is_some();
+        paste = theme::icon_button(ui, can_paste, i::PASTE, "Paste at the top-left selected cell (Ctrl+V)")
+            .clicked();
+        ui.separator();
+        if let Some(pn) = &partner_name {
+            ui.checkbox(&mut app.tune_ui.link, "Link front/rear")
+                .on_hover_text(format!("Apply the same operation to {pn}"));
+        }
+        if matches!(v.shape, Shape::Grid { .. }) {
+            let b = egui::Button::selectable(app.tune_ui.view3d, RichText::new(i::with(i::CUBE, "3D")));
+            if ui.add(b).on_hover_text("Show the map as a 3D surface (drag to rotate)").clicked() {
+                app.tune_ui.view3d = !app.tune_ui.view3d;
+            }
+        }
+        ui.menu_button(RichText::new(i::QUESTION).size(16.0), |ui| {
+            ui.set_max_width(420.0);
+            ui.label(RichText::new("Editing a map").strong());
+            for step in [
+                "1. Select cells: click; drag or Shift-click for a block; Ctrl-click to add; click a row or \
+                 column heading for the whole line.",
+                "2. Type a number.",
+                "3. Press an action.",
+            ] {
+                ui.label(step);
+            }
+            ui.add_space(6.0);
+            ui.label(RichText::new("Shortcuts").strong());
             egui::Grid::new("keys").num_columns(2).spacing([16.0, 4.0]).show(ui, |ui| {
                 for (k, what) in [
                     ("Enter (in the value box)", "Set the selected cells to the value"),
@@ -542,95 +618,9 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
                     ui.end_row();
                 }
             });
-        });
-    });
-
-    // Operations toolbar.
-    let mut op: Option<Op> = None;
-    let mut copy = false;
-    let mut paste = false;
-    ui.horizontal_wrapped(|ui| {
-        let n = app.tune_ui.sel.cells.len();
-        ui.label(
-            RichText::new(if n == 0 { "Select cells".into() } else { format!("{n} selected") })
-                .color(p.muted),
-        );
-        let resp = ui.add(
-            egui::TextEdit::singleline(&mut app.tune_ui.value_text).hint_text("number").desired_width(70.0),
-        );
-        let num: Option<f64> = app.tune_ui.value_text.trim().parse().ok();
-        let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
-        let can = n > 0;
-        if (ui.add_enabled(can && num.is_some(), egui::Button::new("Set")).clicked() || (enter && can))
-            && let Some(x) = num
-        {
-            op = Some(Op::Set(x));
-        }
-        if ui
-            .add_enabled(can && num.is_some(), egui::Button::new("+ Add"))
-            .on_hover_text("Add the value")
-            .clicked()
-        {
-            op = num.map(Op::Add);
-        }
-        if ui
-            .add_enabled(can && num.is_some(), egui::Button::new("− Subtract"))
-            .on_hover_text("Subtract the value")
-            .clicked()
-        {
-            op = num.map(|x| Op::Add(-x));
-        }
-        if ui
-            .add_enabled(can && num.is_some(), egui::Button::new("× Multiply"))
-            .on_hover_text("Multiply by the value")
-            .clicked()
-        {
-            op = num.map(Op::Multiply);
-        }
-        if ui
-            .add_enabled(can && num.is_some(), egui::Button::new("% Change"))
-            .on_hover_text("Change by the value in percent (5 = +5%)")
-            .clicked()
-        {
-            op = num.map(Op::Percent);
-        }
-        if ui
-            .add_enabled(can, egui::Button::new("Smooth"))
-            .on_hover_text("Average each cell with its neighbours")
-            .clicked()
-        {
-            op = Some(Op::Smooth);
-        }
-        if ui
-            .add_enabled(can, egui::Button::new("Fill across ↔"))
-            .on_hover_text("Straight line across each selected row")
-            .clicked()
-        {
-            op = Some(Op::InterpolateRows);
-        }
-        if ui
-            .add_enabled(can, egui::Button::new("Fill down ↕"))
-            .on_hover_text("Straight line down each selected column")
-            .clicked()
-        {
-            op = Some(Op::InterpolateCols);
-        }
-        ui.separator();
-        copy = ui.add_enabled(can, egui::Button::new("Copy")).on_hover_text("Ctrl+C").clicked();
-        paste = ui
-            .add_enabled(
-                app.tune_ui.sel.anchor.is_some() && app.tune_ui.clip.is_some(),
-                egui::Button::new("Paste"),
-            )
-            .on_hover_text("Ctrl+V; pastes at the top-left selected cell")
-            .clicked();
-        if let Some(pn) = &partner_name {
-            ui.checkbox(&mut app.tune_ui.link, "Link front/rear")
-                .on_hover_text(format!("Apply the same operation to {pn}"));
-        }
-        if matches!(v.shape, Shape::Grid { .. }) {
-            ui.checkbox(&mut app.tune_ui.view3d, "3D");
-        }
+        })
+        .response
+        .on_hover_text("How to edit, and keyboard shortcuts");
     });
 
     if app.tune_ui.view3d && matches!(v.shape, Shape::Grid { .. }) {
@@ -893,6 +883,11 @@ fn undo(app: &mut XbApp, redo: bool) {
 
 /// Save to the current file, or ask for a name. A pristine read from the
 /// ECM is never overwritten: it's the backup.
+/// "Undo Set 3 cells (Ctrl+Z)", or "Undo (Ctrl+Z)" with nothing to undo.
+fn tip(verb: &str, what: &str, keys: &str) -> String {
+    if what.is_empty() { format!("{verb} ({keys})") } else { format!("{verb} {what} ({keys})") }
+}
+
 fn save(app: &mut XbApp, _force_dialog: bool) {
     let Some(t) = &app.tune else { return };
     let protected = t.image.meta.source.starts_with("read from ECM") && t.image.meta.modified.is_empty();

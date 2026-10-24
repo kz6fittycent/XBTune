@@ -20,6 +20,7 @@ mod diagnostics;
 mod disclaimer_view;
 mod gauge;
 mod grid;
+mod icons;
 mod import;
 mod logs_view;
 mod remote_sync;
@@ -48,11 +49,15 @@ fn main() -> eframe::Result {
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
     let handle = rt.handle().clone();
 
+    // Reopen at the size it was left (UI checks keep the default size).
+    let saved = settings::Settings::load(settings::Settings::path().as_deref()).window;
+    let saved = saved.filter(|_| std::env::var_os("XBTUNE_SCREENSHOT").is_none());
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("XBTune")
             .with_app_id("xbtune")
-            .with_inner_size([1180.0, 780.0])
+            .with_inner_size(saved.map_or([1180.0, 780.0], settings::WindowSize::clamped))
+            .with_maximized(saved.is_some_and(|w| w.maximized))
             .with_min_inner_size([760.0, 520.0])
             .with_icon(window_icon()),
         ..Default::default()

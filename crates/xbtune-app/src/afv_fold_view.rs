@@ -89,7 +89,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         ui.add_space(8.0);
         ui.horizontal(|ui| {
             let ok = plan.is_ok() && !tuned && !neutral;
-            let b = egui::Button::new(RichText::new("Fold into the maps").color(egui::Color32::WHITE)).fill(p.accent);
+            let b = theme::primary("Fold into the maps");
             if ui.add_enabled(ok, b).clicked() {
                 apply = true;
             }

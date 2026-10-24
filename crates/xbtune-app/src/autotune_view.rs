@@ -352,8 +352,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 let n = a.proposals.as_ref().map_or(0, |v| v.iter().filter(|(_, on)| *on).count());
-                let b = egui::Button::new(RichText::new(format!("Apply {n} change(s) to the tune")).color(egui::Color32::WHITE))
-                    .fill(p.accent);
+                let b = theme::primary(format!("Apply {n} change(s) to the tune"));
                 if ui.add_enabled(n > 0, b).clicked() {
                     apply = true;
                 }

@@ -168,7 +168,11 @@ pub fn banner(app: &mut XbApp, ui: &mut Ui) {
             );
             ui.label(RichText::new(format!("You have {}.", env!("CARGO_PKG_VERSION"))).color(p.muted));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.small_button("×").on_hover_text("Hide until XBTune starts again").clicked() {
+                if ui
+                    .small_button(crate::icons::CLOSE)
+                    .on_hover_text("Hide until XBTune starts again")
+                    .clicked()
+                {
                     app.update.hidden = true;
                 }
                 if ui.button("Skip this version").clicked() {
@@ -176,10 +180,7 @@ pub fn banner(app: &mut XbApp, ui: &mut Ui) {
                     app.save_settings();
                 }
                 if ui
-                    .add(
-                        egui::Button::new(RichText::new("Download").color(egui::Color32::WHITE))
-                            .fill(p.accent),
-                    )
+                    .add(theme::primary(crate::icons::with(crate::icons::DOWNLOAD, "Download")))
                     .on_hover_text(&rel.url)
                     .clicked()
                 {

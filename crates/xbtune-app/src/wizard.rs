@@ -206,13 +206,13 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if step + 1 == STEPS {
                     let b =
-                        egui::Button::new(RichText::new("Finish").color(egui::Color32::WHITE)).fill(p.accent);
+                        theme::primary("Finish");
                     if ui.add(b).clicked() {
                         action = Some(Action::Finish);
                     }
                 } else {
                     let b =
-                        egui::Button::new(RichText::new("Next").color(egui::Color32::WHITE)).fill(p.accent);
+                        theme::primary("Next");
                     if ui.add(b).clicked() {
                         action = Some(Action::Next);
                     }

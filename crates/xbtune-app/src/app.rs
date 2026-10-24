@@ -41,6 +41,9 @@ pub enum View {
     Settings,
 }
 
+/// A sidebar entry: view, icon, label.
+type NavItem = (View, &'static str, &'static str);
+
 /// What the UI knows about the link.
 #[derive(Default)]
 pub struct LinkView {
@@ -106,6 +109,9 @@ pub struct XbApp {
     pub plugs: Vec<PlugState>,
     pub messages: Vec<Message>,
     pub update: crate::update::Updater,
+    /// `hardware.toml` allows EEPROM writes (sidebar note; read at start
+    /// and when Settings changes it).
+    writes_unlocked: bool,
     pub chart_paused: Option<f64>,
     pub diag: crate::diagnostics::DiagUi,
     /// The tune being edited, and an image to compare it with.
@@ -204,6 +210,7 @@ impl XbApp {
             plugs: xbtune_core::env::plug_states(),
             messages: Vec::new(),
             update: Default::default(),
+            writes_unlocked: xbtune_core::diag::unlocks().eeprom_writes,
             chart_paused: None,
             diag: Default::default(),
             tune: None,
@@ -452,6 +459,26 @@ impl XbApp {
         self.messages.push(Message { text, error, at: Instant::now() });
     }
 
+    /// Remember the window's size (saved with the settings at exit). While
+    /// maximized, the size from before stays.
+    fn track_window(&mut self, ctx: &egui::Context) {
+        if self.shot.is_some() {
+            return;
+        }
+        let (rect, maximized) = ctx.input(|i| (i.viewport().inner_rect, i.viewport().maximized));
+        let Some(maximized) = maximized else { return };
+        let mut w = self.settings.window.unwrap_or(crate::settings::WindowSize {
+            width: 1180.0,
+            height: 780.0,
+            maximized,
+        });
+        w.maximized = maximized;
+        if let Some(r) = rect.filter(|_| !maximized) {
+            (w.width, w.height) = (r.width(), r.height());
+        }
+        self.settings.window = Some(w);
+    }
+
     pub fn egui_ctx(&self) -> &egui::Context {
         &self.egui_ctx
     }
@@ -676,6 +703,7 @@ impl XbApp {
                 }
                 Err(e) => return self.say(format!("Couldn't save the safety locks: {e}"), true),
             }
+            self.writes_unlocked = u.eeprom_writes;
         }
         let demo = self.link.target.as_ref().is_some_and(SavedTarget::is_demo);
         let permit = xbtune_core::diag::permit(demo).ok();
@@ -862,7 +890,26 @@ impl XbApp {
             };
             let (r, painter) = ui.allocate_painter(egui::vec2(10.0, 10.0), egui::Sense::hover());
             painter.circle_filled(r.rect.center(), 5.0, dot);
-            ui.label(text);
+            // Link details for those who want them; the bar stays calm.
+            let status = ui.label(text);
+            if let Some(st) = &self.link.stats {
+                let rtt = st.rtt_avg.map_or("-".into(), |d| format!("{:.0} ms", d.as_secs_f64() * 1000.0));
+                status.on_hover_text(format!(
+                    "{:.1} updates a second · round trip {rtt} · errors {:.0}% · retries {} · reconnects {}",
+                    self.link.hz,
+                    st.recent_error_rate() * 100.0,
+                    st.retries,
+                    self.link.reconnects
+                ));
+                let err = st.recent_error_rate() * 100.0;
+                if err > 0.0 {
+                    let color = if err >= 10.0 { p.bad } else { p.warn };
+                    ui.label(RichText::new(format!("{err:.0}% errors")).color(color).size(12.5))
+                        .on_hover_text(
+                            "Replies lost or garbled lately. Move the laptop closer to the adapter.",
+                        );
+                }
+            }
             if let Some((label, state)) = &self.link.wideband
                 && self.session.is_some()
             {
@@ -903,30 +950,29 @@ impl XbApp {
                 }
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                let next = match self.settings.theme {
-                    ThemePref::System => ThemePref::Dark,
-                    ThemePref::Dark => ThemePref::Light,
-                    ThemePref::Light => ThemePref::System,
+                let (icon, now, next) = match self.settings.theme {
+                    ThemePref::System => (crate::icons::SUN_MOON, "follow the system", ThemePref::Dark),
+                    ThemePref::Dark => (crate::icons::MOON, "dark", ThemePref::Light),
+                    ThemePref::Light => (crate::icons::SUN, "light", ThemePref::System),
                 };
-                let label = match self.settings.theme {
-                    ThemePref::System => "Theme: system",
-                    ThemePref::Dark => "Theme: dark",
-                    ThemePref::Light => "Theme: light",
-                };
-                if ui.button(label).clicked() {
+                if theme::icon_button(ui, true, icon, &format!("Theme: {now} (click to change)")).clicked() {
                     self.settings.theme = next;
                     theme::apply(ui.ctx(), next);
                     self.save_settings();
                 }
                 if self.session.is_some() {
-                    if ui.button("Disconnect").clicked() {
+                    if ui.button(crate::icons::with(crate::icons::DISCONNECT, "Disconnect")).clicked() {
                         self.stop();
                     }
                     if self.link.live() || self.link.log.is_some() {
                         match &self.link.log {
                             Some((_, rows)) => {
                                 let b = egui::Button::new(
-                                    RichText::new(format!("■ Stop log ({rows})")).color(Color32::WHITE),
+                                    RichText::new(crate::icons::with(
+                                        crate::icons::STOP,
+                                        &format!("Stop log ({rows})"),
+                                    ))
+                                    .color(Color32::WHITE),
                                 )
                                 .fill(p.bad);
                                 if ui.add(b).clicked() {
@@ -935,7 +981,10 @@ impl XbApp {
                             }
                             None => {
                                 if ui
-                                    .button(RichText::new("● Record").color(p.bad))
+                                    .button(
+                                        RichText::new(crate::icons::with(crate::icons::RECORD, "Record"))
+                                            .color(p.bad),
+                                    )
                                     .on_hover_text("Log every frame to CSV")
                                     .clicked()
                                 {
@@ -945,71 +994,82 @@ impl XbApp {
                         }
                     }
                 }
-                if let Some(st) = &self.link.stats {
-                    let rtt =
-                        st.rtt_avg.map_or("-".into(), |d| format!("{:.0} ms", d.as_secs_f64() * 1000.0));
-                    let err = st.recent_error_rate() * 100.0;
-                    let color = if err >= 10.0 {
-                        p.bad
-                    } else if err > 0.0 {
-                        p.warn
-                    } else {
-                        p.muted
-                    };
-                    // The full line when there's room (the buttons are already
-                    // placed), else the short one.
-                    let text = if ui.available_width() > 360.0 {
-                        format!(
-                            "{:.1} Hz · RTT {rtt} · errors {err:.0}% · retries {} · reconnects {}",
-                            self.link.hz, st.retries, self.link.reconnects
-                        )
-                    } else {
-                        format!("{:.1} Hz · errors {err:.0}%", self.link.hz)
-                    };
-                    ui.label(RichText::new(text).color(color).size(12.5)).on_hover_text(format!(
-                        "RTT {rtt} · retries {} · reconnects {}",
-                        st.retries, self.link.reconnects
-                    ));
-                }
             });
         });
     }
 
     fn nav(&mut self, ui: &mut Ui) {
+        use crate::icons as i;
         ui.add_space(8.0);
-        for (v, label) in [
-            (View::Connect, "Connect"),
-            (View::Dashboard, "Dashboard"),
-            (View::Data, "Live data"),
-            (View::Charts, "Charts"),
-            (View::Diagnostics, "Diagnostics"),
-            (View::Resets, "Resets"),
-            (View::Tune, "Tune"),
-            (View::Setup, "Setup"),
-            (View::Logs, "Logs"),
-            (View::Remote, "Remote"),
-            (View::Settings, "Settings"),
-        ] {
-            let selected = self.view == v;
-            let text = RichText::new(label).size(15.0);
-            let text = if selected { text.font(theme::strong_font(15.0)) } else { text };
-            if ui.add_sized([ui.available_width(), 34.0], egui::Button::selectable(selected, text)).clicked()
-            {
-                self.view = v;
+        ui.spacing_mut().item_spacing.y = 2.0;
+        // Grouped by what the rider is doing; Settings stays at the bottom.
+        let groups: [(Option<&str>, &[NavItem]); 4] = [
+            (None, &[(View::Connect, i::CONNECT, "Connect")]),
+            (
+                Some("Ride"),
+                &[
+                    (View::Dashboard, i::DASHBOARD, "Dashboard"),
+                    (View::Data, i::DATA, "Live data"),
+                    (View::Charts, i::CHARTS, "Charts"),
+                    (View::Logs, i::LOGS, "Logs"),
+                ],
+            ),
+            (
+                Some("Tune"),
+                &[
+                    (View::Tune, i::TUNE, "Tune"),
+                    (View::Setup, i::SETUP, "Setup"),
+                    (View::Remote, i::REMOTE, "Remote"),
+                ],
+            ),
+            (
+                Some("Service"),
+                &[(View::Diagnostics, i::DIAGNOSTICS, "Diagnostics"), (View::Resets, i::RESETS, "Resets")],
+            ),
+        ];
+        for (title, items) in groups {
+            if let Some(t) = title {
+                theme::nav_group(ui, t);
+            }
+            for &(v, icon, label) in items {
+                if theme::nav_item(ui, self.view == v, icon, label).clicked() {
+                    self.view = v;
+                }
             }
         }
         ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
             ui.add_space(6.0);
-            ui.label(RichText::new(format!("v{}", crate::report::version())).small().weak());
-            ui.label(RichText::new("EEPROM writes only via Burn").small().weak());
-            ui.add_space(6.0);
-            let w = ui.available_width();
-            if ui.add_sized([w, 28.0], egui::Button::new("Report a problem")).clicked() {
+            let p = Palette::for_visuals(ui.visuals());
+            ui.horizontal(|ui| {
+                ui.add_space(14.0);
+                ui.label(RichText::new(format!("v{}", crate::report::version())).small().color(p.muted));
+                let (icon, text, tip) = if self.writes_unlocked {
+                    (i::UNLOCK, "Writes unlocked", "Burning and resets are allowed (Settings > Safety locks)")
+                } else {
+                    (
+                        i::LOCK,
+                        "Writes locked",
+                        "XBTune can't write to a real ECM until you allow it in Settings",
+                    )
+                };
+                ui.label(RichText::new(i::with(icon, text)).small().color(if self.writes_unlocked {
+                    p.warn
+                } else {
+                    p.muted
+                }))
+                .on_hover_text(tip);
+            });
+            ui.add_space(4.0);
+            if theme::nav_item(ui, self.view == View::Settings, i::SETTINGS, "Settings").clicked() {
+                self.view = View::Settings;
+            }
+            if theme::nav_item(ui, false, i::BUG, "Report a problem").clicked() {
                 self.report.open();
             }
-            if ui.add_sized([w, 28.0], egui::Button::new("Getting started")).clicked() {
+            if theme::nav_item(ui, false, i::HELP, "Getting started").clicked() {
                 self.wizard.open();
             }
+            ui.separator();
         });
     }
 
@@ -1036,7 +1096,7 @@ impl XbApp {
                             ui.add(egui::Label::new(&m.text).wrap());
                         });
                         ui.with_layout(Layout::right_to_left(Align::TOP), |ui| {
-                            if ui.small_button("Dismiss").clicked() {
+                            if ui.small_button(crate::icons::CLOSE).on_hover_text("Dismiss").clicked() {
                                 dismiss = Some(i);
                             }
                         });
@@ -1178,6 +1238,7 @@ impl eframe::App for XbApp {
         }
         self.connect.poll();
         crate::update::poll(self);
+        self.track_window(ctx);
         crate::remote_view::poll(self);
         crate::logs_view::tick(self);
         // A panic the app survived (a background task): offer a report now.
@@ -1196,7 +1257,7 @@ impl eframe::App for XbApp {
             .show(ui, |ui| self.top_bar(ui));
         egui::Panel::left("nav")
             .resizable(false)
-            .exact_size(170.0)
+            .exact_size(196.0)
             .frame(egui::Frame::new().fill(panel).inner_margin(egui::Margin::symmetric(10, 6)))
             .show(ui, |ui| self.nav(ui));
         egui::CentralPanel::default()

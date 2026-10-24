@@ -139,11 +139,14 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             ui.set_width(ui.available_width());
             ui.label(RichText::new("Startup").font(theme::strong_font(17.0)));
             let mut changed =
-                ui.checkbox(&mut app.settings.show_wizard, "Show the Getting started guide").changed();
-            changed |= ui.checkbox(&mut app.settings.show_splash, "Show the splash screen").changed();
-            changed |= ui
-                .checkbox(&mut app.settings.auto_connect, "Connect to the last adapter when XBTune starts")
-                .changed();
+                theme::toggle(ui, &mut app.settings.show_wizard, "Show the Getting started guide").changed();
+            changed |= theme::toggle(ui, &mut app.settings.show_splash, "Show the splash screen").changed();
+            changed |= theme::toggle(
+                ui,
+                &mut app.settings.auto_connect,
+                "Connect to the last adapter when XBTune starts",
+            )
+            .changed();
             if changed {
                 app.save_settings();
             }
@@ -303,16 +306,12 @@ fn folder_dialog(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
             ui.label(RichText::new(e).color(p.bad));
         }
         ui.add_space(4.0);
-        ui.horizontal(|ui| {
-            let b = egui::Button::new(RichText::new("Use this folder").color(egui::Color32::WHITE))
-                .fill(p.accent);
-            if ui.add(b).clicked() {
-                chosen = Some((pick.dir.clone(), pick.move_existing));
-            }
-            if ui.button("Cancel").clicked() {
-                cancel = true;
-            }
-        });
+        let (use_it, cancelled) =
+            theme::dialog_buttons(ui, theme::primary("Use this folder"), true, "Cancel");
+        if use_it {
+            chosen = Some((pick.dir.clone(), pick.move_existing));
+        }
+        cancel = cancelled;
     });
     if let Some((dir, move_existing)) = chosen {
         match app.set_files_folder(Some(dir), move_existing) {
@@ -331,7 +330,7 @@ fn folder_dialog(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
 fn lock_row(app: &mut XbApp, ui: &mut Ui, p: &Palette, lock: Lock, on: bool, label: &str, what: &str) {
     ui.horizontal(|ui| {
         let mut want = on;
-        if ui.checkbox(&mut want, RichText::new(label).strong()).changed() {
+        if theme::toggle(ui, &mut want, label).changed() {
             if want {
                 app.settings_ui.confirm = Some((lock, false));
             } else {
@@ -343,7 +342,11 @@ fn lock_row(app: &mut XbApp, ui: &mut Ui, p: &Palette, lock: Lock, on: bool, lab
                 app.apply_unlocks(u);
             }
         }
-        let (state, color) = if on { ("unlocked", p.warn) } else { ("locked", p.good) };
+        let (state, color) = if on {
+            (crate::icons::with(crate::icons::UNLOCK, "unlocked"), p.warn)
+        } else {
+            (crate::icons::with(crate::icons::LOCK, "locked"), p.good)
+        };
         ui.label(RichText::new(state).color(color));
     });
     ui.label(RichText::new(what).color(p.muted));
@@ -363,15 +366,8 @@ fn confirm(app: &mut XbApp, ui: &mut Ui, p: &Palette, current: Unlocks) {
         ui.add_space(6.0);
         ui.checkbox(&mut understood, lock.check());
         ui.add_space(8.0);
-        ui.horizontal(|ui| {
-            let b = egui::Button::new(RichText::new("Unlock").color(egui::Color32::WHITE)).fill(p.warn);
-            if ui.add_enabled(understood, b).clicked() {
-                unlock = true;
-            }
-            if ui.button("Cancel").clicked() {
-                cancel = true;
-            }
-        });
+        let b = egui::Button::new(RichText::new("Unlock").color(egui::Color32::WHITE)).fill(p.warn);
+        (unlock, cancel) = theme::dialog_buttons(ui, b, understood, "Cancel");
     });
     if unlock {
         let mut u = current;
@@ -401,7 +397,7 @@ fn updates_card(app: &mut XbApp, ui: &mut Ui) {
             )
             .color(p.muted),
         );
-        if ui.checkbox(&mut app.settings.update_check, "Tell me when a new version is out").changed() {
+        if theme::toggle(ui, &mut app.settings.update_check, "Tell me when a new version is out").changed() {
             app.save_settings();
         }
         ui.horizontal(|ui| {
