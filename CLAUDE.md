@@ -775,9 +775,10 @@ owner's friend with the LC-2 wideband. State at the pause:
   of the old SHAs is optional (risk explained as low; owner undecided).
 - 2026-10-24: owner swapped phases 10/11 and said GO for Windows (phase
   10 now). See "Phase 10 (Windows) contents". Icon fixed (orange arc was
-  off the gauge circle). Next: CI green on windows-latest, then a public
-  GitHub PRE-RELEASE zip for the friend with the LC-2 (owner chose that
-  2026-10-24), then the update notice (link to the release page; no
+  off the gauge circle). CI green on windows-latest (1037b39). Public
+  pre-release `v0.1.1-windows-test.1` (zip from CI run 40126429676) for
+  the friend with the LC-2, made 2026-10-24 (owner chose a pre-release).
+  WAITING for his report. Done since: the update notice (link to the release page; no
   winget), then the UI refresh (owner asked for modern UX; Lucide icons
   approved 2026-10-24: see "UI refresh").
 
