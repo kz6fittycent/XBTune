@@ -95,7 +95,11 @@ parts:
 
   xbtune:
     plugin: nil
+    # git, not a plain copy: only committed files go in, so the snap matches
+    # a commit and the host's target/ (tens of GB of cargo output) stays
+    # out of the build instance (it filled the root disk, 2026-10-25).
     source: .
+    source-type: git
     after: [rust-deps]
     build-packages:
       - pkg-config

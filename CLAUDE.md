@@ -546,6 +546,7 @@ cargo run -p xbtune-cli -- info --serial /dev/pts/N
 tools/test_remote_relay.sh              # remote relay Worker (wrangler dev) vs the Rust tests
 xbtune-cli remote relay & xbtune-cli remote host --relay ws://127.0.0.1:8790/v1   # local remote session
 snapcraft clean xbtune && snapcraft pack   # clean first, or the version label stays stale
+lxc delete --project snapcraft snapcraft-xbtune-amd64-61210625 --force   # after a build: frees the root disk
 sudo snap install --dangerous ./xbtune_0.1.0+git<HEAD>_amd64.snap   # name the file; never a glob
 XBTUNE_SCREENSHOT=~/snap/xbtune/common/s.ppm XBTUNE_VIEW=charts xbtune   # GUI check inside the snap
 ```
@@ -819,6 +820,21 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
      USB cable may be the supported Mac path.
 
 ## Next steps
+
+Resume here (2026-10-25, end of session): PAUSED. Bike profiles + wideband
+logging mode pushed (22264be, no version bump -> built in CI, not uploaded
+to the store); local snap built for the laptop. Waiting for: the owner's
+laptop test of profiles (first profile with "move files", switch to No
+profile and back, connect -> ECM learned) and the logging mode card; the
+LC-2 friend's answer on which exact ECMSpy switches he flips (the BUEIB has
+no closed-loop switch; we pin EGO min/max at 100 instead: ASSUMED) and a
+first log with the mode on (EGO Corr. should read 100 throughout); plus
+the older items below (friend's Windows report/questions/.msl, .msq
+decision). Next release = 0.2.0.
+Snap builds: the part now uses `source-type: git` (committed files only);
+before that `source: .` copied the host's 63 GB target/ into the LXD
+instance twice and filled / (2026-10-25 cleanup: old build containers,
+disabled snap revisions, docker build cache removed).
 
 Resume here (2026-10-22, end of day): WAITING FOR FEEDBACK. Nothing is
 in progress; continue as reports come in from the owner (Phase 9
