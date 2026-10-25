@@ -8,6 +8,7 @@
 //! - [`image`]: EEPROM images and their file formats (`.xbt`, EcmDroid `.xpr`).
 //! - [`read`]: reading the whole EEPROM, with resume and a verify pass.
 //! - [`live`]: runtime channels, samples, rate and CSV logs.
+//! - [`logmode`]: wideband logging mode (closed loop and AFV locked).
 //! - [`session`]: the live-data task (poll, reconnect, log).
 //! - [`setup`]: the ECM Setup screen (EcmDroid's named settings).
 //! - [`tune`]: offline editing with undo/redo.
@@ -23,6 +24,7 @@ pub mod image;
 pub mod live;
 pub mod logfile;
 pub mod logformats;
+pub mod logmode;
 pub mod logstats;
 pub mod read;
 pub mod session;

@@ -24,8 +24,8 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         ui.heading("Charts");
         ui.add_space(12.0);
         for (secs, label) in WINDOWS {
-            if ui.selectable_label(app.settings.chart_seconds == *secs, *label).clicked() {
-                app.settings.chart_seconds = *secs;
+            if ui.selectable_label(app.settings.bike.chart_seconds == *secs, *label).clicked() {
+                app.settings.bike.chart_seconds = *secs;
                 changed = true;
             }
         }
@@ -43,12 +43,12 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             ui.set_max_height(460.0);
             egui::ScrollArea::vertical().show(ui, |ui| {
                 for c in app.link.channels.iter().filter(|c| c.kind == RtKind::Scalar) {
-                    let mut on = app.settings.chart_channels.contains(&c.name);
+                    let mut on = app.settings.bike.chart_channels.contains(&c.name);
                     if ui.checkbox(&mut on, format!("{}  ({})", c.label(), c.name)).changed() {
                         if on {
-                            app.settings.chart_channels.push(c.name.clone());
+                            app.settings.bike.chart_channels.push(c.name.clone());
                         } else {
-                            app.settings.chart_channels.retain(|n| n != &c.name);
+                            app.settings.bike.chart_channels.retain(|n| n != &c.name);
                         }
                         changed = true;
                     }
@@ -62,9 +62,9 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     ui.add_space(6.0);
 
     let end = app.chart_paused.or_else(|| app.history.latest().map(|s| s.t)).unwrap_or(0.0);
-    let start = end - app.settings.chart_seconds;
+    let start = end - app.settings.bike.chart_seconds;
     let vars: Vec<_> =
-        app.settings.chart_channels.iter().filter_map(|n| app.link.channel(n).cloned()).collect();
+        app.settings.bike.chart_channels.iter().filter_map(|n| app.link.channel(n).cloned()).collect();
     if vars.is_empty() {
         ui.label(RichText::new("Pick channels to chart from the Channels menu.").color(p.muted));
         return;
@@ -91,7 +91,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     .height(height)
                     .link_axis(link_group, [true, false])
                     .link_cursor(link_group, [true, false])
-                    .default_x_bounds(-app.settings.chart_seconds, 0.0)
+                    .default_x_bounds(-app.settings.bike.chart_seconds, 0.0)
                     .allow_drag(false)
                     .allow_zoom(false)
                     .allow_scroll(false)
@@ -100,7 +100,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                     .y_axis_min_width(48.0)
                     .x_axis_formatter(|m, _| format!("{:.0}s", m.value))
                     .show(ui, |plot| {
-                        plot.set_plot_bounds_x(-app.settings.chart_seconds..=0.0);
+                        plot.set_plot_bounds_x(-app.settings.bike.chart_seconds..=0.0);
                         plot.line(Line::new(v.label(), PlotPoints::from(pts)).color(color).width(2.0));
                     });
             });

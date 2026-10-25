@@ -12,7 +12,7 @@ use xbtune_core::autotune::{self, Analysis, Filters, Proposal, Settings};
 use xbtune_core::logfile::Log;
 
 use crate::app::XbApp;
-use crate::settings::WbUnit;
+use crate::settings::{AutotuneState, WbUnit};
 use crate::theme::{self, Palette};
 
 /// What the fuel-map overlay shows.
@@ -24,6 +24,27 @@ pub enum Overlay {
     Ego,
     /// Average wideband AFR (wideband logs only).
     Afr,
+}
+
+impl Overlay {
+    /// The name saved in a bike state.
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::Hits => "hits",
+            Self::Ego => "ego",
+            Self::Afr => "afr",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Self {
+        match key {
+            "hits" => Self::Hits,
+            "ego" => Self::Ego,
+            "afr" => Self::Afr,
+            _ => Self::Off,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -49,6 +70,47 @@ pub struct AutotuneUi {
     lag: f64,
     /// Wideband: cells measured lean at high load, as text.
     lean: Vec<String>,
+}
+
+impl AutotuneUi {
+    /// The choices to keep with the bike.
+    pub fn state(&self) -> AutotuneState {
+        let d = Settings::default();
+        let set =
+            self.target_text != autotune::TargetAfr::default().text() || self.target_unit != WbUnit::Afr;
+        AutotuneState {
+            front: (self.front || self.rear).then_some(self.front),
+            rear: (self.front || self.rear).then_some(self.rear),
+            targets: if set { self.target_text.clone() } else { String::new() },
+            target_unit: self.target_unit,
+            lag: if self.lag != autotune::DEFAULT_LAG { self.lag } else { 0.0 },
+            min_hits: if self.settings.min_hits != d.min_hits { self.settings.min_hits } else { 0.0 },
+            max_change: if self.settings.max_change != d.max_change { self.settings.max_change } else { 0.0 },
+            min_clt: if self.settings.filters.min_clt != d.filters.min_clt {
+                self.settings.filters.min_clt
+            } else {
+                0.0
+            },
+        }
+    }
+
+    /// Put saved choices back (zero / empty: XBTune's defaults).
+    pub fn restore(&mut self, s: &AutotuneState) {
+        let d = Settings::default();
+        self.front = s.front.unwrap_or(true);
+        self.rear = s.rear.unwrap_or(true);
+        if s.targets.is_empty() {
+            self.target_text = autotune::TargetAfr::default().text();
+            self.target_unit = WbUnit::Afr;
+        } else {
+            self.target_text = s.targets.clone();
+            self.target_unit = s.target_unit;
+        }
+        self.lag = if s.lag > 0.0 { s.lag } else { autotune::DEFAULT_LAG };
+        self.settings.min_hits = if s.min_hits > 0.0 { s.min_hits } else { d.min_hits };
+        self.settings.max_change = if s.max_change > 0.0 { s.max_change } else { d.max_change };
+        self.settings.filters.min_clt = if s.min_clt > 0.0 { s.min_clt } else { d.filters.min_clt };
+    }
 }
 
 /// Whether every open log has wideband readings.
@@ -117,13 +179,13 @@ pub fn open(app: &mut XbApp) {
         }
         a.wideband = have_wb;
     }
-    let unit = app.settings.wb_unit;
+    let unit = app.settings.bike.wb_unit;
     retarget(&mut app.autotune, unit);
 }
 
 /// The user switched AFR/lambda (here, in Connect or in Settings).
 pub fn unit_changed(app: &mut XbApp) {
-    let unit = app.settings.wb_unit;
+    let unit = app.settings.bike.wb_unit;
     retarget(&mut app.autotune, unit);
     app.autotune.target_error = autotune::TargetAfr::parse(&app.autotune.target_text).err();
 }
@@ -171,7 +233,7 @@ pub fn analyse_now(app: &mut XbApp) {
 }
 
 fn run(app: &mut XbApp) {
-    let unit = app.settings.wb_unit;
+    let unit = app.settings.bike.wb_unit;
     let mut s = app.autotune.settings.clone();
     s.filters = filters(app, app.autotune.wideband);
     let Some(tune) = &app.tune else { return };
@@ -266,7 +328,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     let rear_axes = axes(&app.tune, "Tab_Fuel_Rear");
     let wb_why = wideband_missing(app);
     let have_wb = wb_why.is_none();
-    let unit = app.settings.wb_unit;
+    let unit = app.settings.bike.wb_unit;
     let mut new_unit = unit;
     // The typed targets follow the unit, however it was changed.
     if app.autotune.target_unit != unit {

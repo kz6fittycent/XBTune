@@ -6,6 +6,9 @@
 //!   history) go in a folder the user can see: `~/XBTune` by default
 //!   (the real home, not the snap's; `Documents\XBTune` on Windows), or wherever they choose in the app's
 //!   Settings (saved in `<config>/folders.toml`, read by the CLI too).
+//!   With a bike profile active they go in that bike's own folder,
+//!   `<files>/Bikes/<bike>/`, with the same subfolders (`<config>/bike.toml`
+//!   names the active one; the app picks it, the CLI follows it).
 //! - XBTune's own files (settings, unlocks, the app log, unsent reports)
 //!   stay out of the way: `$SNAP_USER_COMMON/{config,data}` in the snap,
 //!   which survives refreshes and reverts (`$SNAP_USER_DATA` is per
@@ -31,6 +34,8 @@ pub const BACKUPS: &str = "Backups";
 pub const LOGS: &str = "Logs";
 pub const HISTORY: &str = "History";
 pub const REMOTE: &str = "Remote";
+/// One folder per bike profile, each with its own Tunes, Backups, ...
+pub const BIKES: &str = "Bikes";
 
 /// Where XBTune keeps things.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,7 +44,11 @@ pub struct Dirs {
     pub config: PathBuf,
     /// XBTune's own data (app log, unsent reports).
     pub data: PathBuf,
-    /// The user's files: Tunes, Backups, Logs, History.
+    /// The files folder as chosen in Settings (or the default), which holds
+    /// `Bikes/`.
+    pub root: PathBuf,
+    /// The user's files: Tunes, Backups, Logs, History. The active bike's
+    /// folder, else `root`.
     pub files: PathBuf,
 }
 
@@ -61,8 +70,17 @@ impl Dirs {
             let d = directories::ProjectDirs::from("", "", "xbtune")?;
             (d.config_dir().to_path_buf(), d.data_dir().to_path_buf(), standard_files_dir()?)
         };
-        let files = chosen_files_dir(&config).unwrap_or(default_files);
-        Some(Self { config, data, files })
+        let root = chosen_files_dir(&config).unwrap_or(default_files);
+        let files = match active_bike(&config) {
+            Some(b) if root.join(BIKES).join(&b).is_dir() => root.join(BIKES).join(b),
+            _ => root.clone(),
+        };
+        Some(Self { config, data, root, files })
+    }
+
+    /// The bike profiles' folders.
+    pub fn bikes(&self) -> PathBuf {
+        self.root.join(BIKES)
     }
 
     /// Tunes read from the ECM, and the default place to save tunes.
@@ -118,6 +136,47 @@ pub fn real_home() -> Option<PathBuf> {
         .map(PathBuf::from)
         .filter(|p| p.is_absolute())
         .or_else(|| directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf()))
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Default)]
+struct ActiveBike {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    active: Option<String>,
+}
+
+fn bike_file(config: &Path) -> PathBuf {
+    config.join("bike.toml")
+}
+
+/// A bike folder name as stored: one plain path component.
+fn plain_name(name: &str) -> bool {
+    !name.is_empty()
+        && name != "."
+        && name != ".."
+        && !name.contains(['/', '\\'])
+        && Path::new(name).components().count() == 1
+}
+
+/// The active bike profile's folder name (under `<files>/Bikes`), if any.
+pub fn active_bike(config: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(bike_file(config)).ok()?;
+    toml::from_str::<ActiveBike>(&text).ok()?.active.filter(|n| plain_name(n))
+}
+
+/// Make `name` the active bike profile (`None`: no profile).
+pub fn set_active_bike(config: &Path, name: Option<&str>) -> std::io::Result<()> {
+    if let Some(n) = name
+        && !plain_name(n)
+    {
+        return Err(std::io::Error::other(format!("not a folder name: {n:?}")));
+    }
+    std::fs::create_dir_all(config)?;
+    let text =
+        toml::to_string(&ActiveBike { active: name.map(String::from) }).map_err(std::io::Error::other)?;
+    let path = bike_file(config);
+    let tmp = path.with_extension("toml.tmp");
+    std::fs::write(&tmp, format!("# The bike profile in use (a folder in <files>/Bikes).\n{text}"))?;
+    std::fs::rename(&tmp, &path)
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Default)]
@@ -237,20 +296,21 @@ fn remove_empty_dirs(dir: &Path) {
     let _ = std::fs::remove_dir(dir); // only succeeds when empty
 }
 
-/// The four subfolders of one files folder paired with another's.
+/// The subfolders of one files folder (the bike folders included) paired
+/// with another's.
 pub fn folder_pairs(from_files: &Path, to_files: &Path) -> Vec<(PathBuf, PathBuf)> {
-    [TUNES, BACKUPS, LOGS, HISTORY].iter().map(|n| (from_files.join(n), to_files.join(n))).collect()
+    [TUNES, BACKUPS, LOGS, HISTORY, BIKES].iter().map(|n| (from_files.join(n), to_files.join(n))).collect()
 }
 
 /// Before 2026-10-15 the user's files lived in `<data>/{images,backups,
 /// logs,history}`. Move them into the files folder (once; later runs find
-/// nothing to move).
+/// nothing to move). They go to the files folder itself, not a bike's.
 pub fn move_old_layout(d: &Dirs) -> Moved {
     move_files(&[
-        (d.data.join("images"), d.tunes()),
-        (d.data.join("backups"), d.backups()),
-        (d.data.join("logs"), d.logs()),
-        (d.data.join("history"), d.history()),
+        (d.data.join("images"), d.root.join(TUNES)),
+        (d.data.join("backups"), d.root.join(BACKUPS)),
+        (d.data.join("logs"), d.root.join(LOGS)),
+        (d.data.join("history"), d.root.join(HISTORY)),
     ])
 }
 
@@ -341,7 +401,12 @@ mod tests {
     #[test]
     fn old_layout_moves_once_and_never_overwrites() {
         let root = scratch("migrate");
-        let d = Dirs { config: root.join("config"), data: root.join("data"), files: root.join("XBTune") };
+        let d = Dirs {
+            config: root.join("config"),
+            data: root.join("data"),
+            root: root.join("XBTune"),
+            files: root.join("XBTune"),
+        };
         std::fs::create_dir_all(d.data.join("images")).unwrap();
         std::fs::create_dir_all(d.data.join("history/BUEIB_1")).unwrap();
         std::fs::create_dir_all(d.data.join("backups")).unwrap();
@@ -393,6 +458,24 @@ mod tests {
         set_files_dir(&config, None).unwrap();
         assert_eq!(chosen_files_dir(&config), None);
         assert!(set_files_dir(&config, Some(Path::new("relative/dir"))).is_err());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn active_bike_round_trips_and_refuses_paths() {
+        let root = scratch("bike");
+        let config = root.join("config");
+        assert_eq!(active_bike(&config), None);
+        set_active_bike(&config, Some("Jim's XB9SX")).unwrap();
+        assert_eq!(active_bike(&config).as_deref(), Some("Jim's XB9SX"));
+        for bad in ["", "..", "a/b", "/etc", "a\\b"] {
+            assert!(set_active_bike(&config, Some(bad)).is_err(), "{bad:?}");
+        }
+        // A hand-edited file naming a path is ignored.
+        std::fs::write(bike_file(&config), "active = \"../../etc\"\n").unwrap();
+        assert_eq!(active_bike(&config), None);
+        set_active_bike(&config, None).unwrap();
+        assert_eq!(active_bike(&config), None);
         let _ = std::fs::remove_dir_all(&root);
     }
 }

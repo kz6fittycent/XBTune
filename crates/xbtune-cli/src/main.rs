@@ -613,6 +613,12 @@ fn doctor() {
     match env::Dirs::detect() {
         Some(d) => {
             println!("Your files:  {}  (Tunes, Backups, Logs, History)", d.files.display());
+            if let Some(bike) = env::active_bike(&d.config).filter(|_| d.files != d.root) {
+                println!(
+                    "Bike:        {bike} (bike profile chosen in the app; files folder {})",
+                    d.root.display()
+                );
+            }
             println!("Config dir:  {}", d.config.display());
             println!("App data:    {}", d.data.display());
         }

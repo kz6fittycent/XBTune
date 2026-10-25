@@ -496,7 +496,7 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
             // Always shown, so it's clear the option exists and what it needs.
             let why_not = crate::autotune_view::wideband_missing(app);
             ui.add_enabled_ui(why_not.is_none(), |ui| {
-                let label = format!("Average {} (wideband)", app.settings.wb_unit.word());
+                let label = format!("Average {} (wideband)", app.settings.bike.wb_unit.word());
                 ui.selectable_value(&mut app.autotune.overlay, Overlay::Afr, label)
                     .on_disabled_hover_text(why_not.clone().unwrap_or_default());
             });
@@ -674,7 +674,7 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         log: log_stats.as_ref().map(|a| a.cells.as_slice()),
         min_hits: app.autotune.settings.min_hits,
         flip_cols: flip,
-        wb_unit: app.settings.wb_unit,
+        wb_unit: app.settings.bike.wb_unit,
     };
     egui::ScrollArea::horizontal().id_salt("grid").show(ui, |ui| {
         grid(ui, &spec, &mut app.tune_ui.sel);
@@ -975,7 +975,7 @@ pub fn open(app: &mut XbApp, path: &Path, compare: bool) {
             app.tune = Some(t);
             app.tune_ui.sel.clear();
             app.tune_ui.status = Some((format!("Opened {}", path.display()), false));
-            app.settings.last_tune = Some(path.to_path_buf());
+            app.settings.bike.last_tune = Some(path.to_path_buf());
             app.save_settings();
         }
         Err(e) => app.tune_ui.status = Some((format!("{}: {e}", path.display()), true)),

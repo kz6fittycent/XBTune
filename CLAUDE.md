@@ -207,6 +207,43 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   bumps (Cargo.toml + lock); bump once per release, in the commit pushed.
   Pushes without a bump are built and checked but not uploaded.
 
+### Bike profiles + wideband logging mode (built 2026-10-25; sim/UI only)
+
+Owner asked 2026-10-25: profiles per bike, everything reopened as left;
+chose own folder per bike, "last one + match on connect", and the logging
+mode helper for the LC-2 friend (who logs ECMSpy-style: O2/closed loop
+off, AFV locked at 100).
+- `env`: `Dirs.root` (chosen files folder) vs `Dirs.files` (=
+  `root/Bikes/<active>` when `<config>/bike.toml` names an existing one,
+  else root); `active_bike`/`set_active_bike` (one plain path component);
+  `folder_pairs` includes Bikes; old-layout move goes to root. Session
+  store, backups, history, logs, Remote, CLI all follow the active bike;
+  `doctor` prints it.
+- `settings::BikeState` (flattened into Settings, so old settings.toml
+  reads unchanged): last target, gauges, charts, last_tune, wideband,
+  wb_unit, view, tune_var, compare, overlay, logs, `AutotuneState`,
+  `log_mode`. `profile_offer` (global) = "Don't ask again".
+- `profiles.rs`: `Bikes/<folder>/bike.toml` = `[bike]` (name, model,
+  year, notes, ecm_id, ecm_version) + `[state]`. `app.save_settings`
+  captures the views into the state and writes the profile (settings.toml
+  keeps the no-profile state in `app.general_bike`). Switch: saves, unsaved
+  edits -> recovery file, stops the link unless it's the same bike,
+  reopens tune/map/compare/logs/view. Blocked during remote/burn/read.
+  Sidebar picker on top; New/Edit dialog (copy current settings; first
+  profile can move root Tunes/Backups/Logs/History in, paths rebased).
+  On connect (not demo): profile without ECM learns it; other ECM model ->
+  banner (Use <match> / New / Keep); no profile -> offer once per run.
+  Same ECM model can't be told apart (shared version string): no offer.
+  No delete in the app (folder holds the user's files).
+- `xbtune-core::logmode`: KFBFuel_Min/Max, KLFuel_Min/Max, LFuel/LFuel1
+  -> 100; KCL_Fuel_Config bit 7 off where it exists (not on BUEIB).
+  Saved originals in `BikeState.log_mode`; Restore puts limits/switch
+  back, AFV stays 100. ASSUMED: EGO window 100..100 holds EGO at 100 on
+  ECMs without the switch; first log with it should show EGO Corr. = 100.
+  Setup view card. Burn is the normal path.
+- Hooks: `XBTUNE_SHOT_BIKE=1|new|offer` (1 = load the active profile
+  under XBTUNE_HOME in screenshot mode). Icons motorbike + pencil added.
+
 ### Phase 10 (Windows) contents
 
 - Approved 2026-10-24: windows-sys 0.52 (serialport's version) for COM

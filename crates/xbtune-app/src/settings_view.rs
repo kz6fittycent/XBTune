@@ -190,7 +190,7 @@ fn files_card(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
                 .color(p.muted),
         );
         ui.add_space(4.0);
-        let mut shown = d.files.display().to_string();
+        let mut shown = d.root.display().to_string();
         ui.add(
             egui::TextEdit::singleline(&mut shown)
                 .font(egui::TextStyle::Monospace)
@@ -198,27 +198,35 @@ fn files_card(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
         );
         ui.label(
             RichText::new(format!(
-                "In it: {}, {}, {}, {}",
+                "In it: {}, {}, {}, {}, and {} with one folder like that per bike profile",
                 xbtune_core::env::TUNES,
                 xbtune_core::env::BACKUPS,
                 xbtune_core::env::LOGS,
-                xbtune_core::env::HISTORY
+                xbtune_core::env::HISTORY,
+                xbtune_core::env::BIKES
             ))
             .small()
             .color(p.muted),
         );
+        if let Some(b) = &app.profile {
+            ui.label(
+                RichText::new(format!("{}'s files: {}", b.info.name, d.files.display()))
+                    .small()
+                    .color(p.muted),
+            );
+        }
         ui.add_space(4.0);
         ui.horizontal(|ui| {
             if ui.button("Change folder…").clicked() {
                 app.settings_ui.folder = Some(FolderPick {
-                    dir: d.files.clone(),
+                    dir: d.root.clone(),
                     new_name: String::new(),
                     move_existing: true,
                     error: None,
                 });
             }
             if let Some(default) = d.default_files()
-                && default != d.files
+                && default != d.root
                 && ui.button(format!("Use the default ({})", default.display())).clicked()
                 && let Err(e) = app.set_files_folder(None, true)
             {

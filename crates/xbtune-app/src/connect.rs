@@ -134,7 +134,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         ui.add_space(8.0);
         let race = app.connect.race;
 
-        if let Some(last) = app.settings.last.clone().map(|t| t.with_race(race)) {
+        if let Some(last) = app.settings.bike.last.clone().map(|t| t.with_race(race)) {
             theme::card(ui).show(ui, |ui| {
                 ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
@@ -367,7 +367,7 @@ fn wideband(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
             .small()
             .color(p.muted),
         );
-        let before = app.settings.wideband.clone();
+        let before = app.settings.bike.wideband.clone();
         let mut pick = before.clone();
         ui.horizontal_wrapped(|ui| {
             ui.radio_value(&mut pick, None, "None");
@@ -385,31 +385,31 @@ fn wideband(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
         ui.horizontal(|ui| {
             use crate::settings::WbUnit;
             ui.label("Show readings and targets as");
-            let mut unit = app.settings.wb_unit;
+            let mut unit = app.settings.bike.wb_unit;
             ui.radio_value(&mut unit, WbUnit::Afr, "AFR");
             ui.radio_value(&mut unit, WbUnit::Lambda, "Lambda (λ)");
-            if unit != app.settings.wb_unit {
+            if unit != app.settings.bike.wb_unit {
                 app.set_wb_unit(unit);
             }
         });
         if pick != before {
             // A first wideband gets a dashboard gauge, in the chosen unit.
-            let gauge = match app.settings.wb_unit {
+            let gauge = match app.settings.bike.wb_unit {
                 crate::settings::WbUnit::Afr => xbtune_core::wideband::AFR,
                 crate::settings::WbUnit::Lambda => xbtune_core::wideband::LAMBDA,
             }
             .to_string();
-            if before.is_none() && pick.is_some() && !app.settings.gauges.contains(&gauge) {
-                app.settings.gauges.push(gauge);
+            if before.is_none() && pick.is_some() && !app.settings.bike.gauges.contains(&gauge) {
+                app.settings.bike.gauges.push(gauge);
             }
-            app.settings.wideband = pick;
+            app.settings.bike.wideband = pick;
             app.save_settings();
         }
-        let ecm_port = match &app.settings.last {
+        let ecm_port = match &app.settings.bike.last {
             Some(SavedTarget::Serial { path, .. }) => Some(path.clone()),
             _ => None,
         };
-        if let (Some(WidebandPref::Serial { path }), Some(ecm)) = (&app.settings.wideband, &ecm_port)
+        if let (Some(WidebandPref::Serial { path }), Some(ecm)) = (&app.settings.bike.wideband, &ecm_port)
             && path == ecm
         {
             ui.colored_label(p.warn, "That's the ECM's port. The wideband needs a cable of its own.");
@@ -433,7 +433,7 @@ fn wideband(app: &mut XbApp, ui: &mut Ui, p: &Palette) {
 /// The session label of the chosen wideband (as `WbLink` names it).
 fn wanted_label(app: &XbApp) -> Option<String> {
     use crate::settings::WidebandPref;
-    Some(match app.settings.wideband.as_ref()? {
+    Some(match app.settings.bike.wideband.as_ref()? {
         WidebandPref::Demo => "simulated Innovate LC-2".to_string(),
         WidebandPref::Serial { path } => xbtune_core::wideband::WbLink::serial_label(path),
     })

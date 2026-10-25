@@ -54,6 +54,8 @@ pub const DISCONNECT: &str = "\u{e45d}"; // lucide: unplug
 pub const DEMO: &str = "\u{e485}"; // lucide: monitor-play
 pub const WIDEBAND: &str = "\u{e038}"; // lucide: activity
 pub const READ: &str = "\u{e4e5}"; // lucide: hard-drive-download
+pub const BIKE: &str = "\u{e698}"; // lucide: motorbike
+pub const EDIT: &str = "\u{e1f9}"; // lucide: pencil
 
 /// `icon` and `text` as one label.
 pub fn with(icon: &str, text: &str) -> String {

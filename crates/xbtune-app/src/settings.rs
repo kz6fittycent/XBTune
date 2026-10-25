@@ -81,17 +81,13 @@ impl SavedTarget {
 #[serde(default)]
 pub struct Settings {
     pub theme: ThemePref,
-    pub last: Option<SavedTarget>,
-    /// Connect to `last` when the app starts.
+    /// What belongs to one bike (a bike profile keeps its own copy).
+    #[serde(flatten)]
+    pub bike: BikeState,
+    /// Connect to `bike.last` when the app starts.
     pub auto_connect: bool,
-    /// Dashboard gauges, by channel name.
-    pub gauges: Vec<String>,
-    /// Charted channels, by channel name.
-    pub chart_channels: Vec<String>,
-    /// Seconds of history shown in charts.
-    pub chart_seconds: f64,
-    /// Tune file to reopen at start.
-    pub last_tune: Option<std::path::PathBuf>,
+    /// Offer to save a connected bike as a profile ("Don't ask again" clears it).
+    pub profile_offer: bool,
     /// Show "Getting started" when the app starts.
     pub show_wizard: bool,
     /// Show the splash screen when the app starts.
@@ -102,8 +98,6 @@ pub struct Settings {
     pub remote_guide_seen: bool,
     /// The version of the engine-damage warning the user accepted (0: none).
     pub disclaimer_accepted: u32,
-    /// Read a wideband controller during live sessions.
-    pub wideband: Option<WidebandPref>,
     /// AI advisor: "Got it" on its first-use guide.
     pub ai_guide_seen: bool,
     /// Check GitHub for a newer release once a day (not in the snap).
@@ -114,11 +108,81 @@ pub struct Settings {
     pub update_latest: Option<crate::update::Release>,
     /// "Skip this version".
     pub update_skip: String,
-    /// How wideband readings and targets are shown and typed.
-    pub wb_unit: WbUnit,
     /// The window as it was left (size only: a remembered position can be
     /// off-screen once a monitor is unplugged).
     pub window: Option<WindowSize>,
+}
+
+/// Everything that belongs to one bike: how it's reached, what the views
+/// showed, and the tune and logs that were open. Without a bike profile it
+/// lives in settings.toml; each profile has its own (`profiles`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct BikeState {
+    pub last: Option<SavedTarget>,
+    /// Dashboard gauges, by channel name.
+    pub gauges: Vec<String>,
+    /// Charted channels, by channel name.
+    pub chart_channels: Vec<String>,
+    /// Seconds of history shown in charts.
+    pub chart_seconds: f64,
+    /// Tune file to reopen at start.
+    pub last_tune: Option<PathBuf>,
+    /// Read a wideband controller during live sessions.
+    pub wideband: Option<WidebandPref>,
+    /// How wideband readings and targets are shown and typed.
+    pub wb_unit: WbUnit,
+    /// The view that was open ("tune", "logs", ...; see `app::View::key`).
+    pub view: String,
+    /// The variable (map) selected in Tune.
+    pub tune_var: Option<String>,
+    /// The tune it was compared with.
+    pub compare: Option<PathBuf>,
+    /// The fuel-map overlay ("off", "hits", "ego", "afr").
+    pub overlay: String,
+    /// Logs that were open in Logs.
+    pub logs: Vec<PathBuf>,
+    pub autotune: AutotuneState,
+    /// Wideband logging mode: the values it replaced, for Restore.
+    pub log_mode: Option<xbtune_core::logmode::Saved>,
+}
+
+impl Default for BikeState {
+    fn default() -> Self {
+        Self {
+            last: None,
+            gauges: ["RPM", "TPD", "CLT", "Batt. Voltg.", "spark1", "pw1", "O2", "EGO Corr."]
+                .map(String::from)
+                .to_vec(),
+            chart_channels: ["RPM", "TPD", "CLT", "O2"].map(String::from).to_vec(),
+            chart_seconds: 60.0,
+            last_tune: None,
+            wideband: None,
+            wb_unit: WbUnit::Afr,
+            view: String::new(),
+            tune_var: None,
+            compare: None,
+            overlay: String::new(),
+            logs: Vec::new(),
+            autotune: AutotuneState::default(),
+            log_mode: None,
+        }
+    }
+}
+
+/// The auto-tune dialog's choices (empty / zero: XBTune's defaults).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AutotuneState {
+    pub front: Option<bool>,
+    pub rear: Option<bool>,
+    /// Wideband targets as typed, in `target_unit`.
+    pub targets: String,
+    pub target_unit: WbUnit,
+    pub lag: f64,
+    pub min_hits: f64,
+    pub max_change: f64,
+    pub min_clt: f64,
 }
 
 /// Air/fuel ratio or lambda, for everything wideband the user sees or
@@ -177,27 +241,20 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: ThemePref::System,
-            last: None,
+            bike: BikeState::default(),
             auto_connect: false,
-            gauges: ["RPM", "TPD", "CLT", "Batt. Voltg.", "spark1", "pw1", "O2", "EGO Corr."]
-                .map(String::from)
-                .to_vec(),
-            chart_channels: ["RPM", "TPD", "CLT", "O2"].map(String::from).to_vec(),
-            chart_seconds: 60.0,
-            last_tune: None,
+            profile_offer: true,
             show_wizard: true,
             show_splash: true,
             remote_name: String::new(),
             remote_guide_seen: false,
             disclaimer_accepted: 0,
-            wideband: None,
             ai_guide_seen: false,
             update_check: true,
             update_checked_at: 0,
             update_latest: None,
             update_skip: String::new(),
             window: None,
-            wb_unit: WbUnit::Afr,
         }
     }
 }
@@ -246,29 +303,42 @@ mod tests {
         assert_eq!(WbUnit::Lambda.fmt(13.23), "0.90");
     }
 
+    /// Settings saved before bike profiles keep their per-bike values
+    /// (they now sit in `bike`, flattened, so the file looks the same).
+    #[test]
+    fn older_settings_keep_their_bike_values() {
+        let text = "theme = \"dark\"\ngauges = [\"RPM\"]\nchart_seconds = 30.0\nwb_unit = \"lambda\"\n\
+                    last_tune = \"/home/x/XBTune/Tunes/a.xbt\"\n[wideband]\nkind = \"demo\"\n";
+        let s: Settings = toml::from_str(text).unwrap();
+        assert_eq!(s.bike.gauges, ["RPM"]);
+        assert_eq!(s.bike.chart_seconds, 30.0);
+        assert_eq!(s.bike.wb_unit, WbUnit::Lambda);
+        assert_eq!(s.bike.wideband, Some(WidebandPref::Demo));
+        assert!(s.bike.last_tune.is_some());
+        let again: Settings = toml::from_str(&toml::to_string_pretty(&s).unwrap()).unwrap();
+        assert_eq!(again.bike, s.bike);
+    }
+
     #[test]
     fn round_trip_and_partial_files() {
         let dir = std::env::temp_dir().join(format!("xbtune-settings-{}", std::process::id()));
         let p = dir.join("settings.toml");
-        let s = Settings {
-            last: Some(SavedTarget::Bluetooth {
-                address: "00:11:22:AA:BB:CC".into(),
-                channel: 1,
-                name: None,
-                race: true,
-            }),
-            theme: ThemePref::Dark,
-            ..Default::default()
-        };
+        let mut s = Settings { theme: ThemePref::Dark, ..Default::default() };
+        s.bike.last = Some(SavedTarget::Bluetooth {
+            address: "00:11:22:AA:BB:CC".into(),
+            channel: 1,
+            name: None,
+            race: true,
+        });
         s.save(Some(&p));
         let back = Settings::load(Some(&p));
-        assert_eq!(back.last, s.last);
+        assert_eq!(back.bike.last, s.bike.last);
         assert_eq!(back.theme, ThemePref::Dark);
         // Unknown and missing keys fall back to defaults.
         std::fs::write(&p, "theme = \"light\"\nfuture_key = 1\n").unwrap();
         let back = Settings::load(Some(&p));
         assert_eq!(back.theme, ThemePref::Light);
-        assert_eq!(back.gauges, Settings::default().gauges);
+        assert_eq!(back.bike.gauges, Settings::default().bike.gauges);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -291,11 +361,12 @@ mod tests {
             ("[last]\nkind = \"demo\"\n", SavedTarget::Demo { race: false }),
         ] {
             let s: Settings = toml::from_str(text).unwrap();
-            assert_eq!(s.last, Some(want), "{text}");
+            assert_eq!(s.bike.last, Some(want), "{text}");
         }
-        let race = Settings { last: Some(SavedTarget::Demo { race: true }), ..Default::default() };
+        let mut race = Settings::default();
+        race.bike.last = Some(SavedTarget::Demo { race: true });
         let back: Settings = toml::from_str(&toml::to_string_pretty(&race).unwrap()).unwrap();
-        assert_eq!(back.last, race.last);
-        assert!(back.last.unwrap().label().contains("factory race"));
+        assert_eq!(back.bike.last, race.bike.last);
+        assert!(back.bike.last.unwrap().label().contains("factory race"));
     }
 }

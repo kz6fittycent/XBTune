@@ -41,6 +41,31 @@ pub enum View {
     Settings,
 }
 
+const VIEW_KEYS: [(View, &str); 11] = [
+    (View::Connect, "connect"),
+    (View::Dashboard, "dashboard"),
+    (View::Data, "data"),
+    (View::Charts, "charts"),
+    (View::Diagnostics, "diag"),
+    (View::Resets, "resets"),
+    (View::Tune, "tune"),
+    (View::Setup, "setup"),
+    (View::Logs, "logs"),
+    (View::Remote, "remote"),
+    (View::Settings, "settings"),
+];
+
+impl View {
+    /// The name saved in a bike state and used by `XBTUNE_VIEW`.
+    pub fn key(self) -> &'static str {
+        VIEW_KEYS.iter().find(|(v, _)| *v == self).map_or("", |(_, k)| k)
+    }
+
+    pub fn from_key(key: &str) -> Option<Self> {
+        VIEW_KEYS.iter().find(|(_, k)| *k == key).map(|(v, _)| *v)
+    }
+}
+
 /// A sidebar entry: view, icon, label.
 type NavItem = (View, &'static str, &'static str);
 
@@ -101,6 +126,11 @@ pub struct XbApp {
     pub catalog: Arc<Catalog>,
     pub settings: Settings,
     settings_path: Option<PathBuf>,
+    /// The bike profile in use (its state is `settings.bike` meanwhile).
+    pub profile: Option<crate::profiles::Profile>,
+    /// The bike state without a profile (settings.toml's).
+    pub general_bike: crate::settings::BikeState,
+    pub profiles: crate::profiles::ProfilesUi,
     pub view: View,
     pub connect: ConnectUi,
     session: Option<Session>,
@@ -190,19 +220,33 @@ impl XbApp {
             };
             // XBTUNE_SHOT_WIDEBAND=1: the simulated LC-2, with its gauge.
             if std::env::var_os("XBTUNE_SHOT_WIDEBAND").is_some() {
-                settings.wideband = Some(crate::settings::WidebandPref::Demo);
-                settings.gauges.push(xbtune_core::wideband::AFR.into());
+                settings.bike.wideband = Some(crate::settings::WidebandPref::Demo);
+                settings.bike.gauges.push(xbtune_core::wideband::AFR.into());
             }
         }
+        let general_bike = settings.bike.clone();
+        // XBTUNE_SHOT_BIKE=1|new|offer: UI checks with the profile in use
+        // (under XBTUNE_HOME), the new-profile dialog, or the connect offer.
+        let shot_bike = std::env::var("XBTUNE_SHOT_BIKE").ok();
+        let profile = match crate::profiles::load_active().filter(|_| shot.is_none() || shot_bike.is_some()) {
+            Some((p, state)) => {
+                settings.bike = state;
+                Some(p)
+            }
+            None => None,
+        };
         theme::apply(&cc.egui_ctx, settings.theme);
         let splash = crate::splash::Splash::new(settings.show_splash, shot.is_some());
         let catalog = Arc::new(Catalog::builtin().expect("built-in definitions load"));
         let mut app = Self {
             rt,
             catalog,
-            connect: ConnectUi::new(settings.last.clone()),
+            connect: ConnectUi::new(settings.bike.last.clone()),
             settings,
             settings_path,
+            profile,
+            general_bike,
+            profiles: Default::default(),
             view: View::Connect,
             session: None,
             link: LinkView::default(),
@@ -240,12 +284,15 @@ impl XbApp {
             shot,
             splash,
         };
-        if let Some(p) =
-            std::env::var_os("XBTUNE_TUNE").map(PathBuf::from).or_else(|| app.settings.last_tune.clone())
+        if let Some(p) = std::env::var_os("XBTUNE_TUNE").map(PathBuf::from)
             && p.exists()
         {
             crate::tune_view::open(&mut app, &p, false);
             app.tune_ui.status = None;
+        }
+        // The tune, map, logs and view as they were left (this bike's).
+        if app.shot.is_none() {
+            crate::profiles::restore(&mut app);
         }
         if app.shot.is_some()
             && let Ok(script) = std::env::var("XBTUNE_SHOT_TUNE")
@@ -280,19 +327,7 @@ impl XbApp {
             if let Ok(chat) = std::env::var("XBTUNE_SHOT_REMOTE_CHAT") {
                 crate::remote_view::queue_chat(&mut app, chat);
             }
-            app.view = match view.as_str() {
-                "data" => View::Data,
-                "charts" => View::Charts,
-                "connect" => View::Connect,
-                "diag" => View::Diagnostics,
-                "resets" => View::Resets,
-                "settings" => View::Settings,
-                "setup" => View::Setup,
-                "remote" => View::Remote,
-                "logs" => View::Logs,
-                "tune" => View::Tune,
-                _ => View::Dashboard,
-            };
+            app.view = View::from_key(&view).unwrap_or(View::Dashboard);
         }
         // Files from before the visible files folder existed move there once.
         if let Some(d) = xbtune_core::env::Dirs::detect() {
@@ -375,13 +410,18 @@ impl XbApp {
             if let Some(dir) = std::env::var_os("XBTUNE_SHOT_FOLDER") {
                 app.settings_ui.pick_folder(dir.into());
             }
+            match std::env::var("XBTUNE_SHOT_BIKE").as_deref() {
+                Ok("new") => crate::profiles::new_profile(&mut app, false),
+                Ok("offer") => crate::profiles::shot_offer(&mut app),
+                _ => {}
+            }
             // XBTUNE_SHOT_UNLOCK=commands|writes: the unlock confirmation.
             if let Ok(which) = std::env::var("XBTUNE_SHOT_UNLOCK") {
                 app.settings_ui.ask(&which);
             }
             // XBTUNE_SHOT_WBUNIT=lambda: wideband shown as lambda.
             if std::env::var("XBTUNE_SHOT_WBUNIT").as_deref() == Ok("lambda") {
-                app.settings.wb_unit = crate::settings::WbUnit::Lambda;
+                app.settings.bike.wb_unit = crate::settings::WbUnit::Lambda;
             }
             // XBTUNE_SHOT_UPDATE=<version>: the "new version" banner.
             if let Ok(v) = std::env::var("XBTUNE_SHOT_UPDATE") {
@@ -417,7 +457,7 @@ impl XbApp {
             crate::report::send_pending_later(Duration::from_secs(15));
         }
         if app.settings.auto_connect
-            && let Some(t) = app.settings.last.clone()
+            && let Some(t) = app.settings.bike.last.clone()
         {
             app.start(t);
         }
@@ -449,8 +489,19 @@ impl XbApp {
         self.shot.is_some()
     }
 
+    /// Save settings.toml, and the bike profile in use with what the views
+    /// show now.
     pub fn save_settings(&self) {
-        self.settings.save(self.settings_path.as_deref());
+        if self.shot.is_some() {
+            return;
+        }
+        let mut s = self.settings.clone();
+        crate::profiles::capture(self, &mut s.bike);
+        if self.profile.is_some() {
+            crate::profiles::save_active(self, &s.bike);
+            s.bike = self.general_bike.clone();
+        }
+        s.save(self.settings_path.as_deref());
     }
 
     pub fn say(&mut self, text: impl Into<String>, error: bool) {
@@ -471,12 +522,12 @@ impl XbApp {
             crate::settings::WbUnit::Afr => (LAMBDA, AFR),
             crate::settings::WbUnit::Lambda => (AFR, LAMBDA),
         };
-        for list in [&mut self.settings.gauges, &mut self.settings.chart_channels] {
+        for list in [&mut self.settings.bike.gauges, &mut self.settings.bike.chart_channels] {
             for name in list.iter_mut().filter(|n| n.as_str() == from) {
                 *name = to.to_string();
             }
         }
-        self.settings.wb_unit = unit;
+        self.settings.bike.wb_unit = unit;
         crate::autotune_view::unit_changed(self);
         self.save_settings();
     }
@@ -579,13 +630,13 @@ impl XbApp {
         self.history = History::default();
         self.chart_paused = None;
         self.diag = Default::default();
-        self.settings.last = Some(target);
+        self.settings.bike.last = Some(target);
         self.save_settings();
     }
 
     /// The wideband to read with the next session (Settings / Connect).
     fn wideband_link(&self) -> Option<xbtune_core::wideband::WbLink> {
-        match self.settings.wideband.as_ref()? {
+        match self.settings.bike.wideband.as_ref()? {
             crate::settings::WidebandPref::Serial { path } => {
                 Some(xbtune_core::wideband::WbLink::serial(path))
             }
@@ -672,10 +723,10 @@ impl XbApp {
         use xbtune_core::env;
         let d = env::Dirs::detect().ok_or("no home folder")?;
         let target = dir.clone().or_else(|| d.default_files()).ok_or("no home folder")?;
-        if target == d.files {
+        if target == d.root {
             return Ok(());
         }
-        if move_existing && (target.starts_with(&d.files) || d.files.starts_with(&target)) {
+        if move_existing && (target.starts_with(&d.root) || d.root.starts_with(&target)) {
             return Err("Pick a folder that isn't inside the current one (or the other way round), \
                         or untick moving the files."
                 .into());
@@ -687,7 +738,7 @@ impl XbApp {
         env::set_files_dir(&d.config, store).map_err(|e| format!("Couldn't save the setting: {e}"))?;
         let mut note = String::new();
         if move_existing {
-            let moved = env::move_files(&env::folder_pairs(&d.files, &target));
+            let moved = env::move_files(&env::folder_pairs(&d.root, &target));
             for (path, why) in &moved.skipped {
                 tracing::warn!(path = %path.display(), why, "file not moved");
             }
@@ -697,10 +748,15 @@ impl XbApp {
             }
             note.push(')');
         }
-        tracing::info!(from = %d.files.display(), to = %target.display(), "files folder changed");
+        tracing::info!(from = %d.root.display(), to = %target.display(), "files folder changed");
         self.say(format!("Your files now go to {}{note}", target.display()), false);
-        self.tune_ui.dir = target.join(env::TUNES);
-        self.send(Command::SetStore(target));
+        // A bike profile left behind in the old folder is no longer in use.
+        let now = env::Dirs::detect().ok_or("no home folder")?;
+        if self.profile.is_some() && now.files == now.root {
+            crate::profiles::switch(self, None, true);
+        }
+        self.tune_ui.dir = now.tunes();
+        self.send(Command::SetStore(now.files));
         Ok(())
     }
 
@@ -831,7 +887,8 @@ impl XbApp {
                     if self.link.wideband.is_some() {
                         self.link.channels.extend(xbtune_core::wideband::channels());
                     }
-                    self.link.identity = Some(id);
+                    self.link.identity = Some(id.clone());
+                    crate::profiles::on_identified(self, &id);
                 }
                 Event::Sample(s) => {
                     crate::remote_sync::on_sample(self, &s);
@@ -945,7 +1002,7 @@ impl XbApp {
                 let (r, painter) = ui.allocate_painter(egui::vec2(10.0, 10.0), egui::Sense::hover());
                 painter.circle_filled(r.rect.center(), 4.0, color);
                 let text = match self.history.latest().and_then(|s| s.wb) {
-                    Some(w) => match (self.settings.wb_unit, w.lambda, w.afr()) {
+                    Some(w) => match (self.settings.bike.wb_unit, w.lambda, w.afr()) {
                         (crate::settings::WbUnit::Lambda, Some(l), _) => format!("λ {l:.2}"),
                         (crate::settings::WbUnit::Afr, _, Some(a)) => format!("AFR {a:.1}"),
                         _ => format!("WB {}", w.status.text()),
@@ -1023,7 +1080,9 @@ impl XbApp {
 
     fn nav(&mut self, ui: &mut Ui) {
         use crate::icons as i;
-        ui.add_space(8.0);
+        ui.add_space(4.0);
+        crate::profiles::picker(self, ui);
+        ui.add_space(2.0);
         ui.spacing_mut().item_spacing.y = 2.0;
         // Grouped by what the rider is doing; Settings stays at the bottom.
         let groups: [(Option<&str>, &[NavItem]); 4] = [
@@ -1295,6 +1354,7 @@ impl eframe::App for XbApp {
             .frame(egui::Frame::new().fill(ui.visuals().extreme_bg_color).inner_margin(18))
             .show(ui, |ui| {
                 crate::update::banner(self, ui);
+                crate::profiles::banner(self, ui);
                 self.messages(ui);
                 match self.view {
                     View::Connect => crate::connect::show(self, ui),
@@ -1316,6 +1376,7 @@ impl eframe::App for XbApp {
         crate::ai_view::show(self, ui);
         crate::ai_wizard::show(self, ui);
         crate::remote_view::dialogs(self, ui);
+        crate::profiles::show(self, ui);
         // The splash covers everything until it's done; the dialogs wait.
         if let Some(s) = &self.splash {
             if !s.show(ui) {

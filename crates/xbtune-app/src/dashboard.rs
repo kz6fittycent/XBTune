@@ -22,11 +22,11 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             ui.heading("Dashboard");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("Reset gauges").clicked() {
-                    app.settings.gauges = Settings::default().gauges;
+                    app.settings.bike.gauges = Settings::default().bike.gauges;
                     app.save_settings();
                 }
                 if ui.button("Add gauge").clicked() {
-                    app.settings.gauges.push("RPM".into());
+                    app.settings.bike.gauges.push("RPM".into());
                     app.save_settings();
                 }
                 ui.label(RichText::new("Right-click a gauge to change or remove it").small().color(p.muted));
@@ -42,7 +42,7 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         let per_row = (1..=8).rev().find(|&n| fit(n as f32) >= 160.0).unwrap_or(1);
         let size = fit(per_row as f32).min(240.0);
         let mut change: Option<(usize, Option<String>)> = None;
-        for (row, names) in app.settings.gauges.chunks(per_row).enumerate() {
+        for (row, names) in app.settings.bike.gauges.chunks(per_row).enumerate() {
             ui.horizontal(|ui| {
                 for (col, name) in names.iter().enumerate() {
                     let index = row * per_row + col;
@@ -88,9 +88,9 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         }
         if let Some((i, new)) = change {
             match new {
-                Some(n) => app.settings.gauges[i] = n,
+                Some(n) => app.settings.bike.gauges[i] = n,
                 None => {
-                    app.settings.gauges.remove(i);
+                    app.settings.bike.gauges.remove(i);
                 }
             }
             app.save_settings();

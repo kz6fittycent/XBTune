@@ -6,6 +6,7 @@
 //! Baro ADC reads live (255: no sensor fitted).
 
 use egui::{RichText, Ui};
+use xbtune_core::logmode;
 use xbtune_core::setup::{self, Group, State};
 
 use crate::app::{View, XbApp};
@@ -25,6 +26,8 @@ pub struct SetupUi {
 enum Edit {
     Switch(setup::Switch, bool),
     Number(String, f64),
+    LogModeOn,
+    LogModeOff,
 }
 
 pub fn show(app: &mut XbApp, ui: &mut Ui) {
@@ -59,6 +62,14 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     let mut edit: Option<Edit> = None;
     let mut burn = false;
     let mut show_missing = app.setup_ui.show_missing;
+    let log_mode = logmode::changes(tune);
+    let restore = app
+        .settings
+        .bike
+        .log_mode
+        .as_ref()
+        .and_then(|s| logmode::restore_changes(tune, s).ok())
+        .filter(|c| !c.is_empty());
     ui.horizontal(|ui| {
         ui.heading("Setup");
         ui.label(RichText::new(title).color(p.muted));
@@ -90,6 +101,9 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     );
     ui.add_space(6.0);
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+        if let Some(e) = log_mode_card(ui, &p, &log_mode, restore.as_deref()) {
+            edit = Some(e);
+        }
         let mut top = String::new();
         for g in &groups {
             let shown: Vec<_> =
@@ -194,6 +208,36 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
     let r = match e {
         Edit::Switch(s, on) => setup::set_switch(t, &s, on),
         Edit::Number(var, x) => setup::set_number(t, &var, x),
+        Edit::LogModeOn => {
+            match logmode::switch_on(t, app.settings.bike.log_mode.as_ref()) {
+                Ok(saved) => {
+                    tracing::info!(?saved, "wideband logging mode set in the tune");
+                    app.settings.bike.log_mode = Some(saved);
+                    app.save_settings();
+                    app.say(
+                        "Wideband logging mode is set in the tune (Undo reverts it). Burn to write it to the ECM;                          the values it replaced are kept for Restore.",
+                        false,
+                    );
+                }
+                Err(e) => app.say(e, true),
+            }
+            return;
+        }
+        Edit::LogModeOff => {
+            let Some(saved) = app.settings.bike.log_mode.clone() else { return };
+            match logmode::restore(t, &saved) {
+                Ok(c) => {
+                    tracing::info!(changes = c.len(), "normal mode restored in the tune");
+                    app.say(
+                        "Closed loop and AFV limits are back as they were, AFV stays at 100% (the maps changed). \
+                         Burn to write it to the ECM.",
+                        false,
+                    );
+                }
+                Err(e) => app.say(e, true),
+            }
+            return;
+        }
     };
     match r {
         Ok(a) if a.clamped > 0 => {
@@ -202,6 +246,78 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         Ok(_) => {}
         Err(e) => app.say(format!("Couldn't change the setting: {e}"), true),
     }
+}
+
+/// Wideband logging mode (`xbtune_core::logmode`): closed loop and AFV
+/// locked, so the ECM doesn't correct what a wideband log should capture.
+fn log_mode_card(
+    ui: &mut Ui,
+    p: &Palette,
+    plan: &Result<Vec<logmode::Change>, String>,
+    restore: Option<&[logmode::Change]>,
+) -> Option<Edit> {
+    let mut out = None;
+    theme::card(ui).show(ui, |ui| {
+        ui.set_width(ui.available_width());
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Wideband logging mode").font(theme::strong_font(17.0)));
+            let (text, color) = match plan {
+                Ok(c) if c.is_empty() => ("on", p.warn),
+                Ok(_) => ("off", p.muted),
+                Err(_) => ("not available", p.muted),
+            };
+            ui.label(RichText::new(text).color(color).strong());
+        });
+        ui.label(
+            RichText::new(
+                "For logging with a wideband the way it's done in ECMSpy: closed loop off (EGO correction \
+                 locked at 100%) and AFV locked at 100%, so the ECM doesn't correct the mixture you're \
+                 measuring. XBTune's wideband auto-tune also works without it: it takes EGO out of the result.",
+            )
+            .color(p.muted),
+        );
+        match plan {
+            Err(e) => {
+                ui.label(RichText::new(e).color(p.muted));
+            }
+            Ok(changes) if changes.is_empty() => {
+                ui.label(
+                    "The tune has closed loop and AFV locked. After burning it, log your ride: EGO Corr. should \
+                     read 100% throughout. Put the normal settings back when you're done tuning.",
+                );
+                ui.horizontal(|ui| {
+                    let r = ui.add_enabled(restore.is_some(), egui::Button::new("Restore normal mode"));
+                    let r = r.on_disabled_hover_text(
+                        "No saved values for this ECM: set closed loop and the AFV limits by hand below.",
+                    );
+                    if let Some(c) = restore {
+                        let lines: Vec<String> = c.iter().map(logmode::Change::line).collect();
+                        if r.on_hover_text(lines.join("\n")).clicked() {
+                            out = Some(Edit::LogModeOff);
+                        }
+                    }
+                });
+            }
+            Ok(changes) => {
+                for c in changes {
+                    ui.label(RichText::new(format!("•  {}", c.line())).small());
+                }
+                ui.horizontal(|ui| {
+                    if ui.button("Switch on in the tune").clicked() {
+                        out = Some(Edit::LogModeOn);
+                    }
+                    if let Some(c) = restore {
+                        let lines: Vec<String> = c.iter().map(logmode::Change::line).collect();
+                        if ui.button("Restore normal mode").on_hover_text(lines.join("\n")).clicked() {
+                            out = Some(Edit::LogModeOff);
+                        }
+                    }
+                });
+            }
+        }
+    });
+    ui.add_space(6.0);
+    out
 }
 
 fn is_airbox(g: &Group) -> bool {

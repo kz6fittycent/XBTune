@@ -23,6 +23,7 @@ mod grid;
 mod icons;
 mod import;
 mod logs_view;
+mod profiles;
 mod remote_sync;
 mod remote_view;
 mod report;
