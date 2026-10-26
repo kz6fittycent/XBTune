@@ -833,6 +833,16 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 2026-10-26: bumped to 0.2.0 and pushed (owner's go) -> store candidate + call for testing.
 Then 0.2.1 (owner): map cells take typed numbers (8e2481f); first automatic Windows pre-release.
+0.2.1 went through by itself: candidate + pre-release v0.2.1 (cabd79d).
+Wiki updated for 0.2.1 (555e65f): new pages Windows, Bike-Profiles; all
+screenshots retaken in demo mode (script idea: one XBTUNE_HOME per shot,
+XBTUNE_SHOT_BIKE=1 with a made-up "2005 XB9SX" profile; paths painted to
+/home/rider/...; user namespaces are blocked here). KEEP THE WIKI CURRENT
+with every user-visible change (owner, 2026-10-26).
+OPEN BUG: an .xpr without an ID prefix in its name gets the first ID of
+that size: BUEIB-sized files open as B2RIB (factory race; Values 172 vs
+168). Wiki Troubleshooting says to keep the prefix. Fix: prefer a street
+ID / the connected ECM.
 
 Resume here (2026-10-25, end of session): PAUSED. Bike profiles + wideband
 logging mode pushed (22264be, then 9383229 snap-from-git fix); CI green on
