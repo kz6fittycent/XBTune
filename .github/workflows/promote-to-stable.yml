@@ -17,6 +17,7 @@ on:
 # repository variable XBTUNE_STORE_PUBLISH=true to turn it on.
 permissions:
   issues: write
+  contents: write
 
 env:
   SNAP_NAME: xbtune
@@ -81,6 +82,26 @@ jobs:
           for rev in "${revs[@]}"; do
             snapcraft release "${SNAP_NAME}" "$rev" stable
           done
+
+      # The same version's Windows pre-release (windows-release.yml) becomes
+      # the latest full release, which the app's update notice offers.
+      # Security rebuilds reuse a released version, so there's nothing to do.
+      - name: Make the GitHub release of this version the latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          if [[ ! "$ISSUE_TITLE" =~ ^Call\ for\ testing:\ v([0-9.]+)\  ]]; then
+            echo "Not a call-for-testing issue; no GitHub release to update."
+            exit 0
+          fi
+          tag="v${BASH_REMATCH[1]}"
+          if ! gh release view "$tag" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::warning::No GitHub release ${tag} (Windows build failed or not run); run windows-release.yml, then mark it latest by hand."
+            exit 0
+          fi
+          gh release edit "$tag" --repo "${{ github.repository }}" --prerelease=false --latest
+          echo "${tag} is now the latest release."
 
       - name: Comment on the issue
         env:

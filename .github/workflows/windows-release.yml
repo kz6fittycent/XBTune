@@ -1,0 +1,134 @@
+name: 🪟 Windows Release
+
+# Builds the Windows zip for a release and attaches it to a GitHub
+# pre-release `v<version>` (phase 10: one version for every platform).
+# Called by call-for-testing.yml when its gate finds a new version, as a
+# job of its own: a failure here never blocks the snap. promote-to-stable
+# turns the pre-release into the latest full release; only then does the
+# app's update notice (releases/latest) offer it.
+# Run by hand (Actions -> Run workflow) for a version whose call for
+# testing ran before this workflow existed, or to rebuild a failed one.
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: Commit to build
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to build (its Cargo.toml version names the release)
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout the release commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
+
+      - name: Determine the app version
+        id: version
+        shell: bash
+        run: |
+          version="$(grep -m1 -oP '^version = "\K[^"]+' Cargo.toml)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Tests
+        run: cargo test --workspace --locked
+
+      - name: Build
+        run: cargo build --release --locked -p xbtune-app -p xbtune-cli
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $dir = "xbtune-windows-x64"
+          New-Item -ItemType Directory $dir | Out-Null
+          Copy-Item target/release/xbtune.exe, target/release/xbtune-cli.exe, LICENSE, README.md $dir
+          Compress-Archive -Path $dir -DestinationPath xbtune-windows-x64.zip
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: xbtune-windows-x64-release
+          path: xbtune-windows-x64.zip
+          retention-days: 14
+
+  # The release itself is made on Linux (gh, bash heredoc), from the zip
+  # built above.
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the zip
+        uses: actions/download-artifact@v7
+        with:
+          name: xbtune-windows-x64-release
+
+      - name: Create or update the pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.build.outputs.version }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          tag="v${VERSION}"
+          repo="${{ github.repository }}"
+          # A re-run replaces the zip; it never turns a full release back
+          # into a pre-release.
+          if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
+            gh release upload "$tag" xbtune-windows-x64.zip --repo "$repo" --clobber
+            echo "Updated the zip on the existing release ${tag}."
+            exit 0
+          fi
+
+          notes=$(cat <<EOF
+          **XBTune ${VERSION}**, built from commit ${SHA:0:7}.
+
+          This is a **pre-release** while it is tested: Linux users get the same version from the snap's \`candidate\` channel (\`sudo snap install xbtune --candidate\`). It becomes the full release when it goes to the snap's stable channel.
+
+          > ⚠️ **Tuning can damage your engine.** XBTune only reads from the ECM unless you unlock writing in Settings.
+
+          ### Windows: install
+
+          1. Download \`xbtune-windows-x64.zip\` below and unzip it anywhere (e.g. your Desktop). Replace any older XBTune folder; your files are kept elsewhere.
+          2. Run \`xbtune.exe\`. The build isn't code-signed, so Windows may show **"Windows protected your PC"**: click **More info → Run anyway**.
+
+          Your files (tunes, backups, logs) go in \`Documents\\XBTune\`. Windows 10/11, 64-bit.
+
+          ### Connect to the bike
+
+          - **BuellTooth (Bluetooth):** pair it first in **Settings → Bluetooth & devices → Add device** (PIN usually \`1234\`). In XBTune → **Connect**, it shows up as a COM port marked **"outgoing: use this one"**. Ignore the one marked "incoming".
+          - **USB cable:** plug it in; it shows up as a COM port.
+
+          ### Problems
+
+          Use **Report a problem** at the bottom of XBTune's sidebar, or open an issue here. The app log is \`%APPDATA%\\xbtune\\data\\app-log\\app.log\`.
+
+          Changes: see the [commits](https://github.com/${repo}/commits/${SHA}).
+          EOF
+          )
+          gh release create "$tag" xbtune-windows-x64.zip \
+            --repo "$repo" \
+            --target "$SHA" \
+            --title "XBTune ${VERSION}" \
+            --prerelease \
+            --notes "$notes"
+          echo "Created pre-release ${tag}."

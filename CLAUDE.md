@@ -280,7 +280,14 @@ off, AFV locked at 100).
   html_url) / Skip this version / ×. Settings "Updates" card: switch,
   Check now, All releases link. Failures logged only. Hook
   `XBTUNE_SHOT_UPDATE=<version>`.
-- Not yet: release/pre-release workflow, Windows
+- Release workflow (2026-10-26): `windows-release.yml` (workflow_call
+  from call-for-testing's gate as job `windows-release`, its own job so it
+  never blocks the snap; also workflow_dispatch with `sha`): tests, builds,
+  zips `xbtune-windows-x64.zip`, creates pre-release `v<version>` (re-run
+  = replace the zip). promote-to-stable: after the snap release, the
+  issue title's version -> `gh release edit --prerelease=false --latest`
+  (security rebuilds skip). Issue body links the pre-release.
+- Not yet: Windows
   crash handler (SetUnhandledExceptionFilter), installer.
 
 ### Friend's files (2026-10-24; Windows tester with the LC-2)
