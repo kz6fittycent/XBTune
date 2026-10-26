@@ -839,10 +839,13 @@ screenshots retaken in demo mode (script idea: one XBTUNE_HOME per shot,
 XBTUNE_SHOT_BIKE=1 with a made-up "2005 XB9SX" profile; paths painted to
 /home/rider/...; user namespaces are blocked here). KEEP THE WIKI CURRENT
 with every user-visible change (owner, 2026-10-26).
-OPEN BUG: an .xpr without an ID prefix in its name gets the first ID of
-that size: BUEIB-sized files open as B2RIB (factory race; Values 172 vs
-168). Wiki Troubleshooting says to keep the prefix. Fix: prefer a street
-ID / the connected ECM.
+0.2.2 (owner): in-cell editing (`grid::CellEdit`: typing on selected
+cells opens an editor in the anchor cell, Enter sets all cells selected
+then, Esc cancels, click-away sets; double-click/F2 edits the old value;
+not in overlay modes; egui-driven test in grid.rs needs theme::install
+fonts or cursors don't place) and .xpr IDs (`Image::load_preferring`:
+name > connected ECM / compared tune > street ID of a shared definition;
+B2RIB has its own category, so it isn't interchangeable with BUEIB).
 
 Resume here (2026-10-25, end of session): PAUSED. Bike profiles + wideband
 logging mode pushed (22264be, then 9383229 snap-from-git fix); CI green on
