@@ -839,6 +839,26 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 ## Next steps
 
+Resume here (2026-10-26, end of session): PAUSED, waiting for the LC-2
+friend's input (Windows tester; no GitHub account: he gets
+`~/Nextcloud/iDraw/xbtune-windows-x64.zip`, synced from `windows-test`
+by the user timer). State:
+- Store `latest/candidate` = 0.2.3 rev 9 (3a4f3a5), call for testing #11;
+  stable still empty until the owner's `/promote 9 stable done` (that also
+  makes GitHub `v0.2.3` the latest full release: first real run of that
+  promote step, check it).
+- GitHub: pre-releases v0.2.0-v0.2.3 (Windows zip each), rolling
+  `windows-test` (every push to main). Every push builds Windows now.
+- Wiki current as of 0.2.3 (f005d33). Keep it current with every
+  user-visible change.
+- Versions: the owner asked for 0.2.3 after 0.2.2, but CLAUDE.md's rule
+  (and `tools/bump_version.sh`) count in threes (0.2.2 -> 0.3.0); the
+  script made 0.3.0 (be9ad7d, never uploaded) and 3a4f3a5 set 0.2.3 by
+  hand. ASK the owner which rule holds before the next bump.
+- Older waits still open: the friend's ECMSpy switches + a first log with
+  logging mode on (EGO Corr. = 100?), his .msl, the .msq import decision,
+  the owner's laptop test of bike profiles.
+
 2026-10-26: bumped to 0.2.0 and pushed (owner's go) -> store candidate + call for testing.
 Then 0.2.1 (owner): map cells take typed numbers (8e2481f); first automatic Windows pre-release.
 0.2.1 went through by itself: candidate + pre-release v0.2.1 (cabd79d).
@@ -849,7 +869,7 @@ XBTUNE_SHOT_BIKE=1 with a made-up "2005 XB9SX" profile; paths painted to
 with every user-visible change (owner, 2026-10-26).
 0.2.2 (owner): in-cell editing (`grid::CellEdit`: typing on selected
 cells opens an editor in the anchor cell, Enter sets all cells selected
-then, Esc cancels, click-away sets; double-click/F2 edits the old value;
+then, Esc cancels, click-away set (changed in 0.2.3); double-click/F2 edits the old value;
 not in overlay modes; egui-driven test in grid.rs needs theme::install
 fonts or cursors don't place) and .xpr IDs (`Image::load_preferring`:
 name > connected ECM / compared tune > street ID of a shared definition;
