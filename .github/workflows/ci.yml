@@ -68,6 +68,65 @@ jobs:
           path: xbtune-windows-x64
           retention-days: 14
 
+  # Every push to main replaces the rolling pre-release `windows-test` with
+  # this build, so Windows testers have one link that always has the newest
+  # zip (owner, 2026-10-26). Version bumps also get their own v<version>
+  # pre-release (windows-release.yml). Never marked latest, so the app's
+  # update notice ignores it.
+  windows-test-release:
+    needs: windows
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: windows-test-release
+      cancel-in-progress: true
+    steps:
+      - name: Download the build
+        uses: actions/download-artifact@v7
+        with:
+          name: xbtune-windows-x64-${{ github.sha }}
+          path: xbtune-windows-x64
+
+      - name: Replace the windows-test pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Only the tip of main: the tag must sit on a commit with main's
+          # workflow files, or GITHUB_TOKEN gets a 403 (windows-release.yml).
+          tip="$(gh api "repos/${REPO}/commits/main" --jq .sha)"
+          if [[ "$tip" != "$SHA" ]]; then
+            echo "::notice::${SHA:0:7} is no longer the tip of main (${tip:0:7}); its run will publish."
+            exit 0
+          fi
+          zip -qr xbtune-windows-x64.zip xbtune-windows-x64
+          version="$(gh api "repos/${REPO}/contents/Cargo.toml?ref=${SHA}" --jq .content | base64 -d | grep -m1 -oP '^version = "\K[^"]+')"
+          subject="$(gh api "repos/${REPO}/commits/${SHA}" --jq '.commit.message | split("\n")[0]')"
+          notes=$(cat <<EOF
+          **Windows test build: the newest commit on main, not a release.** Rebuilt on every push; this page always has the latest one.
+
+          Built from commit [${SHA:0:7}](https://github.com/${REPO}/commit/${SHA}) (version ${version}): ${subject}
+
+          > ⚠️ **Tuning can damage your engine.** XBTune only reads from the ECM unless you unlock writing in Settings.
+
+          1. Download \`xbtune-windows-x64.zip\` below and unzip it anywhere. Replace the old folder; your files (\`Documents\\XBTune\`) are kept.
+          2. Run \`xbtune.exe\`. It isn't code-signed, so Windows may say **"Windows protected your PC"**: **More info → Run anyway**.
+
+          Pairing, COM ports and where things are: [XBTune on Windows](https://github.com/${REPO}/wiki/Windows). Problems: **Report a problem** in the side bar, or an issue here. [All commits](https://github.com/${REPO}/commits/main).
+          EOF
+          )
+          gh release delete windows-test --repo "$REPO" --cleanup-tag --yes 2>/dev/null || true
+          gh release create windows-test xbtune-windows-x64.zip \
+            --repo "$REPO" \
+            --target "$SHA" \
+            --title "Windows test build (main, ${SHA:0:7})" \
+            --prerelease \
+            --latest=false \
+            --notes "$notes"
+
   deny:
     runs-on: ubuntu-latest
     steps:

@@ -290,6 +290,14 @@ off, AFV locked at 100).
   (security rebuilds skip). Issue body links the pre-release.
   The tag's commit must have main's workflow files, or GITHUB_TOKEN gets
   a 403 on create. v0.2.0 = e7604c5 (run 40349553273; 047da49 failed so).
+- Rolling `windows-test` pre-release (owner, 2026-10-26: the friend tests
+  every push): ci.yml job `windows-test-release` after `windows`, push to
+  main only, tip-of-main check, deletes and recreates the release + tag
+  on that commit, never latest. Link: releases/tag/windows-test.
+  Local copy for the friend (no GitHub account yet): user timer
+  `xbtune-windows-sync.timer` (every 10 min) runs
+  `~/.local/bin/xbtune-windows-sync`, which puts that zip in
+  `~/Nextcloud/iDraw/xbtune-windows-x64.zip` when the build changes.
 - Not yet: Windows
   crash handler (SetUnhandledExceptionFilter), installer.
 
