@@ -854,6 +854,9 @@ not in overlay modes; egui-driven test in grid.rs needs theme::install
 fonts or cursors don't place) and .xpr IDs (`Image::load_preferring`:
 name > connected ECM / compared tune > street ID of a shared definition;
 B2RIB has its own category, so it isn't interchangeable with BUEIB).
+0.2.3 (owner): the cell editor edits `TuneUi.value_text` (shared with the
+toolbar box), so = + − × % use what was typed; click-away no longer sets
+(closes, keeps the number); Esc restores the box's old text.
 
 Resume here (2026-10-25, end of session): PAUSED. Bike profiles + wideband
 logging mode pushed (22264be, then 9383229 snap-from-git fix); CI green on
