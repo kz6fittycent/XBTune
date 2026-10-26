@@ -565,7 +565,7 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         let resp = ui.add(
             egui::TextEdit::singleline(&mut app.tune_ui.value_text).hint_text("number").desired_width(70.0),
         );
-        let num: Option<f64> = app.tune_ui.value_text.trim().parse().ok();
+        let num = parse_value(&app.tune_ui.value_text);
         let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
         let can = n > 0;
         let with_num = can && num.is_some();
@@ -626,7 +626,8 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
                  column heading for the whole line.",
                 "2. Type a number and press Enter to set them all to it, or double-click a cell to \
                  change its value.",
-                "3. Or type a number in the box above and press an action: = + − × %, smooth, fill.",
+                "3. Or, instead of Enter, press an action: = + − × % use the number you typed (it's \
+                 also in the box above); smooth and fill need none.",
             ] {
                 ui.label(step);
             }
@@ -680,7 +681,7 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
     };
     let typed_in = egui::ScrollArea::horizontal()
         .id_salt("grid")
-        .show(ui, |ui| grid(ui, &spec, &mut app.tune_ui.sel))
+        .show(ui, |ui| grid(ui, &spec, &mut app.tune_ui.sel, &mut app.tune_ui.value_text))
         .inner
         .set;
     let editable = spec.mode == CellMode::Values;
@@ -748,13 +749,17 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         if editable && !app.tune_ui.sel.cells.is_empty() {
             if let Some(t) = typed {
                 // Keys typed before the editor has the focus go into it too.
-                match &mut app.tune_ui.sel.editing {
-                    Some(ed) => ed.text.push_str(&t),
-                    None => app.tune_ui.sel.start_edit(t),
+                let ui_state = &mut app.tune_ui;
+                match &ui_state.sel.editing {
+                    Some(_) => ui_state.value_text.push_str(&t),
+                    None => ui_state.sel.start_edit(&mut ui_state.value_text, t),
                 }
                 ui.ctx().request_repaint();
             } else if f2 && let Some((r, c)) = app.tune_ui.sel.anchor {
-                app.tune_ui.sel.start_edit(xbtune_defs::format_number(values[r][c], decimals));
+                let ui_state = &mut app.tune_ui;
+                ui_state
+                    .sel
+                    .start_edit(&mut ui_state.value_text, xbtune_defs::format_number(values[r][c], decimals));
                 ui.ctx().request_repaint();
             }
         }
@@ -766,16 +771,15 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
     }
 
     let mut cells = app.tune_ui.sel.list();
-    if let Some((typed_cells, text)) = typed_in {
-        match text.trim().replace(',', ".").parse::<f64>() {
-            Ok(x) => {
+    if let Some(typed_cells) = typed_in {
+        let text = app.tune_ui.value_text.trim();
+        match parse_value(text) {
+            Some(x) => {
                 cells = typed_cells;
                 op = Some(Op::Set(x));
             }
-            Err(_) if text.trim().is_empty() => {}
-            Err(_) => {
-                app.tune_ui.status = Some((format!("\u{201c}{}\u{201d} isn't a number", text.trim()), true))
-            }
+            None if text.is_empty() => {}
+            None => app.tune_ui.status = Some((format!("\u{201c}{text}\u{201d} isn't a number"), true)),
         }
     }
     // The clipboard holds cells as seen on screen (a spreadsheet paste
@@ -1167,6 +1171,11 @@ fn discard_dialog(app: &mut XbApp, ui: &mut Ui) {
     }
 }
 
+/// A typed number; a decimal comma counts as a point.
+fn parse_value(text: &str) -> Option<f64> {
+    text.trim().replace(',', ".").parse().ok()
+}
+
 /// Screenshot hook: `XBTUNE_SHOT_TUNE="select=0,0:2,3;op=add:5;type=57;3d;compare=PATH;var=NAME;mode=diff"`.
 pub fn scripted(app: &mut XbApp, script: &str) {
     for step in script.split(';').map(str::trim) {
@@ -1200,7 +1209,10 @@ pub fn scripted(app: &mut XbApp, script: &str) {
             }
             "3d" => app.tune_ui.view3d = true,
             // As if typed on the grid: the value box takes it, focused.
-            "type" => app.tune_ui.sel.start_edit(v.to_string()),
+            "type" => {
+                let ui_state = &mut app.tune_ui;
+                ui_state.sel.start_edit(&mut ui_state.value_text, v.to_string());
+            }
             "compare" => open(app, Path::new(v), true),
             "mode" if v == "diff" => app.tune_ui.mode = CellMode::Difference,
             _ => {}

@@ -19,15 +19,19 @@ pub struct Selection {
     pub editing: Option<CellEdit>,
 }
 
-/// Typing in a cell, as in a spreadsheet: Enter sets every cell that was
-/// selected when it started, Escape cancels, clicking elsewhere sets.
+/// Typing in a cell, as in a spreadsheet. The text is the Tune view's
+/// value box, so the toolbar's = + − × % act on what was typed. Enter sets
+/// every cell that was selected when it started; Escape cancels (the box
+/// gets its old text back); clicking elsewhere just closes the editor, so
+/// a toolbar button can still use the number.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CellEdit {
     /// Where the editor is drawn (storage order).
     pub at: (usize, usize),
-    /// The cells the value goes to.
+    /// The cells Enter sets.
     pub cells: Vec<(usize, usize)>,
-    pub text: String,
+    /// The value box's text before, for Escape.
+    before: String,
     /// Until the editor has the focus: ask for it, then put the cursor at
     /// the end.
     fresh: bool,
@@ -51,13 +55,15 @@ impl Selection {
         self.cells.iter().copied().collect()
     }
 
-    /// Start typing in the anchor cell, with `text` in the editor: the
-    /// typed characters, or the cell's value to change (F2/double-click).
-    pub fn start_edit(&mut self, text: String) {
+    /// Start typing in the anchor cell, putting `text` in the value box
+    /// `value`: the typed characters, or the cell's value to change
+    /// (F2/double-click).
+    pub fn start_edit(&mut self, value: &mut String, text: String) {
         let Some(at) = self.anchor.filter(|a| self.cells.contains(a)).or(self.cells.first().copied()) else {
             return;
         };
-        self.editing = Some(CellEdit { at, cells: self.list(), text, fresh: true });
+        let before = std::mem::replace(value, text);
+        self.editing = Some(CellEdit { at, cells: self.list(), before, fresh: true });
     }
 
     /// Move a single-cell selection with the arrow keys.
@@ -161,13 +167,14 @@ fn range(grid: &[Vec<f64>]) -> (f64, f64) {
 /// What happened in the grid this frame.
 #[derive(Debug, Default)]
 pub struct GridEvents {
-    /// A typed value to set: the cells and the text as typed.
-    pub set: Option<(Vec<(usize, usize)>, String)>,
+    /// Enter in the cell editor: set these cells to the value box's number.
+    pub set: Option<Vec<(usize, usize)>>,
 }
 
-/// Draw the grid, update `sel` from the mouse, and run the cell editor.
-/// Cells can be typed into only while they show the values themselves.
-pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> GridEvents {
+/// Draw the grid, update `sel` from the mouse, and run the cell editor on
+/// `value` (the value box's text). Cells can be typed into only while they
+/// show the values themselves.
+pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection, value: &mut String) -> GridEvents {
     let mut out = GridEvents::default();
     let p = Palette::for_visuals(ui.visuals());
     let rows = spec.values.len();
@@ -279,7 +286,7 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> GridEvents {
         let id = ui.id().with("cell_edit");
         let resp = ui.put(
             cell_rect(ed.at.0, ed.at.1),
-            egui::TextEdit::singleline(&mut ed.text)
+            egui::TextEdit::singleline(value)
                 .id(id)
                 .font(font.clone())
                 .horizontal_align(egui::Align::Center)
@@ -291,19 +298,23 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> GridEvents {
             ui.ctx().request_repaint();
         } else if std::mem::take(&mut ed.fresh) {
             let mut state = egui::TextEdit::load_state(ui.ctx(), id).unwrap_or_default();
-            let end = egui::text::CCursor::new(ed.text.chars().count());
+            let end = egui::text::CCursor::new(value.chars().count());
             state.cursor.set_char_range(Some(egui::text::CCursorRange::one(end)));
             state.store(ui.ctx(), id);
         } else if resp.lost_focus() {
-            if !ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-                out.set = Some((std::mem::take(&mut ed.cells), std::mem::take(&mut ed.text)));
+            let (enter, escape) =
+                ui.input(|i| (i.key_pressed(egui::Key::Enter), i.key_pressed(egui::Key::Escape)));
+            if enter {
+                out.set = Some(std::mem::take(&mut ed.cells));
+            } else if escape {
+                *value = std::mem::take(&mut ed.before);
             }
             sel.editing = None;
         }
         if let Some(ed) = &sel.editing {
             let n = ed.cells.len();
             let tip = if n > 1 { format!("Enter: set all {n} selected cells") } else { "Enter: set".into() };
-            resp.on_hover_text(format!("{tip} · Esc: cancel"));
+            resp.on_hover_text(format!("{tip} · or use = + − × % above · Esc: cancel"));
         }
     }
 
@@ -372,7 +383,7 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> GridEvents {
         sel.cells.clear();
         sel.cells.insert((r, c));
         sel.anchor = Some((r, c));
-        sel.start_edit(format_number(spec.values[r][c], spec.decimals));
+        sel.start_edit(value, format_number(spec.values[r][c], spec.decimals));
     }
     out
 }
@@ -513,6 +524,7 @@ mod tests {
         ctx: &egui::Context,
         spec: &GridSpec,
         sel: &mut Selection,
+        value: &mut String,
         events: Vec<egui::Event>,
     ) -> GridEvents {
         let input = egui::RawInput {
@@ -521,7 +533,7 @@ mod tests {
             ..Default::default()
         };
         let mut out = GridEvents::default();
-        ctx.run_ui(input, |ui| out = grid(ui, spec, sel)).textures_delta.clear();
+        ctx.run_ui(input, |ui| out = grid(ui, spec, sel, value)).textures_delta.clear();
         out
     }
 
@@ -536,7 +548,7 @@ mod tests {
     }
 
     #[test]
-    fn typing_in_a_cell_sets_the_cells_selected_then() {
+    fn typing_in_a_cell_shares_the_value_box() {
         let values = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
         let spec = GridSpec {
             values: &values,
@@ -556,31 +568,52 @@ mod tests {
         // The app's fonts: without any, text has no glyphs and no cursor places.
         crate::theme::install(&ctx);
         let mut sel = Selection::default();
+        let mut value = "2".to_string();
+        let run = |sel: &mut Selection, value: &mut String, events| frame(&ctx, &spec, sel, value, events);
         sel.rect((0, 0), (0, 1));
         sel.anchor = Some((0, 0));
-        frame(&ctx, &spec, &mut sel, vec![]);
-        // A typed "5" opens the editor with it; then "7" and Enter.
-        sel.start_edit("5".into());
-        assert!(frame(&ctx, &spec, &mut sel, vec![]).set.is_none());
-        assert!(frame(&ctx, &spec, &mut sel, vec![]).set.is_none());
-        assert!(frame(&ctx, &spec, &mut sel, vec![egui::Event::Text("7".into())]).set.is_none());
-        let out = frame(&ctx, &spec, &mut sel, vec![key(egui::Key::Enter)]);
-        assert_eq!(out.set, Some((vec![(0, 0), (0, 1)], "57".to_string())));
+        run(&mut sel, &mut value, vec![]);
+
+        // A typed "5" opens the editor with it; then "7" and Enter sets
+        // both selected cells.
+        sel.start_edit(&mut value, "5".into());
+        assert!(run(&mut sel, &mut value, vec![]).set.is_none());
+        assert!(run(&mut sel, &mut value, vec![]).set.is_none());
+        assert!(run(&mut sel, &mut value, vec![egui::Event::Text("7".into())]).set.is_none());
+        assert_eq!(value, "57");
+        let out = run(&mut sel, &mut value, vec![key(egui::Key::Enter)]);
+        assert_eq!(out.set, Some(vec![(0, 0), (0, 1)]));
         assert!(sel.editing.is_none());
 
-        // F2/double-click: the old value, cursor after it; Escape cancels.
-        sel.start_edit("1".into());
-        frame(&ctx, &spec, &mut sel, vec![]);
-        frame(&ctx, &spec, &mut sel, vec![]);
-        frame(&ctx, &spec, &mut sel, vec![egui::Event::Text("9".into())]);
-        assert_eq!(sel.editing.as_ref().map(|e| e.text.as_str()), Some("19"));
-        assert!(frame(&ctx, &spec, &mut sel, vec![key(egui::Key::Escape)]).set.is_none());
+        // F2/double-click: the old value, cursor after it; Escape cancels
+        // and the value box gets its text back.
+        sel.start_edit(&mut value, "1".into());
+        run(&mut sel, &mut value, vec![]);
+        run(&mut sel, &mut value, vec![]);
+        run(&mut sel, &mut value, vec![egui::Event::Text("9".into())]);
+        assert_eq!(value, "19");
+        assert!(run(&mut sel, &mut value, vec![key(egui::Key::Escape)]).set.is_none());
         assert!(sel.editing.is_none());
+        assert_eq!(value, "57");
+
+        // Clicking away (here: the focus goes) sets nothing and keeps the
+        // number for the toolbar's = + − × %.
+        sel.start_edit(&mut value, "8".into());
+        run(&mut sel, &mut value, vec![]);
+        run(&mut sel, &mut value, vec![]);
+        ctx.memory_mut(|m| {
+            if let Some(id) = m.focused() {
+                m.surrender_focus(id);
+            }
+        });
+        assert!(run(&mut sel, &mut value, vec![]).set.is_none());
+        assert!(sel.editing.is_none());
+        assert_eq!(value, "8");
 
         // Overlays aren't typed into.
-        sel.start_edit("3".into());
-        let hits = GridSpec { mode: CellMode::Difference, ..spec };
-        frame(&ctx, &hits, &mut sel, vec![]);
+        sel.start_edit(&mut value, "3".into());
+        let diff = GridSpec { mode: CellMode::Difference, ..spec };
+        frame(&ctx, &diff, &mut sel, &mut value, vec![]);
         assert!(sel.editing.is_none());
     }
 
