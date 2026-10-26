@@ -821,6 +821,8 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 ## Next steps
 
+2026-10-26: bumped to 0.2.0 and pushed (owner's go) -> store candidate + call for testing.
+
 Resume here (2026-10-25, end of session): PAUSED. Bike profiles + wideband
 logging mode pushed (22264be, then 9383229 snap-from-git fix); CI green on
 both (CI incl. the windows job, Snap Builds, Call for Testing: no version
