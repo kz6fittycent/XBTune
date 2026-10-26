@@ -854,7 +854,8 @@ by the user timer). State:
 - Versions: the owner asked for 0.2.3 after 0.2.2, but CLAUDE.md's rule
   (and `tools/bump_version.sh`) count in threes (0.2.2 -> 0.3.0); the
   script made 0.3.0 (be9ad7d, never uploaded) and 3a4f3a5 set 0.2.3 by
-  hand. ASK the owner which rule holds before the next bump.
+  hand. Owner 2026-10-26: next release is 0.3.0 (threes rule stands;
+  0.2.3 was a one-off); `tools/bump_version.sh` gives 0.2.3 -> 0.3.0.
 - Older waits still open: the friend's ECMSpy switches + a first log with
   logging mode on (EGO Corr. = 100?), his .msl, the .msq import decision,
   the owner's laptop test of bike profiles.
