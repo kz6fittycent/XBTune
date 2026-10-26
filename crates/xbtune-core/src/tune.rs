@@ -105,7 +105,13 @@ impl Tune {
     }
 
     pub fn open(path: &Path, catalog: &Catalog) -> Result<Self, TuneError> {
-        let image = Image::load(path, None, catalog)?;
+        Self::open_preferring(path, None, catalog)
+    }
+
+    /// [`Tune::open`]; an `.xpr` whose name and length don't settle its ECM
+    /// is taken as `prefer` (the connected ECM) when that fits.
+    pub fn open_preferring(path: &Path, prefer: Option<&str>, catalog: &Catalog) -> Result<Self, TuneError> {
+        let image = Image::load_preferring(path, None, prefer, catalog)?;
         let mut t = Self::new(image, catalog)?;
         t.path = Some(path.to_path_buf());
         Ok(t)

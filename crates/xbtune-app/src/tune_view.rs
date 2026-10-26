@@ -28,8 +28,6 @@ pub struct TuneUi {
     filter: String,
     sel: Selection,
     value_text: String,
-    /// Typing on the grid started a value: focus the value box next frame.
-    focus_value: bool,
     link: bool,
     view3d: bool,
     view: (f32, f32),
@@ -51,7 +49,6 @@ impl Default for TuneUi {
             filter: String::new(),
             sel: Selection::default(),
             value_text: String::new(),
-            focus_value: false,
             link: false,
             view3d: false,
             view: (0.6, 0.7),
@@ -568,9 +565,6 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         let resp = ui.add(
             egui::TextEdit::singleline(&mut app.tune_ui.value_text).hint_text("number").desired_width(70.0),
         );
-        if std::mem::take(&mut app.tune_ui.focus_value) {
-            focus_at_end(ui.ctx(), &resp, app.tune_ui.value_text.chars().count());
-        }
         let num: Option<f64> = app.tune_ui.value_text.trim().parse().ok();
         let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
         let can = n > 0;
@@ -630,8 +624,9 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
             for step in [
                 "1. Select cells: click; drag or Shift-click for a block; Ctrl-click to add; click a row or \
                  column heading for the whole line.",
-                "2. Type a number (it goes into the value box).",
-                "3. Press an action.",
+                "2. Type a number and press Enter to set them all to it, or double-click a cell to \
+                 change its value.",
+                "3. Or type a number in the box above and press an action: = + − × %, smooth, fill.",
             ] {
                 ui.label(step);
             }
@@ -639,7 +634,8 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
             ui.label(RichText::new("Shortcuts").strong());
             egui::Grid::new("keys").num_columns(2).spacing([16.0, 4.0]).show(ui, |ui| {
                 for (k, what) in [
-                    ("Type a number, Enter", "Set the selected cells to it"),
+                    ("Type a number, Enter", "Set the selected cells to it (Esc cancels)"),
+                    ("Double-click a cell, or F2", "Change its value"),
                     ("Arrow keys", "Move the selection"),
                     ("Ctrl+C / Ctrl+V", "Copy / paste cells (works with spreadsheets)"),
                     ("Ctrl+Z", "Undo"),
@@ -682,9 +678,12 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         flip_cols: flip,
         wb_unit: app.settings.bike.wb_unit,
     };
-    egui::ScrollArea::horizontal().id_salt("grid").show(ui, |ui| {
-        grid(ui, &spec, &mut app.tune_ui.sel);
-    });
+    let typed_in = egui::ScrollArea::horizontal()
+        .id_salt("grid")
+        .show(ui, |ui| grid(ui, &spec, &mut app.tune_ui.sel))
+        .inner
+        .set;
+    let editable = spec.mode == CellMode::Values;
     if let Some((_, l)) = &ys
         && matches!(v.shape, Shape::Grid { .. })
         && l.len() != rows
@@ -695,7 +694,7 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
     // Keyboard shortcuts for the grid (when no text box has focus).
     let typing = ui.ctx().egui_wants_keyboard_input();
     if !typing {
-        let (c, v_paste, pasted, arrows, typed) = ui.input(|i| {
+        let (c, v_paste, pasted, arrows, typed, f2) = ui.input(|i| {
             let ctrl = i.modifiers.command;
             let typed: String = i
                 .events
@@ -731,6 +730,7 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
                 pasted,
                 arrows,
                 typed,
+                i.key_pressed(Key::F2),
             )
         });
         copy |= c;
@@ -742,14 +742,21 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         } else if v_paste {
             paste = true;
         }
-        // Typing a number on the selected cells starts the value box, so
-        // "click a cell, type 57, Enter" works like a spreadsheet.
-        if !app.tune_ui.sel.cells.is_empty()
-            && let Some(t) = typed
-        {
-            app.tune_ui.value_text = t;
-            app.tune_ui.focus_value = true;
-            ui.ctx().request_repaint();
+        // Typing a number on the selected cells types it into the cell, so
+        // "click a cell, type 57, Enter" works like a spreadsheet; F2 edits
+        // the value that's there.
+        if editable && !app.tune_ui.sel.cells.is_empty() {
+            if let Some(t) = typed {
+                // Keys typed before the editor has the focus go into it too.
+                match &mut app.tune_ui.sel.editing {
+                    Some(ed) => ed.text.push_str(&t),
+                    None => app.tune_ui.sel.start_edit(t),
+                }
+                ui.ctx().request_repaint();
+            } else if f2 && let Some((r, c)) = app.tune_ui.sel.anchor {
+                app.tune_ui.sel.start_edit(xbtune_defs::format_number(values[r][c], decimals));
+                ui.ctx().request_repaint();
+            }
         }
         if arrows != (0, 0) {
             // Left/right as seen on screen.
@@ -758,7 +765,19 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
         }
     }
 
-    let cells = app.tune_ui.sel.list();
+    let mut cells = app.tune_ui.sel.list();
+    if let Some((typed_cells, text)) = typed_in {
+        match text.trim().replace(',', ".").parse::<f64>() {
+            Ok(x) => {
+                cells = typed_cells;
+                op = Some(Op::Set(x));
+            }
+            Err(_) if text.trim().is_empty() => {}
+            Err(_) => {
+                app.tune_ui.status = Some((format!("\u{201c}{}\u{201d} isn't a number", text.trim()), true))
+            }
+        }
+    }
     // The clipboard holds cells as seen on screen (a spreadsheet paste
     // lands the way it looks); `vc` maps a column both ways.
     let vc = |c: usize| crate::grid::view_col(c, cols, flip);
@@ -977,7 +996,8 @@ fn do_save(app: &mut XbApp, path: &Path) {
 /// Open `path` as the tune (or as the comparison image).
 pub fn open(app: &mut XbApp, path: &Path, compare: bool) {
     if compare {
-        match Image::load(path, None, &app.catalog) {
+        let prefer = app.tune.as_ref().map(|t| t.image.ecm_id.clone());
+        match Image::load_preferring(path, None, prefer.as_deref(), &app.catalog) {
             Ok(img) if app.tune.as_ref().is_some_and(|t| t.image.ecm_id != img.ecm_id) => {
                 app.tune_ui.status = Some((
                     format!(
@@ -997,7 +1017,8 @@ pub fn open(app: &mut XbApp, path: &Path, compare: bool) {
         }
         return;
     }
-    match Tune::open(path, &app.catalog) {
+    let connected = app.link.identity.as_ref().map(|i| i.ecm.id.clone());
+    match Tune::open_preferring(path, connected.as_deref(), &app.catalog) {
         Ok(t) => {
             app.tune = Some(t);
             app.tune_ui.sel.clear();
@@ -1146,15 +1167,6 @@ fn discard_dialog(app: &mut XbApp, ui: &mut Ui) {
     }
 }
 
-/// Give a text box the keyboard focus with the cursor after `chars`.
-fn focus_at_end(ctx: &egui::Context, resp: &egui::Response, chars: usize) {
-    resp.request_focus();
-    let mut state = egui::TextEdit::load_state(ctx, resp.id).unwrap_or_default();
-    let at = egui::text::CCursor::new(chars);
-    state.cursor.set_char_range(Some(egui::text::CCursorRange::one(at)));
-    state.store(ctx, resp.id);
-}
-
 /// Screenshot hook: `XBTUNE_SHOT_TUNE="select=0,0:2,3;op=add:5;type=57;3d;compare=PATH;var=NAME;mode=diff"`.
 pub fn scripted(app: &mut XbApp, script: &str) {
     for step in script.split(';').map(str::trim) {
@@ -1188,10 +1200,7 @@ pub fn scripted(app: &mut XbApp, script: &str) {
             }
             "3d" => app.tune_ui.view3d = true,
             // As if typed on the grid: the value box takes it, focused.
-            "type" => {
-                app.tune_ui.value_text = v.to_string();
-                app.tune_ui.focus_value = true;
-            }
+            "type" => app.tune_ui.sel.start_edit(v.to_string()),
             "compare" => open(app, Path::new(v), true),
             "mode" if v == "diff" => app.tune_ui.mode = CellMode::Difference,
             _ => {}

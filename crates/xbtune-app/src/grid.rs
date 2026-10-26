@@ -15,6 +15,22 @@ pub struct Selection {
     pub cells: BTreeSet<(usize, usize)>,
     pub anchor: Option<(usize, usize)>,
     drag_from: Option<(usize, usize)>,
+    /// A value being typed into a cell.
+    pub editing: Option<CellEdit>,
+}
+
+/// Typing in a cell, as in a spreadsheet: Enter sets every cell that was
+/// selected when it started, Escape cancels, clicking elsewhere sets.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CellEdit {
+    /// Where the editor is drawn (storage order).
+    pub at: (usize, usize),
+    /// The cells the value goes to.
+    pub cells: Vec<(usize, usize)>,
+    pub text: String,
+    /// Until the editor has the focus: ask for it, then put the cursor at
+    /// the end.
+    fresh: bool,
 }
 
 impl Selection {
@@ -33,6 +49,15 @@ impl Selection {
 
     pub fn list(&self) -> Vec<(usize, usize)> {
         self.cells.iter().copied().collect()
+    }
+
+    /// Start typing in the anchor cell, with `text` in the editor: the
+    /// typed characters, or the cell's value to change (F2/double-click).
+    pub fn start_edit(&mut self, text: String) {
+        let Some(at) = self.anchor.filter(|a| self.cells.contains(a)).or(self.cells.first().copied()) else {
+            return;
+        };
+        self.editing = Some(CellEdit { at, cells: self.list(), text, fresh: true });
     }
 
     /// Move a single-cell selection with the arrow keys.
@@ -133,14 +158,26 @@ fn range(grid: &[Vec<f64>]) -> (f64, f64) {
     (lo, hi)
 }
 
-/// Draw the grid and update `sel` from the mouse. Returns true if the
-/// selection changed.
-pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> bool {
+/// What happened in the grid this frame.
+#[derive(Debug, Default)]
+pub struct GridEvents {
+    /// A typed value to set: the cells and the text as typed.
+    pub set: Option<(Vec<(usize, usize)>, String)>,
+}
+
+/// Draw the grid, update `sel` from the mouse, and run the cell editor.
+/// Cells can be typed into only while they show the values themselves.
+pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> GridEvents {
+    let mut out = GridEvents::default();
     let p = Palette::for_visuals(ui.visuals());
     let rows = spec.values.len();
     let cols = spec.values.first().map_or(0, |r| r.len());
     if rows == 0 || cols == 0 {
-        return false;
+        return out;
+    }
+    let editable = spec.mode == CellMode::Values;
+    if !editable {
+        sel.editing = None;
     }
     let header_w = 64.0;
     let header_h = 26.0;
@@ -234,8 +271,43 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> bool {
         painter.text(cr.right_center(), Align2::RIGHT_CENTER, l, hfont.clone(), p.muted);
     }
 
+    // The cell editor, over its cell.
+    if let Some(ed) = &mut sel.editing
+        && ed.at.0 < rows
+        && ed.at.1 < cols
+    {
+        let id = ui.id().with("cell_edit");
+        let resp = ui.put(
+            cell_rect(ed.at.0, ed.at.1),
+            egui::TextEdit::singleline(&mut ed.text)
+                .id(id)
+                .font(font.clone())
+                .horizontal_align(egui::Align::Center)
+                .vertical_align(egui::Align::Center)
+                .margin(vec2(2.0, 0.0)),
+        );
+        if ed.fresh && !resp.has_focus() {
+            resp.request_focus();
+            ui.ctx().request_repaint();
+        } else if std::mem::take(&mut ed.fresh) {
+            let mut state = egui::TextEdit::load_state(ui.ctx(), id).unwrap_or_default();
+            let end = egui::text::CCursor::new(ed.text.chars().count());
+            state.cursor.set_char_range(Some(egui::text::CCursorRange::one(end)));
+            state.store(ui.ctx(), id);
+        } else if resp.lost_focus() {
+            if !ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                out.set = Some((std::mem::take(&mut ed.cells), std::mem::take(&mut ed.text)));
+            }
+            sel.editing = None;
+        }
+        if let Some(ed) = &sel.editing {
+            let n = ed.cells.len();
+            let tip = if n > 1 { format!("Enter: set all {n} selected cells") } else { "Enter: set".into() };
+            resp.on_hover_text(format!("{tip} · Esc: cancel"));
+        }
+    }
+
     // Mouse.
-    let before = sel.clone();
     let hit = |pos: Pos2| -> Option<(Option<usize>, Option<usize>)> {
         let d = pos - origin;
         let r = (d.y >= 0.0).then(|| (d.y / cell_h) as usize).filter(|r| *r < rows);
@@ -292,7 +364,17 @@ pub fn grid(ui: &mut Ui, spec: &GridSpec, sel: &mut Selection) -> bool {
     if response.drag_stopped() {
         sel.drag_from = None;
     }
-    *sel != before
+    // Double-click a cell to change its value.
+    if editable
+        && response.double_clicked()
+        && let Some((Some(r), Some(c))) = response.interact_pointer_pos().and_then(hit)
+    {
+        sel.cells.clear();
+        sel.cells.insert((r, c));
+        sel.anchor = Some((r, c));
+        sel.start_edit(format_number(spec.values[r][c], spec.decimals));
+    }
+    out
 }
 
 /// The log overlay: hits as a heatmap, average EGO coloured by how far
@@ -425,6 +507,82 @@ pub fn surface(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Run frames of the grid with `events`, as the app would.
+    fn frame(
+        ctx: &egui::Context,
+        spec: &GridSpec,
+        sel: &mut Selection,
+        events: Vec<egui::Event>,
+    ) -> GridEvents {
+        let input = egui::RawInput {
+            events,
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(900.0, 600.0))),
+            ..Default::default()
+        };
+        let mut out = GridEvents::default();
+        ctx.run_ui(input, |ui| out = grid(ui, spec, sel)).textures_delta.clear();
+        out
+    }
+
+    fn key(k: egui::Key) -> egui::Event {
+        egui::Event::Key {
+            key: k,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Default::default(),
+        }
+    }
+
+    #[test]
+    fn typing_in_a_cell_sets_the_cells_selected_then() {
+        let values = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
+        let spec = GridSpec {
+            values: &values,
+            saved: None,
+            other: None,
+            mode: CellMode::Values,
+            row_labels: vec!["a".into(), "b".into()],
+            col_labels: vec!["x".into(), "y".into()],
+            decimals: Some(0),
+            live: None,
+            log: None,
+            min_hits: 0.0,
+            wb_unit: Default::default(),
+            flip_cols: false,
+        };
+        let ctx = egui::Context::default();
+        // The app's fonts: without any, text has no glyphs and no cursor places.
+        crate::theme::install(&ctx);
+        let mut sel = Selection::default();
+        sel.rect((0, 0), (0, 1));
+        sel.anchor = Some((0, 0));
+        frame(&ctx, &spec, &mut sel, vec![]);
+        // A typed "5" opens the editor with it; then "7" and Enter.
+        sel.start_edit("5".into());
+        assert!(frame(&ctx, &spec, &mut sel, vec![]).set.is_none());
+        assert!(frame(&ctx, &spec, &mut sel, vec![]).set.is_none());
+        assert!(frame(&ctx, &spec, &mut sel, vec![egui::Event::Text("7".into())]).set.is_none());
+        let out = frame(&ctx, &spec, &mut sel, vec![key(egui::Key::Enter)]);
+        assert_eq!(out.set, Some((vec![(0, 0), (0, 1)], "57".to_string())));
+        assert!(sel.editing.is_none());
+
+        // F2/double-click: the old value, cursor after it; Escape cancels.
+        sel.start_edit("1".into());
+        frame(&ctx, &spec, &mut sel, vec![]);
+        frame(&ctx, &spec, &mut sel, vec![]);
+        frame(&ctx, &spec, &mut sel, vec![egui::Event::Text("9".into())]);
+        assert_eq!(sel.editing.as_ref().map(|e| e.text.as_str()), Some("19"));
+        assert!(frame(&ctx, &spec, &mut sel, vec![key(egui::Key::Escape)]).set.is_none());
+        assert!(sel.editing.is_none());
+
+        // Overlays aren't typed into.
+        sel.start_edit("3".into());
+        let hits = GridSpec { mode: CellMode::Difference, ..spec };
+        frame(&ctx, &hits, &mut sel, vec![]);
+        assert!(sel.editing.is_none());
+    }
 
     #[test]
     fn flipped_columns_map_both_ways() {

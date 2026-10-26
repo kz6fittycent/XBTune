@@ -108,8 +108,16 @@ impl Image {
     }
 
     /// Read an EcmDroid `.xpr`. The ECM ID comes from `id`, else from the
-    /// file name prefix, else from the length if that is unambiguous.
-    pub fn read_xpr(path: &Path, id: Option<&str>, catalog: &Catalog) -> Result<Self, ImageError> {
+    /// file name prefix, else from the length: `prefer` (the connected
+    /// ECM, or the tune being compared with) if it fits, else the street ID
+    /// of a definition several IDs share (BUEIB over its race twin B2RIB,
+    /// which has its own variable set), else an error.
+    pub fn read_xpr(
+        path: &Path,
+        id: Option<&str>,
+        prefer: Option<&str>,
+        catalog: &Catalog,
+    ) -> Result<Self, ImageError> {
         let raw = std::fs::read(path)?;
         let from_name = path
             .file_name()
@@ -120,11 +128,17 @@ impl Image {
             Some(id) => catalog.lookup(id).ok_or_else(|| ImageError::UnknownEcm(id.to_string()))?,
             None => {
                 let c = catalog.ids_for_image_len(raw.len());
-                // IDs sharing one definition and size are interchangeable here.
                 let mut defs: Vec<&str> = c.iter().map(|d| d.definition.as_str()).collect();
                 defs.dedup();
-                match (c.first(), defs.len()) {
-                    (Some(first), 1) => *first,
+                let street = || {
+                    c.iter()
+                        .find(|d| d.id == d.definition)
+                        .or_else(|| c.iter().find(|d| !d.is_race()))
+                        .or(c.first())
+                };
+                match (prefer.and_then(|p| c.iter().find(|d| d.id == p)), defs.len()) {
+                    (Some(p), _) => *p,
+                    (None, 1) => street().copied().expect("one definition, so one ID"),
                     _ => {
                         return Err(ImageError::Ambiguous {
                             len: raw.len(),
@@ -232,8 +246,19 @@ impl Image {
 
     /// Load `.xbt` or `.xpr` by extension (`id` only applies to `.xpr`).
     pub fn load(path: &Path, id: Option<&str>, catalog: &Catalog) -> Result<Self, ImageError> {
+        Self::load_preferring(path, id, None, catalog)
+    }
+
+    /// [`Image::load`], with the ECM ID to take for an `.xpr` whose name and
+    /// length don't settle it (see [`Image::read_xpr`]).
+    pub fn load_preferring(
+        path: &Path,
+        id: Option<&str>,
+        prefer: Option<&str>,
+        catalog: &Catalog,
+    ) -> Result<Self, ImageError> {
         if is_xpr(path) {
-            Self::read_xpr(path, id, catalog)
+            Self::read_xpr(path, id, prefer, catalog)
         } else {
             Self::from_xbt(&std::fs::read_to_string(path)?, catalog)
         }
@@ -374,14 +399,20 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let named = dir.join("BUEIB_20261014-120000.xpr");
         std::fs::write(&named, BUEIB).unwrap();
-        assert_eq!(Image::read_xpr(&named, None, &c).unwrap().ecm_id, "BUEIB");
-        // 1206 bytes fits BUEIB, BUEIC and B2RIB, which share one definition.
+        assert_eq!(Image::read_xpr(&named, None, None, &c).unwrap().ecm_id, "BUEIB");
+        // The name wins over a preference.
+        assert_eq!(Image::read_xpr(&named, None, Some("BUEIC"), &c).unwrap().ecm_id, "BUEIB");
+        // 1206 bytes fits BUEIB, BUEIC and the race B2RIB: the street ID
+        // unless something says otherwise (B2RIB has its own variables).
         let anon = dir.join("dump.xpr");
         std::fs::write(&anon, BUEIB).unwrap();
-        assert_eq!(Image::read_xpr(&anon, None, &c).unwrap().bytes.len(), 1210);
+        let img = Image::read_xpr(&anon, None, None, &c).unwrap();
+        assert_eq!((img.ecm_id.as_str(), img.bytes.len()), ("BUEIB", 1210));
+        assert_eq!(Image::read_xpr(&anon, None, Some("B2RIB"), &c).unwrap().ecm_id, "B2RIB");
+        assert_eq!(Image::read_xpr(&anon, None, Some("BUEOD"), &c).unwrap().ecm_id, "BUEIB");
         let odd = dir.join("odd.xpr");
         std::fs::write(&odd, [0u8; 7]).unwrap();
-        assert!(matches!(Image::read_xpr(&odd, None, &c), Err(ImageError::Ambiguous { .. })));
+        assert!(matches!(Image::read_xpr(&odd, None, None, &c), Err(ImageError::Ambiguous { .. })));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
