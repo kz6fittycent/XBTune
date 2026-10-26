@@ -288,6 +288,8 @@ off, AFV locked at 100).
   = replace the zip). promote-to-stable: after the snap release, the
   issue title's version -> `gh release edit --prerelease=false --latest`
   (security rebuilds skip). Issue body links the pre-release.
+  The tag's commit must have main's workflow files, or GITHUB_TOKEN gets
+  a 403 on create. v0.2.0 = e7604c5 (run 40349553273; 047da49 failed so).
 - Not yet: Windows
   crash handler (SetUnhandledExceptionFilter), installer.
 

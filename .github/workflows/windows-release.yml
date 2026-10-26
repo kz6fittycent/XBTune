@@ -8,6 +8,11 @@ name: 🪟 Windows Release
 # app's update notice (releases/latest) offer it.
 # Run by hand (Actions -> Run workflow) for a version whose call for
 # testing ran before this workflow existed, or to rebuild a failed one.
+# The sha must have the same .github/workflows/ as main: creating the tag
+# on a commit whose workflow files differ is a workflow change, which
+# GITHUB_TOKEN may never make ("HTTP 403: Resource not accessible by
+# integration", 2026-10-26 with 0.2.0). Use the newest commit carrying
+# that version.
 on:
   workflow_call:
     inputs:
