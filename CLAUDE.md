@@ -297,7 +297,7 @@ off, AFV locked at 100).
   Local copy for the friend (no GitHub account yet): user timer
   `xbtune-windows-sync.timer` (every 10 min) runs
   `~/.local/bin/xbtune-windows-sync`, which puts that zip in
-  `~/Nextcloud/iDraw/xbtune-windows-x64.zip` when the build changes.
+  `~/Nextcloud/XBTUNE/xbtune-windows-x64.zip` when the build changes.
 - Not yet: Windows
   crash handler (SetUnhandledExceptionFilter), installer.
 
@@ -841,7 +841,7 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 Resume here (2026-10-26, end of session): PAUSED, waiting for the LC-2
 friend's input (Windows tester; no GitHub account: he gets
-`~/Nextcloud/iDraw/xbtune-windows-x64.zip`, synced from `windows-test`
+`~/Nextcloud/XBTUNE/xbtune-windows-x64.zip`, synced from `windows-test`
 by the user timer). State:
 - Store `latest/candidate` = 0.2.3 rev 9 (3a4f3a5), call for testing #11;
   stable still empty until the owner's `/promote 9 stable done` (that also
