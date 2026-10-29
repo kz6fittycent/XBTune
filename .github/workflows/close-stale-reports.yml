@@ -7,7 +7,7 @@ name: 🧹 Close Stale Bug Reports
 # "keep" label to exempt one for good.
 on:
   schedule:
-    - cron: "30 7 * * *"  # daily, 07:30 UTC
+    - cron: "30 7 * * 1"  # weekly (Mondays), 07:30 UTC
   workflow_dispatch: {}
 
 permissions:
