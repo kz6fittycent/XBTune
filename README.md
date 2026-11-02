@@ -150,6 +150,10 @@ snapcraft pack                      # the snap
 Bugs and ideas: [issues](https://github.com/kz6fittycent/XBTune/issues), or
 **Report a problem** in the app.
 
+XBTune is free and stays free. If it's useful to you, a tip on
+[Ko-fi](https://ko-fi.com/kz6fittycent), one-time or monthly, helps keep it
+going (also **Support XBTune** in the app).
+
 ## Credits and license
 
 The protocol code is a Rust port of [EcmDroid](https://github.com/ecmdroid/ecmdroid)

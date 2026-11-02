@@ -69,6 +69,10 @@ impl View {
 /// A sidebar entry: view, icon, label.
 type NavItem = (View, &'static str, &'static str);
 
+/// Where "Support XBTune" goes: the owner's Ko-fi page (one-time or
+/// monthly). Also in .github/FUNDING.yml, the snap's `donation:`, README.
+pub const SUPPORT_URL: &str = "https://ko-fi.com/kz6fittycent";
+
 /// What the UI knows about the link.
 #[derive(Default)]
 pub struct LinkView {
@@ -1159,6 +1163,14 @@ impl XbApp {
             if theme::nav_item(ui, false, i::HELP, "Getting started").clicked() {
                 self.wizard.open();
             }
+            if theme::nav_item(ui, false, i::HEART, "Support XBTune")
+                .on_hover_text(
+                    "XBTune is free and stays free. A one-time or monthly tip on Ko-fi helps keep it going.",
+                )
+                .clicked()
+            {
+                ui.ctx().open_url(egui::OpenUrl::new_tab(SUPPORT_URL));
+            }
             ui.separator();
         });
     }
@@ -1340,6 +1352,7 @@ impl eframe::App for XbApp {
     }
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
+        let _links = crate::links::Guard(ui.ctx().clone());
         self.screenshot(ui);
         let panel = ui.visuals().panel_fill;
         egui::Panel::top("top")

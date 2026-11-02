@@ -22,6 +22,7 @@ mod gauge;
 mod grid;
 mod icons;
 mod import;
+mod links;
 mod logs_view;
 mod profiles;
 mod remote_sync;

@@ -18,6 +18,7 @@ pub const REMOTE: &str = "\u{e404}"; // lucide: radio-tower
 pub const SETTINGS: &str = "\u{e154}"; // lucide: settings
 pub const HELP: &str = "\u{e101}"; // lucide: life-buoy
 pub const BUG: &str = "\u{e20c}"; // lucide: bug
+pub const HEART: &str = "\u{e0f2}"; // lucide: heart
 pub const SUN: &str = "\u{e178}"; // lucide: sun
 pub const MOON: &str = "\u{e11e}"; // lucide: moon
 pub const SUN_MOON: &str = "\u{e2b2}"; // lucide: sun-moon
