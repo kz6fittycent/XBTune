@@ -297,7 +297,9 @@ off, AFV locked at 100).
   Local copy for the friend (no GitHub account yet): user timer
   `xbtune-windows-sync.timer` (every 10 min) runs
   `~/.local/bin/xbtune-windows-sync`, which puts that zip in
-  `~/Nextcloud/XBTUNE/xbtune-windows-x64.zip` when the build changes.
+  `~/Nextcloud/XBTUNE/xbtune-windows-x64.zip` when the build changes. Since 2026-11-02 it also
+  writes `VERSION.txt` there (version, commit, build time, SHA-256 checked
+  against GitHub's asset digest; a mismatch keeps the old zip).
 - Not yet: Windows
   crash handler (SetUnhandledExceptionFilter), installer.
 
