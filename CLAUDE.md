@@ -847,6 +847,29 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 ## Next steps
 
+Resume here (2026-11-02, end of session): PAUSED, waiting for testing
+from riders actively tuning bikes (owner installed 0.3.1, nothing to do
+on his end). Releases stay on `latest/candidate` until everyone's
+testing buy-in; only then `/promote` to stable. State:
+- Store candidate = 0.3.1 (17b5e9a). main = bef2765 (simulator fix: the
+  demo now sets Flags2 bit 7 in closed loop, reports its EEPROM's AFV,
+  WUE 100% by 170 °C; wideband dialog wording); no bump, so it ships
+  with the next release (0.3.2).
+- Issue #12: owner posted the follow-up himself. Owner confirmed the
+  Support XBTune link opens Ko-fi from the snap.
+- Security Rebuild fails every week (stable is empty): EXPECTED, leave
+  the workflow alone (owner). A fix is parked on local branch
+  `hold/security-rebuild-empty-stable` (d98a065), unpushed.
+- Wiki current as of 0.3.1 (ec14394, all 27 screenshots retaken). Shots
+  are made by a script (scratchpad, not kept): one XBTUNE_HOME per shot
+  copied from a base with the "2005 XB9SX" profile, BUEIB_stock.xpr =
+  owner's dump, BUEIB_demo.xbt = ED's image, local relay for Remote, then
+  scratch paths painted to /home/rider/... in burn + Settings.
+- Demo narrowband auto-tune still finds too few samples per cell in a
+  short ride (wideband works); not fixed.
+- Older waits still open: the LC-2 friend (logging mode, .msl, .msq
+  decision), the owner's laptop test of bike profiles.
+
 2026-11-02 (0.3.1): donations = Ko-fi only (owner): https://ko-fi.com/kz6fittycent
 (one-time or monthly). Sidebar "Support XBTune" (heart), .github/FUNDING.yml,
 snap `donation:`, README, wiki Home. Links now open via `links.rs`
@@ -856,8 +879,8 @@ did nothing.
 
 2026-11-02: 0.3.0 = issue #12 auto-tune fixes (closed loop from Flags2
 bit 7, DDFI-3 front channels, WUE <= 102%, no AFV reset advice: fold
-first, axis padding). Replied on #12 (preliminary); post a follow-up there
-when 0.3.0 is on candidate. Wiki updated for it.
+first, axis padding). Replied on #12 (preliminary); owner posted the
+follow-up. Wiki updated for it.
 
 Resume here (2026-10-26, end of session): PAUSED, waiting for the LC-2
 friend's input (Windows tester; no GitHub account: he gets
