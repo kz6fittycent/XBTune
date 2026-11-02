@@ -847,7 +847,7 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
 
 ## Next steps
 
-2026-11-02: donations = Ko-fi only (owner): https://ko-fi.com/kz6fittycent
+2026-11-02 (0.3.1): donations = Ko-fi only (owner): https://ko-fi.com/kz6fittycent
 (one-time or monthly). Sidebar "Support XBTune" (heart), .github/FUNDING.yml,
 snap `donation:`, README, wiki Home. Links now open via `links.rs`
 (xdg-open / open / rundll32): eframe has no `links` feature, so before
