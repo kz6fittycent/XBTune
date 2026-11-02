@@ -367,7 +367,8 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
             });
             let how = if a.wideband {
                 "Each cell is corrected so the measured mixture would reach the target for its load \
-                 (new = old × EGO ÷ 100 × measured λ ÷ target λ), in open and closed loop. Only cells with \
+                 (new = old × measured λ ÷ target λ, times EGO ÷ 100 in closed loop), in open and closed \
+                 loop. Only cells with \
                  enough steady, warm data change. In closed loop the ECM still aims for stoichiometric \
                  (AFR 14.7, λ 1.00), so keep light-load targets there. This edits the open tune only; \
                  burning it is a separate step."

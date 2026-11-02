@@ -28,6 +28,8 @@ pub struct EngineState {
     pub o2_volts: f64,
     /// EGO correction, percent.
     pub ego: f64,
+    /// Closed loop (written as `Flags2` bit 7, as the ECM reports it).
+    pub closed_loop: bool,
 }
 
 /// Length of one ride cycle, seconds.
@@ -63,6 +65,7 @@ pub fn state_at(t: f64) -> EngineState {
         pw: (pw, pw * 1.03),
         o2_volts,
         ego: if closed_loop { 100.0 + 4.0 * (t * 0.7).sin() } else { 100.0 },
+        closed_loop,
     }
 }
 
@@ -95,15 +98,21 @@ impl Engine {
         Self { def }
     }
 
+    pub fn def(&self) -> &Definition {
+        &self.def
+    }
+
     /// `template` (a whole runtime reply frame) with the ride at `t`
     /// written in, and the checksum fixed.
     pub fn frame(&self, template: &[u8], t: f64) -> Vec<u8> {
-        self.frame_with(template, t, true)
+        self.frame_with(template, t, true, 100.0)
     }
 
     /// Like [`Engine::frame`]; with `running` false the engine is stopped
-    /// (ignition on): no RPM, throttle closed, no fuel or spark.
-    pub fn frame_with(&self, template: &[u8], t: f64, running: bool) -> Vec<u8> {
+    /// (ignition on): no RPM, throttle closed, no fuel or spark. `afv` is
+    /// the AFV reported (%): the simulated EEPROM's, so logs and the tune
+    /// read from the same ECM agree.
+    pub fn frame_with(&self, template: &[u8], t: f64, running: bool, afv: f64) -> Vec<u8> {
         let mut s = state_at(t);
         if !running {
             s.rpm = 0.0;
@@ -112,6 +121,7 @@ impl Engine {
             s.spark = (0.0, 0.0);
             s.o2_volts = 0.0;
             s.ego = 100.0;
+            s.closed_loop = false;
             s.battery = 12.6;
         }
         let mut f = template.to_vec();
@@ -133,14 +143,16 @@ impl Engine {
             ("TE", s.engine_temp),
             ("TA", s.air_temp),
             ("O2", s.o2_volts),
-            ("CrTE", 100.0 + ((120.0 - s.engine_temp) / 2.0).max(0.0)),
+            // Warm-up enrichment off by ~170 °C: the shape of EcmDroid's
+            // and the owner's BUEIB logs (102% at 120 °C, 101% at 140).
+            ("CrTE", 100.0 + ((170.0 - s.engine_temp) / 25.0).max(0.0)),
             ("CrTA", 100.0),
             ("CrAcc", 0.0),
             ("CrDec", 100.0),
             ("CrWOT", 100.0),
             ("CrIdle", 100.0),
             ("CrOL", 100.0),
-            ("LFuel_LD", 100.0),
+            ("LFuel_LD", afv),
             ("FBFuel", s.ego),
             ("ATPS", 100.0 + s.tps * 7.0),
             ("Fan_Duty", if s.engine_temp > 220.0 { 100.0 } else { 0.0 }),
@@ -159,6 +171,13 @@ impl Engine {
                 f[var.offset + i] = (raw >> (8 * i)) as u8;
             }
         }
+        // Flags2 bit 7: closed loop (EcmDroid `Bin2MslConverter`); the
+        // other bits stay as in the template.
+        if let Some(var) = self.def.runtime.values().find(|r| r.varname == "Flags2")
+            && var.offset < f.len()
+        {
+            f[var.offset] = (f[var.offset] & 0x7f) | if s.closed_loop { 0x80 } else { 0 };
+        }
         let n = f.len();
         f[n - 1] = xbtune_proto::pdu::checksum(&f);
         f
@@ -170,6 +189,10 @@ mod tests {
     use super::*;
     use xbtune_defs::Catalog;
     use xbtune_proto::Pdu;
+
+    fn def_offset(e: &Engine, varname: &str) -> usize {
+        e.def.runtime.values().find(|r| r.varname == varname).unwrap().offset
+    }
 
     #[test]
     fn ride_moves_and_frames_stay_valid() {
@@ -188,6 +211,10 @@ mod tests {
             assert!(Pdu::parse(&idle).is_ok() && Pdu::parse(&pull).is_ok(), "{id}");
             let (a, b) = (rpm.value(&idle).unwrap(), rpm.value(&pull).unwrap());
             assert!((1000.0..1200.0).contains(&a) && b > 6000.0, "{id}: {a} {b}");
+            // Closed loop in the cruise (Flags2 bit 7), not on the pull.
+            let flags = def_offset(&e, "Flags2");
+            let cruise = e.frame(&template, 15.0);
+            assert!(cruise[flags] & 0x80 != 0 && pull[flags] & 0x80 == 0, "{id}");
         }
     }
 }

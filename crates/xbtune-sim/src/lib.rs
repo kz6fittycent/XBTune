@@ -365,7 +365,13 @@ impl Simulator {
             [CMD_RTDATA] => match &self.engine {
                 Some((e, start, fixed)) => {
                     let t = fixed.unwrap_or_else(|| start.elapsed().as_secs_f64());
-                    e.frame_with(&self.runtime, t, self.engine_running)
+                    // AFV as stored in the simulated EEPROM (`LFuel`).
+                    let view = xbtune_defs::ImageView { bytes: &self.image, page_zero: false };
+                    let afv = match e.def().eeprom.get("LFuel").map(|v| v.decode(&view)) {
+                        Some(Ok(xbtune_defs::Value::Number(x))) => x,
+                        _ => 100.0,
+                    };
+                    e.frame_with(&self.runtime, t, self.engine_running, afv)
                 }
                 None => self.runtime.clone(),
             },

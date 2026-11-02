@@ -375,3 +375,8 @@ Nothing outside tests may rely on them.
 - The made-up ride reports Accel Corr. 0% (it was 100%, which auto-tune's
   filter reads as acceleration enrichment); the owner's logs show 0 when
   steady.
+- The made-up ride sets `Flags2` bit 7 in its closed-loop stretches
+  (light throttle above 1500 rpm), reports the simulated EEPROM's `LFuel`
+  as AFV, and its warm-up enrichment falls to 100% by 170 °C (the shape,
+  not the values, of EcmDroid's and the owner's BUEIB logs). Before
+  2026-11-02 it had no closed-loop flag and AFV was always 100%.
