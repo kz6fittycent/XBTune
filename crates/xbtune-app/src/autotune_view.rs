@@ -56,7 +56,7 @@ pub struct AutotuneUi {
     /// Proposals and whether each is ticked; `None` until analysed.
     proposals: Option<Vec<(Proposal, bool)>>,
     summary: Vec<String>,
-    afv: Option<f64>,
+    afv: Vec<autotune::AfvNote>,
     pub overlay: Overlay,
     /// (map, logs generation, filters) -> analysis, for the overlay.
     cache: Vec<(String, u64, Filters, Arc<Analysis>)>,
@@ -91,6 +91,11 @@ impl AutotuneUi {
             } else {
                 0.0
             },
+            max_wue: if self.settings.filters.max_wue != d.filters.max_wue {
+                self.settings.filters.max_wue
+            } else {
+                0.0
+            },
         }
     }
 
@@ -110,6 +115,7 @@ impl AutotuneUi {
         self.settings.min_hits = if s.min_hits > 0.0 { s.min_hits } else { d.min_hits };
         self.settings.max_change = if s.max_change > 0.0 { s.max_change } else { d.max_change };
         self.settings.filters.min_clt = if s.min_clt > 0.0 { s.min_clt } else { d.filters.min_clt };
+        self.settings.filters.max_wue = if s.max_wue > 0.0 { s.max_wue } else { d.filters.max_wue };
     }
 }
 
@@ -245,14 +251,18 @@ fn run(app: &mut XbApp) {
         .collect();
     let mut all = Vec::new();
     let mut summary = Vec::new();
-    let mut afv = None;
+    let mut afv = Vec::new();
     for map in &maps {
         match autotune::analyze(&logs, tune, map, &s.filters).and_then(|a| {
             let p = autotune::propose(&a, tune, &s)?;
             Ok((a, p))
         }) {
             Ok((a, p)) => {
-                afv = afv.or(a.afv);
+                if let Some(n) = autotune::afv_note(&a, tune)
+                    && !afv.contains(&n)
+                {
+                    afv.push(n);
+                }
                 let r = &a.rejected;
                 let label = tune.var(map).map(|v| v.label().to_string()).unwrap_or_else(|_| map.clone());
                 let first = if a.wideband {
@@ -261,10 +271,11 @@ fn run(app: &mut XbApp) {
                     format!("{} open loop", r.open_loop)
                 };
                 summary.push(format!(
-                    "{label}: {} of {} samples used ({first}, {} cold, {} changing, {} enrichment, {} after a gap); {} cell(s) to change",
+                    "{label}: {} of {} samples used ({first}, {} cold, {} warming up, {} changing, {} enrichment, {} after a gap); {} cell(s) to change",
                     a.used,
                     a.samples,
                     r.cold,
+                    r.warm_up,
                     r.transient,
                     r.enrichment,
                     r.gap,
@@ -381,6 +392,11 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 ui.label("Engine at least");
                 ui.add(egui::DragValue::new(&mut f.min_clt).range(0.0..=200.0).suffix(" °C"));
                 ui.end_row();
+                ui.label("Warm-up enrichment at most");
+                ui.add(egui::DragValue::new(&mut f.max_wue).range(100.0..=150.0).speed(0.1).suffix(" %"))
+                    .on_hover_text("The ECM adds fuel until the engine is fully warm (WUE above 100%): \
+                                    samples from then are left out");
+                ui.end_row();
                 ui.label("Samples per cell at least");
                 ui.add(egui::DragValue::new(&mut a.settings.min_hits).range(1.0..=10_000.0))
                     .on_hover_text("About 6.5 per second spent in a cell");
@@ -491,14 +507,28 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
                 for l in &a.lean {
                     ui.colored_label(p.bad, format!("Lean at high load: {l}. Check this before riding hard."));
                 }
-                if let Some(v) = a.afv {
-                    ui.label(
-                        RichText::new(format!(
-                            "AFV in the logs: {v:.1}%. These corrections already include it, so after burning \
-                             them, reset AFV (Resets) so it isn't counted twice."
-                        ))
-                        .color(p.warn),
-                    );
+                for n in &a.afv {
+                    let (text, color) = match n {
+                        autotune::AfvNote::Changed { logged, tune, var } => (
+                            format!(
+                                "The logs were made with AFV {logged:.1}%, this tune has {var} {tune:.1}% \
+                                 (folded or reset since?). Log again after burning this tune before \
+                                 auto-tuning it."
+                            ),
+                            p.bad,
+                        ),
+                        autotune::AfvNote::NotNeutral { afv, var } => (
+                            format!(
+                                "{var} is {afv:.1}%. These corrections are complete as they are: the ECM \
+                                 doesn't add AFV on top of EGO. Don't reset AFV after burning them, that \
+                                 would lean out the open-loop areas (high load, WOT). Best order: fold AFV \
+                                 into the maps (Fold AFV into the maps…) and burn that first, then ride, \
+                                 log and auto-tune."
+                            ),
+                            p.warn,
+                        ),
+                    };
+                    ui.label(RichText::new(text).color(color));
                 }
             }
             ui.add_space(8.0);

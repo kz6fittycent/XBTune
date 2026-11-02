@@ -16,7 +16,7 @@ use xbtune_core::tune::Tune;
 use xbtune_defs::{Shape, Value as DefValue};
 
 /// Bump when the prompt changes in substance (it's in every journal entry).
-pub const PROMPT_VERSION: u32 = 6;
+pub const PROMPT_VERSION: u32 = 7;
 
 /// The fixed system prompt.
 pub const SYSTEM_PROMPT: &str = "\
@@ -36,8 +36,10 @@ knock sensing on these ECMs.
 load: it trims fuel with the EGO correction (percent; 100 = no trim) to hold stoichiometric \
 (about 14.7:1). EGO above 100 means the ECM had to add fuel (the map is lean there); below 100 it \
 removed fuel (rich). The ECM applies EGO to both cylinders.
-- AFV is the closed-loop correction the ECM has learned over time; EGO starts from it. After \
-fuel-map corrections based on EGO are burned, AFV should be reset so it isn't counted twice.
+- AFV is the correction the ECM has learned over time. EGO starts from it when closed loop \
+begins, but in closed loop the ECM applies EGO alone (not EGO x AFV), so a cell's average EGO is \
+its whole correction. AFV is applied in open loop (warm-up, high load, WOT). Resetting AFV after \
+burning EGO-based corrections leans out the open-loop areas; fold AFV into the maps first instead.
 - Outside closed loop (warm-up, high load, WOT) the narrowband says little. A wideband sensor, \
 when logged, measures the actual air/fuel ratio anywhere.
 - Air-cooled V-twins like these are usually run a bit rich at high load (roughly 12.8-13.5 AFR) \

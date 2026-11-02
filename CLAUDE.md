@@ -366,21 +366,29 @@ Icons: Lucide (ISC) as a bundled font, like Inter (owner chose it
 - `xbtune-core::logfile`: reads `xbtune-log 1` CSVs back (time_s + raw
   frame re-decoded with the current definition; events kept).
 - `xbtune-core::autotune`: `channel_for_axis` (RPM/Load), `frac_index`,
-  `cell_weights` (bilinear), `analyze` (filters: CLT >= 80 C, closed loop =
-  EGO changed in the last 3 samples, |dRPM/dt| <= 800/s, |dTPD/dt| <= 10/s,
-  no Accel/Decel/WOT correction, dt <= 1 s; weighted EGO per cell),
+  `cell_weights` (bilinear), `analyze` (filters: CLT >= 80 C, WUE <= 102%,
+  closed loop = `Flags2` bit 7 (fallback without Flags2: EGO changed in the
+  last 3 samples) and 1 s settled, |dRPM/dt| <= 800/s, |dTPD/dt| <= 10/s,
+  no Accel/Decel/WOT correction, dt <= 1 s; weighted EGO per cell;
+  `Cylinder::for_map`: DDFI-3 front = EGO1 Corr./Load1/AFV1), `used_len`
+  (repeated trailing axis breakpoints = padding), `afv_note`,
   `propose` (new = old x EGO/100, min hits 30, cap +-10%, map rounding),
   `apply` (one undo step), `fuel_maps`.
 - Evidence from the owner's logs (tests pin it): veCurr1 == fuel map
   interpolated at (RPM, Load) for 70% of samples within 0.15 (median 0.03);
   EGO holds at AFV in open loop (64 s at warm-up), moves every frame in
-  closed loop; EGO starts from AFV, so it includes AFV -> advise AFV reset
-  after burning corrections. One O2 sensor (rear); ECM's EGO applies to
-  both cylinders -> both maps corrected by default (Front/Rear ticks).
+  closed loop. One O2 sensor (rear); ECM's EGO applies to both cylinders
+  -> both maps corrected by default (Front/Rear ticks).
+- Issue #12 fixes (2026-11-02, PROVENANCE "Auto-tune"): pulse widths in
+  ED's logs show the ECM applies EGO alone in closed loop, AFV only in
+  open loop -> NO AFV reset after burning corrections (leans out open
+  loop); fold AFV first, burn, log, then auto-tune. Auto-tune warns when
+  the logs' AFV differs from the tune's. Wideband open loop = lambda ratio
+  without EGO. `KLCL_Min_TE` is not the closed-loop temperature.
 - `xbtune-core::logstats`: O2 rich/lean/error % (split at KO2_Midpoint),
   avg rich/lean V; anomalies (gap > 2 s, CLT jump > 3.5 C, battery 11-16 V).
 - CLI: `logstats LOG...`, `autotune --tune T LOG... [-o|--in-place]
-  [--maps --min-hits --max-change --min-clt]` (saves only with -o).
+  [--maps --min-hits --max-change --min-clt --max-wue]` (saves only with -o).
 - App: Logs view (`logs_view.rs`): open logs, stats, anomalies, charts
   with playhead, playback (only when not connected) driving Dashboard/Live
   data/Charts/map live point. Tune view: fuel-map overlays (samples per
@@ -838,6 +846,11 @@ KICKOFF §8 lists 8 phases. The owner added remote tuning as phase 8, so
      USB cable may be the supported Mac path.
 
 ## Next steps
+
+2026-11-02: 0.3.0 = issue #12 auto-tune fixes (closed loop from Flags2
+bit 7, DDFI-3 front channels, WUE <= 102%, no AFV reset advice: fold
+first, axis padding). Replied on #12 (preliminary); post a follow-up there
+when 0.3.0 is on candidate. Wiki updated for it.
 
 Resume here (2026-10-26, end of session): PAUSED, waiting for the LC-2
 friend's input (Windows tester; no GitHub account: he gets

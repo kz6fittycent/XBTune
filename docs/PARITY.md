@@ -75,7 +75,7 @@ Status: ✅ done · 🟡 partial · ⬜ planned · ❌ deliberately not doing
 |---|---|---|
 | EGO correction averaged per cell, hit counts (>100 significant) | ✅ bilinear-weighted per cell; auto-tune (app + `autotune`) proposes values for review | 7 |
 | **NEW** Lambda (wideband) averaged per cell; front/rear separately | ⬜ needs a wideband | 7+ |
-| **NEW** Helper: multiply maps by the current AFV, then reset AFV | ⬜ (auto-tune advises the AFV reset after burning its corrections) | 7 |
+| **NEW** Helper: multiply maps by the current AFV, then reset AFV | ✅ "Fold AFV into the maps…" / `fold-afv`; auto-tune advises folding first (the ECM doesn't apply AFV on top of EGO, so resetting AFV after burning EGO corrections would lean out open loop) | 7 |
 | **NEW** Guided workflows ("Process Finder": six processes by sensor setup) | ⬜ docs + UI hints | 8 |
 | Closed-loop / open-loop learn toggles, closed-loop boundaries | 🟡 scalars; edit in 5 | 5 |
 | **NEW** Front cylinder correction table | 🟡 if in the definition | 5 |

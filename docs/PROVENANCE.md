@@ -216,6 +216,21 @@ known-good source:**
 | `tests/fixtures/ecmdroid/BUEIB_log_2000.bin` | First 5 + 2000×111 bytes of ED `androidTest/resources/BUEIB_log.bin` at 2f17d29f (sha256 of the whole file `854acfe4…56bc`). GPL-3.0 |
 | ED's test `.msl` is its converter's output for the first 176 records of `BUE2D_log.bin`, with times 1/10 of the current converter's (an older version) | XB (compared in `logformats::tests`) |
 
+## Auto-tune (`crates/xbtune-core/src/autotune.rs`)
+
+Raised in issue #12 (2026-10-27, an EcmDroid fork's author); each point
+re-checked here against EcmDroid's own files at 2f17d29f (2026-11-02).
+
+| Fact | Source |
+|---|---|
+| Closed loop = `Flags2` bit 7 set (EGO used), open loop = clear (AFV used) | ED `util/Bin2MslConverter.java` (`rtBuffer[offsFlags2] >= 128`). On ED's 42-min `BUEIB_log.bin` the old "EGO changed in the last 3 samples" test disagreed on 954 running records |
+| DDFI-3 front cylinder: `EGO1 Corr.` (`FBFuel1`), `AFV1`, `Load1` (`FLoad`) | ED `Bin2MslConverter` (category 3 writes `Gego1` from `EGO1 Corr.`/`AFV1`); ED-DB descriptions ("for the front cylinder"). On ED's BUE2D log front and rear EGO differ on 99.6% of closed-loop records |
+| Fuel: closed loop ∝ table × IAT × WUE (× fuel pressure, front) × EGO; open loop ∝ table × … × OL × AFV. AFV is not applied on top of EGO, EGO not in open loop | XB, fitted to injector pulse widths (pw − Batt. Corr.) in ED's `BUE2D_log.bin` (front AFV 95%) and `BUEIB_log.bin`: EGO alone in closed loop gives the open-loop constant within 1%, EGO × AFV is ~5% off (test `closed_loop_fuel_is_ego_alone_and_afv_open_loop_only`). So AFV reset after burning EGO corrections leans out open loop; fold AFV first |
+| Warm-up enrichment filter: WUE ≤ 102% | XB. WUE follows engine temperature the same way on ED's BUEIB ride and the owner's (~102% at 120 °C, 101% at 140, 100.3% at 160). The issue suggested 100.5%, which leaves out all of the owner's warm ride (CLT ≤ 164 °C) |
+| `KLCL_Min_TE` is NOT the closed-loop temperature | XB: ED-DB labels it "Calibration Mode Minimum Engine Temperature" (130 on ED's BUEIB image); the closed-loop flag comes on at 59 °C (BUEIB ride) and 33 °C (BUE2D) |
+| Closed-loop settle time 1 s after the flag comes on | XB (EGO starts from AFV; the issue's suggestion) |
+| Repeated trailing axis breakpoints are padding (BUE2D `800, 0, 0, 0`); a single trailing 0 is a real breakpoint | XB: BUE2D's repeated-0 columns hold 0; the 0-rpm column on ED's BUEIB image holds real-looking fuel values. Not testable on ED's ride (never below 800 rpm while running) |
+
 ## App assets (`crates/xbtune-app/assets`)
 
 | File | Source |
@@ -271,9 +286,9 @@ commands to the chain.
 
 XBTune choices (not from a source; no real controller tested yet):
 - A reading goes on an ECM sample if it is at most 300 ms old.
-- Auto-tune with a wideband: correction = EGO / 100 x measured lambda /
-  target lambda. ASSUMED: in open loop the EGO value (held at AFV) is
-  applied to the fuel. Default sensor delay 0.2 s; default targets by load
+- Auto-tune with a wideband: correction = measured lambda / target lambda,
+  times EGO / 100 in closed loop only (the ECM applies EGO in closed loop
+  only; see "Auto-tune"). Default sensor delay 0.2 s; default targets by load
   40: 14.7, 60: 14.0, 80: 13.5, 100: 13.2, 125: 13.0 (stoichiometric in the
   light-load closed-loop area, richer with load). These are starting points
   for the owner to adjust, not Buell data.

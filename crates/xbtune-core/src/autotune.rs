@@ -12,28 +12,43 @@
 //!   interpolated bilinearly at (RPM, Load), wherever Load sits on a
 //!   breakpoint. So a sample belongs to the 4 cells around it, weighted the
 //!   same way.
-//! - In open loop (warm-up, O2 sensor not active) the EGO correction holds
-//!   exactly at the AFV value; in closed loop it changes on almost every
-//!   frame. "EGO changed in the last few samples" therefore marks closed
-//!   loop without the (unnamed) flag bits.
-//! - EGO starts from AFV, so it is the whole closed-loop correction (AFV
-//!   included). After burning corrected cells, AFV should be reset so it
-//!   isn't counted twice.
+//! - Closed loop is `Flags2` bit 7 (EcmDroid `Bin2MslConverter`: set =
+//!   closed loop, EGO; clear = open loop, AFV). Logs without `Flags2`
+//!   (.msl from other tools) fall back to "EGO changed in the last few
+//!   samples", which misses closed loop where EGO sits at its limit.
+//!   EGO starts from AFV when closed loop begins, so the first
+//!   [`Filters::cl_settle`] seconds are left out.
+//! - Fuel (fitted to injector pulse widths in EcmDroid's BUEIB and BUE2D
+//!   test logs, see PROVENANCE "Auto-tune"): closed loop = table × EGO,
+//!   open loop = table × OL × AFV; AFV is NOT applied on top of EGO and EGO
+//!   not in open loop. So a cell's average EGO is its whole correction,
+//!   whatever AFV is, and AFV only moves the open-loop fuel. Resetting AFV
+//!   after burning corrections would lean out the open-loop areas: fold
+//!   AFV into the maps first ([`fold_afv`]), then log and auto-tune.
+//! - Warm-up enrichment (WUE) is applied in closed loop too, and cell
+//!   averages taken during warm-up differ from the warm ones (neither
+//!   way consistently, and EGO x WUE doesn't line them up), so samples
+//!   with WUE above [`Filters::max_wue`] are left out. The ECM enters
+//!   closed loop well below the tune's `KLCL_Min_TE` (33-59 °C in those
+//!   logs), so that isn't a closed-loop threshold.
+//! - DDFI-3 with its own front loop logs `EGO1 Corr.`, `Load1` and `AFV1`
+//!   for the front cylinder ([`Cylinder`]); one sensor (DDFI-2) corrects
+//!   both maps with the rear values.
 //!
-//! Filters (all adjustable): warm engine, closed loop, steady RPM and
-//! throttle, no acceleration/deceleration/WOT enrichment, no gap before the
-//! sample. A cell needs a minimum weight of samples, and each pass changes
-//! a cell by at most `max_change`.
+//! Filters (all adjustable): warm engine past warm-up enrichment, closed
+//! loop, steady RPM and throttle, no acceleration/deceleration/WOT
+//! enrichment, no gap before the sample. A cell needs a minimum weight of
+//! samples, and each pass changes a cell by at most `max_change`.
 //!
 //! With a wideband ([`Mode::Wideband`], logs with `crate::wideband`
-//! readings) the correction is `EGO / 100 × measured λ / target λ`: the
-//! fuel the cell needs to reach the target AFR with EGO back at 100%.
-//! Open-loop and WOT samples count too (that's where a wideband helps);
-//! the reading is taken `lag` seconds after the sample, for the time the
-//! exhaust takes to reach the sensor. ASSUMED (no wideband log from a
-//! real bike yet): EGO holding at AFV in open loop is applied to the fuel
-//! there as well, and the default lag and targets ([`TargetAfr`]) are
-//! XBTune's starting points, not Buell figures.
+//! readings) the correction is `measured λ / target λ`, times EGO in
+//! closed loop: the fuel the cell needs to reach the target AFR with EGO
+//! back at 100% (open loop: with AFV as it is). Open-loop and WOT samples
+//! count too (that's where a wideband helps); the reading is taken `lag`
+//! seconds after the sample, for the time the exhaust takes to reach the
+//! sensor. The default lag and targets ([`TargetAfr`]) are XBTune's
+//! starting points, not Buell figures (no wideband log from a real bike
+//! yet).
 
 use xbtune_defs::{EeVar, Shape};
 
@@ -52,9 +67,23 @@ pub fn channel_for_axis(axis_label: &str) -> Option<&'static str> {
     }
 }
 
+/// How many of `axis`'s breakpoints are real: trailing repeats of the
+/// last value are padding (BUE2D's RPM axis ends `800, 0, 0, 0`; its
+/// cells there are 0). A single trailing 0 is kept: on EcmDroid's BUEIB
+/// image the 0-rpm column holds real fuel values.
+pub fn used_len(axis: &[f64]) -> usize {
+    let mut n = axis.len();
+    while n >= 2 && axis[n - 1] == axis[n - 2] {
+        n -= 1;
+    }
+    n
+}
+
 /// Fractional position of `x` in breakpoints `axis` (either direction);
-/// outside the axis it sits on the nearer end.
+/// outside the axis it sits on the nearer end. Padding past
+/// [`used_len`] is never used.
 pub fn frac_index(axis: &[f64], x: f64) -> Option<f64> {
+    let axis = &axis[..used_len(axis)];
     for i in 0..axis.len().saturating_sub(1) {
         let (a, b) = (axis[i], axis[i + 1]);
         if (a <= x && x <= b) || (b <= x && x <= a) {
@@ -88,8 +117,16 @@ pub fn cell_weights(r: f64, c: f64, rows: usize, cols: usize) -> Vec<((usize, us
 pub struct Filters {
     /// Engine temperature at least this (CLT channel, °C).
     pub min_clt: f64,
-    /// Closed loop: EGO changed within this many samples before.
+    /// Warm-up enrichment (WUE channel, %) at most this. WUE follows
+    /// engine temperature (BUEIB, EcmDroid's ride and the owner's: ~102%
+    /// at 120 °C, 101% at 140, 100.3% at 160); 102 keeps a normally warm
+    /// ride and drops the warm-up itself.
+    pub max_wue: f64,
+    /// Closed loop without the ECM's flag in the log: EGO changed within
+    /// this many samples before.
     pub ego_window: usize,
+    /// Seconds left out after closed loop starts (EGO settles from AFV).
+    pub cl_settle: f64,
     /// Steady state: RPM changing no faster than this (RPM/s).
     pub max_rpm_rate: f64,
     /// Steady state: throttle changing no faster than this (°/s).
@@ -103,7 +140,9 @@ impl Default for Filters {
     fn default() -> Self {
         Self {
             min_clt: 80.0,
+            max_wue: 102.0,
             ego_window: 3,
+            cl_settle: 1.0,
             max_rpm_rate: 800.0,
             max_tpd_rate: 10.0,
             max_gap: 1.0,
@@ -235,6 +274,9 @@ impl Default for Settings {
 pub struct Rejected {
     pub missing: usize,
     pub cold: usize,
+    /// Warm-up enrichment still on.
+    pub warm_up: usize,
+    /// Open loop, or closed loop that has only just started.
     pub open_loop: usize,
     pub transient: usize,
     pub enrichment: usize,
@@ -247,6 +289,7 @@ impl Rejected {
     pub fn total(&self) -> usize {
         self.missing
             + self.cold
+            + self.warm_up
             + self.open_loop
             + self.transient
             + self.enrichment
@@ -279,8 +322,15 @@ pub struct Analysis {
     pub samples: usize,
     pub used: usize,
     pub rejected: Rejected,
-    /// AFV from the logs (last value seen), if logged.
+    /// AFV from the logs (last value seen) for this map's cylinder, if
+    /// logged.
     pub afv: Option<f64>,
+    /// Every log had the ECM's closed-loop flag (else EGO movement was
+    /// used for at least one).
+    pub cl_flag: bool,
+    /// The correction channel used (last log): "EGO Corr." or, for a
+    /// DDFI-3 front map, "EGO1 Corr.".
+    pub ego_channel: &'static str,
     pub wideband: bool,
     /// Wideband: cells at load >= `LEAN_LOAD` measured leaner than
     /// `LEAN_AFR` on average, as (row, col).
@@ -295,6 +345,63 @@ fn grid_of(v: &EeVar) -> Result<(usize, usize), String> {
         Shape::Grid { rows, cols, .. } => Ok((rows, cols)),
         _ => Err(format!("{} isn't a map", v.name)),
     }
+}
+
+/// The log channels one fuel map is corrected from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Cylinder {
+    pub ego: &'static str,
+    pub load: &'static str,
+    pub afv: &'static str,
+}
+
+impl Cylinder {
+    pub const REAR: Self = Self { ego: "EGO Corr.", load: "Load", afv: "AFV" };
+
+    /// The channels for `map` in `log`. A DDFI-3 front map is read at the
+    /// front load (`Load1`, ED-DB "Load for the front cylinder") where
+    /// logged; its correction is the front one (`EGO1 Corr.`, `AFV1`) only
+    /// when that moves by itself. With the front loop off, or one sensor,
+    /// the rear correction applies to both cylinders.
+    pub fn for_map(log: &Log, map: &str) -> Self {
+        if !map.contains("Front") {
+            return Self::REAR;
+        }
+        let load = if log.channel("Load1").is_some() { "Load1" } else { "Load" };
+        if own_front_loop(log) {
+            let afv = if log.channel("AFV1").is_some() { "AFV1" } else { "AFV" };
+            Self { ego: "EGO1 Corr.", load, afv }
+        } else {
+            Self { load, ..Self::REAR }
+        }
+    }
+
+    /// The live channel for an axis channel name ("Load" -> this load).
+    fn axis(&self, ch: &'static str) -> &'static str {
+        if ch == "Load" { self.load } else { ch }
+    }
+}
+
+/// The log has a front correction that isn't constant and isn't a copy of
+/// the rear one (on at least 5% of the samples that have both).
+fn own_front_loop(log: &Log) -> bool {
+    if log.channel("EGO1 Corr.").is_none() {
+        return false;
+    }
+    let (front, rear) = (log.series("EGO1 Corr."), log.series("EGO Corr."));
+    let both: Vec<(f64, Option<f64>)> =
+        front.iter().zip(&rear).filter_map(|(f, r)| Some(((*f)?, *r))).collect();
+    let Some(&(first, _)) = both.first() else { return false };
+    let moves = both.iter().any(|&(f, _)| f != first);
+    let differs = both.iter().filter(|&&(f, r)| r != Some(f)).count();
+    moves && differs * 20 >= both.len()
+}
+
+/// Closed loop per sample from the ECM's flag (`Flags2` bit 7), if the log
+/// has it.
+fn closed_loop_flags(log: &Log) -> Option<Vec<Option<bool>>> {
+    log.channel("Flags2")?;
+    Some(log.series("Flags2").into_iter().map(|v| v.map(|b| (b as u32) & 0x80 != 0)).collect())
 }
 
 /// Breakpoints and live channel of one axis of `map`.
@@ -327,6 +434,8 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
         used: 0,
         rejected: Rejected::default(),
         afv: None,
+        cl_flag: true,
+        ego_channel: Cylinder::REAR.ego,
         wideband: wb.is_some(),
         lean: Vec::new(),
         missing_channels: Vec::new(),
@@ -340,28 +449,44 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
                 tune.ecm.id
             ));
         }
-        for name in [xch, ych, "EGO Corr."] {
+        let cyl = Cylinder::for_map(log, map);
+        let (xch, ych) = (cyl.axis(xch), cyl.axis(ych));
+        a.ego_channel = cyl.ego;
+        for name in [xch, ych, cyl.ego] {
             if log.channel(name).is_none() && !a.missing_channels.iter().any(|m| m == name) {
                 a.missing_channels.push(name.to_string());
             }
         }
         let series = |n: &str| log.series(n);
-        let (x, y, ego, clt, tpd) =
-            (series(xch), series(ych), series("EGO Corr."), series("CLT"), series("TPD"));
+        let (x, y, ego, clt, wue, tpd) =
+            (series(xch), series(ych), series(cyl.ego), series("CLT"), series("WUE"), series("TPD"));
         let (rpm, accel, decel, wot) =
             (series("RPM"), series("Accel Corr."), series("Decel Corr."), series("WOT Corr."));
-        if let Some(Some(v)) = series("AFV").last() {
+        if let Some(Some(v)) = series(cyl.afv).last() {
             a.afv = Some(*v);
         }
+        let flags = closed_loop_flags(log);
+        a.cl_flag &= flags.is_some();
         if wb.is_some() && log.wideband.is_none() {
             return Err(format!("{} has no wideband readings", log.name()));
         }
         // The load each sample sits at (for the target AFR).
-        let load = series("Load");
+        let load = series(cyl.load);
         let lag = wb.map_or(0.0, |(_, l)| l);
         let mut later = 0;
+        // When the current stretch of closed loop began.
+        let mut cl_since: Option<f64> = None;
         for i in 0..log.samples.len() {
             a.samples += 1;
+            let t = log.samples[i].t;
+            let closed = match &flags {
+                Some(fl) => fl[i] == Some(true),
+                None => {
+                    let lo = i.saturating_sub(f.ego_window);
+                    ego[i].is_some_and(|e| (lo..i).any(|j| ego[j].is_some_and(|p| p != e)))
+                }
+            };
+            cl_since = if closed { cl_since.or(Some(t)) } else { None };
             let rej = &mut a.rejected;
             let (Some(xv), Some(yv), Some(e)) = (x[i], y[i], ego[i]) else {
                 rej.missing += 1;
@@ -371,7 +496,7 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
                 rej.gap += 1;
                 continue;
             }
-            let dt = log.samples[i].t - log.samples[i - 1].t;
+            let dt = t - log.samples[i - 1].t;
             if dt <= 0.0 || dt > f.max_gap {
                 rej.gap += 1;
                 continue;
@@ -380,8 +505,19 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
                 rej.cold += 1;
                 continue;
             }
-            let lo = i.saturating_sub(f.ego_window);
-            if wb.is_none() && !(lo..i).any(|j| ego[j].is_some_and(|p| p != e)) {
+            if wue[i].is_some_and(|w| w > f.max_wue) {
+                rej.warm_up += 1;
+                continue;
+            }
+            let settled = cl_since.is_some_and(|s| t - s >= f.cl_settle);
+            if wb.is_none() && !settled {
+                rej.open_loop += 1;
+                continue;
+            }
+            // Wideband: just after closed loop starts, EGO is still
+            // moving from AFV; the fuel is right but the sample isn't
+            // steady, so it's left out too.
+            if wb.is_some() && closed && !settled {
                 rej.open_loop += 1;
                 continue;
             }
@@ -427,7 +563,9 @@ pub fn analyze(logs: &[Log], tune: &Tune, map: &str, f: &Filters) -> Result<Anal
                         continue;
                     }
                     let target = targets.at(ld);
-                    (e * l / (target / w.stoich), l * w.stoich, target)
+                    // EGO is in the fuel in closed loop only.
+                    let ego = if closed { e } else { 100.0 };
+                    (ego * l / (target / w.stoich), l * w.stoich, target)
                 }
             };
             let (Some(c), Some(r)) = (frac_index(&xs, xv), frac_index(&ys, yv)) else {
@@ -526,8 +664,9 @@ pub fn propose(a: &Analysis, tune: &Tune, s: &Settings) -> Result<Vec<Proposal>,
 pub const AUTOTUNE_STEP: &str = "auto-tune: ";
 
 /// Whether the tune holds auto-tune corrections that haven't been undone.
-/// They already include AFV (EGO starts from it), so folding AFV in as well
-/// would count it twice: reset AFV instead.
+/// Those cells already hold their whole closed-loop correction, so folding
+/// AFV in afterwards would move them by AFV again: fold first, then
+/// auto-tune from logs made after burning the folded tune.
 pub fn has_autotune_step(tune: &Tune) -> bool {
     tune.undo_labels().any(|l| l.starts_with(AUTOTUNE_STEP))
 }
@@ -591,6 +730,45 @@ pub fn afv_fold_plan(tune: &Tune) -> Result<Vec<AfvFold>, String> {
     Ok(out)
 }
 
+/// (rows, cols) of `map` and how many of each have a real breakpoint
+/// ([`used_len`]).
+fn used_grid(tune: &Tune, map: &str) -> Result<(usize, usize, usize, usize), String> {
+    let v = tune.var(map).map_err(|e| e.to_string())?;
+    let (rows, cols) = grid_of(v)?;
+    let used = |axis: Option<&String>, n: usize| {
+        axis.and_then(|a| tune.elements(a).ok()).map_or(n, |el| used_len(&el).min(n))
+    };
+    Ok((rows, cols, used(v.y_axis.as_ref(), rows), used(v.x_axis.as_ref(), cols)))
+}
+
+/// What to tell the user about AFV after an analysis.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AfvNote {
+    /// The logs were made with a different AFV than the tune holds (it
+    /// was folded or reset since): the open-loop fuel the logs saw isn't
+    /// what this tune gives, and the corrections assume the logged state.
+    Changed { logged: f64, tune: f64, var: String },
+    /// AFV isn't 100%: the corrections are right as they are (EGO is the
+    /// whole closed-loop correction); AFV still moves the open-loop fuel.
+    /// Don't reset it after burning; fold it into the maps first.
+    NotNeutral { afv: f64, var: String },
+}
+
+/// The AFV note for `a` on `tune`, if any.
+pub fn afv_note(a: &Analysis, tune: &Tune) -> Option<AfvNote> {
+    let fold = afv_fold_plan(tune).ok()?.into_iter().find(|f| f.map == a.map)?;
+    let neutral = crate::burn::AFV_NEUTRAL;
+    match a.afv {
+        Some(logged) if (logged - fold.afv).abs() > 0.5 => {
+            Some(AfvNote::Changed { logged, tune: fold.afv, var: fold.afv_var })
+        }
+        _ if (fold.afv - neutral).abs() > 0.05 => {
+            Some(AfvNote::NotNeutral { afv: fold.afv, var: fold.afv_var })
+        }
+        _ => None,
+    }
+}
+
 /// Multiply each fuel map by its AFV / 100 and set those AFVs to 100%, as
 /// one undoable step. The ECM then fuels the same with nothing learned.
 pub fn fold_afv(tune: &mut Tune, plan: &[AfvFold]) -> Result<crate::tune::Applied, String> {
@@ -601,7 +779,16 @@ pub fn fold_afv(tune: &mut Tune, plan: &[AfvFold]) -> Result<crate::tune::Applie
     for f in plan {
         let factor = f.afv / crate::burn::AFV_NEUTRAL;
         let cells = tune.elements(&f.map).map_err(|e| e.to_string())?;
-        changes.extend(cells.iter().enumerate().map(|(i, v)| (f.map.clone(), i, v * factor)));
+        let (rows, cols, used_rows, used_cols) = used_grid(tune, &f.map)?;
+        for r in 0..rows {
+            for c in 0..cols {
+                // Padding past the real breakpoints stays as it is.
+                if r < used_rows && c < used_cols {
+                    let i = r * cols + c;
+                    changes.push((f.map.clone(), i, cells[i] * factor));
+                }
+            }
+        }
     }
     let mut vars: Vec<&str> = plan.iter().map(|f| f.afv_var.as_str()).collect();
     vars.sort_unstable();
@@ -718,7 +905,7 @@ mod tests {
         }
         let catalog = Catalog::builtin().unwrap();
         let tune = Tune::open(&img, &catalog).unwrap();
-        let logs = ["idle.csv", "BUEIB_20261014-231006.csv"]
+        let logs = ["idle.csv", "BUEIB_20261014-231006.csv", "BUEIB_20261015-200748.csv"]
             .iter()
             .map(|n| Log::open(&dir.join(n), &catalog).unwrap())
             .collect();
@@ -819,6 +1006,8 @@ mod tests {
             set(&mut f, "TPD", 10.0);
             set(&mut f, "CLT", 150.0);
             set(&mut f, "EGO Corr.", if i % 2 == 0 { 89.8 } else { 90.2 });
+            set(&mut f, "Flags2", 128.0);
+            set(&mut f, "WUE", 100.0);
             set(&mut f, "Accel Corr.", 0.0);
             set(&mut f, "Decel Corr.", 100.0);
             set(&mut f, "WOT Corr.", 100.0);
@@ -840,7 +1029,9 @@ mod tests {
             unread_columns: Vec::new(),
         };
         let a = analyze(std::slice::from_ref(&log), &tune, "Tab_Fuel_Front", &Filters::default()).unwrap();
-        assert_eq!(a.used, 199, "{:?}", a.rejected);
+        // Sample 0 has no gap before it; closed loop counts from 1 s on.
+        assert_eq!(a.used, 193, "{:?}", a.rejected);
+        assert!(a.cl_flag && a.ego_channel == "EGO Corr.");
         let s = Settings { max_change: 0.05, ..Default::default() };
         let p = propose(&a, &tune, &s).unwrap();
         assert_eq!(p.len(), 1, "{p:?}");
@@ -906,6 +1097,7 @@ mod tests {
                 ("TPD", 10.0),
                 ("CLT", 150.0),
                 ("EGO Corr.", 100.0),
+                ("WUE", 100.0),
                 ("Accel Corr.", 0.0),
                 ("Decel Corr.", 100.0),
                 ("WOT Corr.", if load > 50.0 { 110.0 } else { 100.0 }),
@@ -963,5 +1155,150 @@ mod tests {
         let mut nb = log.clone();
         nb.wideband = None;
         assert!(analyze(&[nb], &tune, "Tab_Fuel_Front", &f).is_err());
+    }
+
+    fn ed_log(name: &str, c: &Catalog) -> Log {
+        let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/ecmdroid").join(name);
+        Log::open(&p, c).unwrap()
+    }
+
+    fn ed_tune(id: &str, c: &Catalog) -> Tune {
+        let bytes: &[u8] = match id {
+            "BUEIB" => include_bytes!("../../../tests/fixtures/BUEIB.eeprom"),
+            _ => include_bytes!("../../../tests/fixtures/BUE2D.eeprom"),
+        };
+        let mut img = crate::image::Image::from_raw(c.lookup(id).unwrap(), bytes).unwrap();
+        img.page_zero = true;
+        Tune::new(img, c).unwrap()
+    }
+
+    /// The fuel equation auto-tune relies on, from injector pulse widths in
+    /// EcmDroid's BUE2D log (front AFV 95%): (pw - battery correction) /
+    /// (table x IAT x WUE x fuel pressure x correction) is one constant
+    /// when the correction is EGO alone in closed loop and OL x AFV in open
+    /// loop. EGO x AFV in closed loop is about 5% off.
+    #[test]
+    fn closed_loop_fuel_is_ego_alone_and_afv_open_loop_only() {
+        let c = Catalog::builtin().unwrap();
+        let log = ed_log("BUE2D_log.bin", &c);
+        let s = |n: &str| log.series(n);
+        let (pw, bat, ve, iat, wue, fp) =
+            (s("pw1"), s("Batt. Corr."), s("veCurr1"), s("IAT Corr."), s("WUE"), s("F. Pr. Corr."));
+        let (ego, afv, ol, flags) =
+            (s("EGO1 Corr."), s("AFV1"), s("OL Corr."), closed_loop_flags(&log).unwrap());
+        let (rpm, acc, dec, wot) = (s("RPM"), s("Accel Corr."), s("Decel Corr."), s("WOT Corr."));
+        let median = |mut v: Vec<f64>| {
+            v.sort_by(f64::total_cmp);
+            v[v.len() / 2]
+        };
+        let (mut cl, mut cl_afv, mut open) = (Vec::new(), Vec::new(), Vec::new());
+        for i in 0..log.samples.len() {
+            let all = [pw[i], bat[i], ve[i], iat[i], wue[i], fp[i], ego[i], afv[i], ol[i], rpm[i]];
+            let Some(v) = all.iter().copied().collect::<Option<Vec<f64>>>() else { continue };
+            let [pw, bat, ve, iat, wue, fp, ego, afv, ol, rpm] = v[..] else { unreachable!() };
+            if rpm < 800.0 || acc[i] != Some(0.0) || dec[i] != Some(100.0) || wot[i] != Some(100.0) {
+                continue;
+            }
+            let k = (pw - bat) / (ve * iat / 100.0 * wue / 100.0 * fp / 100.0);
+            if flags[i] == Some(true) {
+                cl.push(k / (ego / 100.0));
+                cl_afv.push(k / (ego / 100.0 * afv / 100.0));
+            } else {
+                open.push(k / (ol / 100.0 * afv / 100.0));
+            }
+        }
+        assert!(cl.len() > 1000 && open.len() > 500, "{} {}", cl.len(), open.len());
+        let (cl, cl_afv, open) = (median(cl), median(cl_afv), median(open));
+        assert!((cl / open - 1.0).abs() < 0.02, "closed {cl} open {open}");
+        assert!((cl_afv / open - 1.0).abs() > 0.04, "closed with AFV {cl_afv} open {open}");
+    }
+
+    #[test]
+    fn ddfi3_front_map_follows_the_front_cylinder() {
+        let c = Catalog::builtin().unwrap();
+        let d3 = ed_log("BUE2D_log.bin", &c);
+        let front = Cylinder { ego: "EGO1 Corr.", load: "Load1", afv: "AFV1" };
+        assert_eq!(Cylinder::for_map(&d3, "Tab_Fuel_Front"), front);
+        assert_eq!(Cylinder::for_map(&d3, "Tab_Fuel_Rear"), Cylinder::REAR);
+        // DDFI-2: one sensor, the rear values for both maps.
+        let d2 = ed_log("BUEIB_log_2000.bin", &c);
+        assert_eq!(Cylinder::for_map(&d2, "Tab_Fuel_Front"), Cylinder::REAR);
+        // A front correction that only copies the rear one isn't its own.
+        let mut copy = d3.clone();
+        let (f, r) =
+            (copy.channel("EGO1 Corr.").unwrap().clone(), copy.channel("EGO Corr.").unwrap().clone());
+        for smp in &mut copy.samples {
+            let rear = smp.frame[r.offset..r.offset + r.size].to_vec();
+            smp.frame[f.offset..f.offset + f.size].copy_from_slice(&rear);
+        }
+        assert_eq!(Cylinder::for_map(&copy, "Tab_Fuel_Front"), Cylinder { load: "Load1", ..Cylinder::REAR });
+        let t = ed_tune("BUE2D", &c);
+        let a = analyze(std::slice::from_ref(&d3), &t, "Tab_Fuel_Front", &Filters::default()).unwrap();
+        assert_eq!((a.ego_channel, a.afv), ("EGO1 Corr.", Some(95.0)));
+    }
+
+    /// EcmDroid's BUEIB ride: closed loop by the ECM's flag. Without
+    /// Flags2 in the log, EGO movement stands in for it.
+    #[test]
+    fn closed_loop_comes_from_the_ecm_flag() {
+        let c = Catalog::builtin().unwrap();
+        let t = ed_tune("BUEIB", &c);
+        let log = ed_log("BUEIB_log_2000.bin", &c);
+        let f = Filters::default();
+        let a = analyze(std::slice::from_ref(&log), &t, "Tab_Fuel_Front", &f).unwrap();
+        assert!(a.cl_flag && a.used > 0, "{:?}", a.rejected);
+        let mut no_flag = log.clone();
+        no_flag.channels.retain(|v| v.name != "Flags2");
+        let b = analyze(&[no_flag], &t, "Tab_Fuel_Front", &f).unwrap();
+        assert!(!b.cl_flag);
+        assert_ne!(a.used, b.used);
+        // Every sample used with the flag is closed loop and past warm-up.
+        let flags = closed_loop_flags(&log).unwrap();
+        let wue = log.series("WUE");
+        assert!(flags.contains(&Some(false)) && flags.contains(&Some(true)));
+        assert!(wue.iter().flatten().any(|w| *w > f.max_wue) && a.rejected.warm_up > 0, "{:?}", a.rejected);
+    }
+
+    #[test]
+    fn padding_breakpoints_are_left_alone() {
+        assert_eq!(used_len(&[8000.0, 800.0, 0.0, 0.0, 0.0]), 3);
+        assert_eq!(used_len(&[8000.0, 1000.0, 800.0, 0.0]), 4);
+        assert_eq!(used_len(&[0.0]), 1);
+        let rpm = [8000.0, 1000.0, 800.0, 0.0, 0.0, 0.0];
+        assert_eq!(frac_index(&rpm, 400.0), Some(2.5));
+        assert_eq!(frac_index(&rpm, 0.0), Some(3.0));
+        let c = Catalog::builtin().unwrap();
+        let mut t = ed_tune("BUE2D", &c);
+        let (rows, cols, ur, uc) = used_grid(&t, "Tab_Fuel_Front").unwrap();
+        assert_eq!((rows, cols, ur, uc), (16, 20, 16, 18));
+        // A pad cell with a value in it keeps it through a fold.
+        t.set(
+            "pad",
+            &[("Tab_Fuel_Front".into(), 19, 50.0), ("LFuel".into(), 0, 95.0), ("LFuel1".into(), 0, 95.0)],
+        )
+        .unwrap();
+        let before = t.elements("Tab_Fuel_Front").unwrap();
+        let plan = afv_fold_plan(&t).unwrap();
+        fold_afv(&mut t, &plan).unwrap();
+        let after = t.elements("Tab_Fuel_Front").unwrap();
+        assert_eq!(after[19], 50.0);
+        assert!(after[0] < before[0], "{} -> {}", before[0], after[0]);
+    }
+
+    #[test]
+    fn afv_note_says_fold_first_or_log_again() {
+        let c = Catalog::builtin().unwrap();
+        let mut t = ed_tune("BUEIB", &c);
+        let log = ed_log("BUEIB_log_2000.bin", &c);
+        let f = Filters::default();
+        let a = analyze(std::slice::from_ref(&log), &t, "Tab_Fuel_Front", &f).unwrap();
+        assert_eq!(a.afv, Some(100.0));
+        t.set("afv", &[("LFuel".into(), 0, 100.0)]).unwrap();
+        assert_eq!(afv_note(&a, &t), None);
+        t.set("afv", &[("LFuel".into(), 0, 103.0)]).unwrap();
+        assert!(matches!(afv_note(&a, &t), Some(AfvNote::Changed { .. })));
+        let mut a2 = a.clone();
+        a2.afv = Some(103.0);
+        assert_eq!(afv_note(&a2, &t), Some(AfvNote::NotNeutral { afv: 103.0, var: "LFuel".into() }));
     }
 }

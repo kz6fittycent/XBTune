@@ -377,25 +377,20 @@ fn axis_labels(t: &Tune, axis: &Option<String>) -> Option<(Vec<f64>, Vec<String>
     Some((v, labels))
 }
 
-/// Fractional position of `x` in breakpoints `axis` (either direction).
+/// Fractional position of `x` in breakpoints `axis` (either direction;
+/// padding past the real breakpoints is never used).
 fn frac_index(axis: &[f64], x: f64) -> Option<f32> {
-    for i in 0..axis.len().saturating_sub(1) {
-        let (a, b) = (axis[i], axis[i + 1]);
-        if (a <= x && x <= b) || (b <= x && x <= a) {
-            let f = if b != a { (x - a) / (b - a) } else { 0.0 };
-            return Some(i as f32 + f as f32);
-        }
-    }
-    let (first, last) = (*axis.first()?, *axis.last()?);
-    let nearer_first = (x - first).abs() < (x - last).abs();
-    Some(if nearer_first { 0.0 } else { (axis.len() - 1) as f32 })
+    xbtune_core::autotune::frac_index(axis, x).map(|f| f as f32)
 }
 
-/// Live channel for a map axis, by the axis name (XBTune's reading).
-fn live_for_axis(app: &XbApp, axis: &str) -> Option<f64> {
+/// Live channel for an axis of `map`, by the axis name (XBTune's reading).
+/// A front map follows the front cylinder's load where the ECM has one
+/// (DDFI-3 `Load1`), as auto-tune does.
+fn live_for_axis(app: &XbApp, map: &str, axis: &str) -> Option<f64> {
     let s = app.history.latest()?;
     let ch = xbtune_core::autotune::channel_for_axis(axis)?;
-    s.value(app.link.channel(ch)?)
+    let front = (ch == "Load" && map.contains("Front")).then(|| app.link.channel("Load1")).flatten();
+    s.value(front.or_else(|| app.link.channel(ch))?)
 }
 
 fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
@@ -429,8 +424,8 @@ fn grid_editor(app: &mut XbApp, ui: &mut Ui, v: &EeVar) {
     // live channel.
     let live = match (&xs, &ys, &v.x_axis, &v.y_axis) {
         (Some((xv, _)), Some((yv, _)), Some(xn), Some(yn)) if app.link.live() || app.logs.play.is_some() => {
-            let x = live_for_axis(app, xn).and_then(|x| frac_index(xv, x));
-            let y = live_for_axis(app, yn).and_then(|y| frac_index(yv, y));
+            let x = live_for_axis(app, &v.name, xn).and_then(|x| frac_index(xv, x));
+            let y = live_for_axis(app, &v.name, yn).and_then(|y| frac_index(yv, y));
             x.zip(y).map(|(c, r)| (r, c))
         }
         _ => None,

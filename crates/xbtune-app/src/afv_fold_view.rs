@@ -77,9 +77,9 @@ pub fn show(app: &mut XbApp, ui: &mut Ui) {
         if tuned {
             ui.label(
                 RichText::new(
-                    "This tune has auto-tune corrections. They already include AFV (EGO starts from it), so \
-                     folding AFV in too would count it twice. Burn them and reset AFV instead (Resets), or \
-                     undo the auto-tune first.",
+                    "This tune has auto-tune corrections. Those cells already hold their whole correction, \
+                     so folding AFV in now would move them by AFV again. Undo the auto-tune, fold AFV and \
+                     burn that first, then ride, log and auto-tune.",
                 )
                 .color(p.bad),
             );

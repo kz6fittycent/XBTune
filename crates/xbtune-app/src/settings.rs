@@ -183,6 +183,7 @@ pub struct AutotuneState {
     pub min_hits: f64,
     pub max_change: f64,
     pub min_clt: f64,
+    pub max_wue: f64,
 }
 
 /// Air/fuel ratio or lambda, for everything wideband the user sees or

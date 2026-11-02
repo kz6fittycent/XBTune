@@ -89,7 +89,9 @@ fn log(tune: &Tune, points: &[(f64, f64, f64)], seconds: f64) -> Log {
                 ("Load", load),
                 ("TPD", load / 4.0),
                 ("CLT", 150.0),
-                // Closed loop: EGO moves a little every frame.
+                // Closed loop (the ECM's flag); EGO moves a little.
+                ("Flags2", 128.0),
+                ("WUE", 100.0),
                 ("EGO Corr.", ego + if i % 2 == 0 { -0.2 } else { 0.2 }),
                 ("Accel Corr.", 0.0),
                 ("Decel Corr.", 100.0),

@@ -50,6 +50,9 @@ pub struct AutotuneArgs {
     /// Ignore samples below this engine temperature (°C).
     #[arg(long, default_value_t = 80.0)]
     min_clt: f64,
+    /// Ignore samples with more warm-up enrichment than this (WUE, %).
+    #[arg(long, default_value_t = 102.0)]
+    max_wue: f64,
     /// Correct toward a target AFR with the logs' wideband readings
     /// (logged with --wideband) instead of the ECM's EGO correction.
     #[arg(long)]
@@ -154,27 +157,31 @@ pub fn autotune(a: AutotuneArgs) -> Result<()> {
         autotune::Mode::Narrowband
     };
     let settings = Settings {
-        filters: Filters { min_clt: a.min_clt, mode, ..Default::default() },
+        filters: Filters { min_clt: a.min_clt, max_wue: a.max_wue, mode, ..Default::default() },
         min_hits: a.min_hits,
         max_change: a.max_change / 100.0,
     };
     let mut all = Vec::new();
-    let mut afv = None;
+    let mut notes = Vec::new();
     for map in &maps {
         let an = autotune::analyze(&logs, &tune, map, &settings.filters).map_err(anyhow::Error::msg)?;
-        afv = afv.or(an.afv);
-        let r = &an.rejected;
-        if an.wideband {
-            println!(
-                "{map}: {} of {} samples used (left out: {} no wideband reading, {} cold, {} changing, {} enrichment, {} after a gap, {} missing)",
-                an.used, an.samples, r.no_wideband, r.cold, r.transient, r.enrichment, r.gap, r.missing
-            );
-        } else {
-            println!(
-                "{map}: {} of {} samples used (left out: {} open loop, {} cold, {} changing, {} enrichment, {} after a gap, {} missing)",
-                an.used, an.samples, r.open_loop, r.cold, r.transient, r.enrichment, r.gap, r.missing
-            );
+        if let Some(n) = autotune::afv_note(&an, &tune)
+            && !notes.contains(&n)
+        {
+            notes.push(n);
         }
+        let r = &an.rejected;
+        let first = if an.wideband {
+            format!("{} no wideband reading", r.no_wideband)
+        } else {
+            format!("{} open loop", r.open_loop)
+        };
+        println!(
+            "{map}: {} of {} samples used (left out: {first}, {} cold, {} warming up, {} changing, {} enrichment, {} after a gap, {} missing)",
+            an.used, an.samples, r.cold, r.warm_up, r.transient, r.enrichment, r.gap, r.missing
+        );
+        let how = if an.cl_flag { "the ECM's flag" } else { "EGO movement (no Flags2 in a log)" };
+        println!("  correction from {}; closed loop from {how}", an.ego_channel);
         if !an.missing_channels.is_empty() {
             println!(
                 "  a log has no {} channel: auto-tune needs RPM, Load and EGO Corr. in every sample",
@@ -215,11 +222,19 @@ pub fn autotune(a: AutotuneArgs) -> Result<()> {
         }
         all.extend(p);
     }
-    if let Some(v) = afv {
-        println!(
-            "AFV in the logs: {v:.1}%. The EGO corrections above already include it: after burning this \
-             tune, reset AFV (xbtune.cli afv-reset) so it isn't counted twice."
-        );
+    for n in &notes {
+        match n {
+            autotune::AfvNote::Changed { logged, tune, var } => println!(
+                "WARNING: the logs were made with AFV {logged:.1}%, this tune has {var} {tune:.1}% (folded or \
+                 reset since?). Log again after burning this tune before auto-tuning it."
+            ),
+            autotune::AfvNote::NotNeutral { afv, var } => println!(
+                "{var} is {afv:.1}%. The corrections above are complete as they are: the ECM doesn't add AFV \
+                 on top of EGO. Don't reset AFV after burning them, that would lean out the open-loop areas \
+                 (high load, WOT). Best order: fold AFV into the maps (xbtune.cli fold-afv) and burn that \
+                 first, then ride, log and auto-tune."
+            ),
+        }
     }
     match out {
         None => println!("Nothing saved (add -o FILE to save the corrected tune)."),

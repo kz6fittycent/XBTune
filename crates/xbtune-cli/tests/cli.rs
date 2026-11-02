@@ -328,7 +328,8 @@ fn burn_restore_and_afv_reset_on_sim() {
 #[test]
 fn logstats_and_autotune_on_owner_logs() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/owner");
-    let (tune, log) = (dir.join("BUEIB_xbtune.xpr"), dir.join("idle.csv"));
+    // The warm ride: the idle logs never get past warm-up enrichment.
+    let (tune, log) = (dir.join("BUEIB_xbtune.xpr"), dir.join("BUEIB_20261015-200748.csv"));
     if !tune.exists() || !log.exists() {
         eprintln!("skipping: owner fixtures not present");
         return;
