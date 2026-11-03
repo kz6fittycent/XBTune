@@ -89,6 +89,28 @@ jobs:
           name: xbtune-windows-x64-${{ github.sha }}
           path: xbtune-windows-x64
 
+      - name: Checkout (for the guide script and fonts)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          path: src
+
+      - name: Build the guide PDF from the wiki
+        # The wiki as a PDF in the zip (owner, 2026-11-02). Never blocks
+        # the build: without it the zip ships as before.
+        working-directory: src
+        env:
+          LABEL: ""
+        run: |
+          sudo apt-get install -y -qq libpango-1.0-0 libpangoft2-1.0-0 fonts-dejavu-core >/dev/null
+          # Releases pass their version; test builds say which commit.
+          label="${LABEL:-$(grep -m1 -oP '^version = "\K[^"]+' Cargo.toml) (test build ${GITHUB_SHA::7})}"
+          if tools/make_guide_pdf.sh ../XBTune-Guide.pdf "$label"; then
+            echo "guide=yes" >> "$GITHUB_ENV"
+          else
+            echo "::warning::The guide PDF couldn't be built; the zip ships without it."
+          fi
+
       - name: Replace the windows-test pre-release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -102,6 +124,11 @@ jobs:
             echo "::notice::${SHA:0:7} is no longer the tip of main (${tip:0:7}); its run will publish."
             exit 0
           fi
+          assets=(xbtune-windows-x64.zip)
+          if [[ "${guide:-}" == yes ]]; then
+            cp XBTune-Guide.pdf xbtune-windows-x64/
+            assets+=(XBTune-Guide.pdf)
+          fi
           zip -qr xbtune-windows-x64.zip xbtune-windows-x64
           version="$(gh api "repos/${REPO}/contents/Cargo.toml?ref=${SHA}" --jq .content | base64 -d | grep -m1 -oP '^version = "\K[^"]+')"
           subject="$(gh api "repos/${REPO}/commits/${SHA}" --jq '.commit.message | split("\n")[0]')"
@@ -114,12 +141,13 @@ jobs:
 
           1. Download \`xbtune-windows-x64.zip\` below and unzip it anywhere. Replace the old folder; your files (\`Documents\\XBTune\`) are kept.
           2. Run \`xbtune.exe\`. It isn't code-signed, so Windows may say **"Windows protected your PC"**: **More info → Run anyway**.
+          3. \`XBTune-Guide.pdf\` in the folder (also below) is the wiki as one PDF, from the time of this build.
 
           Pairing, COM ports and where things are: [XBTune on Windows](https://github.com/${REPO}/wiki/Windows). Problems: **Report a problem** in the side bar, or an issue here. [All commits](https://github.com/${REPO}/commits/main).
           EOF
           )
           gh release delete windows-test --repo "$REPO" --cleanup-tag --yes 2>/dev/null || true
-          gh release create windows-test xbtune-windows-x64.zip \
+          gh release create windows-test "${assets[@]}" \
             --repo "$REPO" \
             --target "$SHA" \
             --title "Windows test build (main, ${SHA:0:7})" \

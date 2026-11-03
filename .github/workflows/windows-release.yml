@@ -88,6 +88,36 @@ jobs:
         with:
           name: xbtune-windows-x64-release
 
+      - name: Checkout (for the guide script and fonts)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
+          path: src
+
+      - name: Build the guide PDF from the wiki
+        # The wiki as a PDF in the zip (owner, 2026-11-02). Never blocks
+        # the build: without it the zip ships as before.
+        working-directory: src
+        env:
+          LABEL: ${{ needs.build.outputs.version }}
+        run: |
+          sudo apt-get install -y -qq libpango-1.0-0 libpangoft2-1.0-0 fonts-dejavu-core >/dev/null
+          # Releases pass their version; test builds say which commit.
+          label="${LABEL:-$(grep -m1 -oP '^version = "\K[^"]+' Cargo.toml) (test build ${GITHUB_SHA::7})}"
+          if tools/make_guide_pdf.sh ../XBTune-Guide.pdf "$label"; then
+            echo "guide=yes" >> "$GITHUB_ENV"
+          else
+            echo "::warning::The guide PDF couldn't be built; the zip ships without it."
+          fi
+
+      - name: Put the guide in the zip
+        if: env.guide == 'yes'
+        run: |
+          mkdir -p xbtune-windows-x64
+          cp XBTune-Guide.pdf xbtune-windows-x64/
+          zip -q xbtune-windows-x64.zip xbtune-windows-x64/XBTune-Guide.pdf
+          unzip -l xbtune-windows-x64.zip
+
       - name: Create or update the pre-release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -98,8 +128,10 @@ jobs:
           repo="${{ github.repository }}"
           # A re-run replaces the zip; it never turns a full release back
           # into a pre-release.
+          assets=(xbtune-windows-x64.zip)
+          [[ "${guide:-}" == yes ]] && assets+=(XBTune-Guide.pdf)
           if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
-            gh release upload "$tag" xbtune-windows-x64.zip --repo "$repo" --clobber
+            gh release upload "$tag" "${assets[@]}" --repo "$repo" --clobber
             echo "Updated the zip on the existing release ${tag}."
             exit 0
           fi
@@ -118,6 +150,8 @@ jobs:
 
           Your files (tunes, backups, logs) go in \`Documents\\XBTune\`. Windows 10/11, 64-bit.
 
+          The guide: \`XBTune-Guide.pdf\` in the zip (also below) is the [wiki](https://github.com/${repo}/wiki) as one PDF.
+
           ### Connect to the bike
 
           - **BuellTooth (Bluetooth):** pair it first in **Settings → Bluetooth & devices → Add device** (PIN usually \`1234\`). In XBTune → **Connect**, it shows up as a COM port marked **"outgoing: use this one"**. Ignore the one marked "incoming".
@@ -130,7 +164,7 @@ jobs:
           Changes: see the [commits](https://github.com/${repo}/commits/${SHA}).
           EOF
           )
-          gh release create "$tag" xbtune-windows-x64.zip \
+          gh release create "$tag" "${assets[@]}" \
             --repo "$repo" \
             --target "$SHA" \
             --title "XBTune ${VERSION}" \

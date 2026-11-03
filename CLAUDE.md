@@ -300,6 +300,14 @@ off, AFV locked at 100).
   `~/Nextcloud/XBTUNE/xbtune-windows-x64.zip` when the build changes. Since 2026-11-02 it also
   writes `VERSION.txt` there (version, commit, build time, SHA-256 checked
   against GitHub's asset digest; a mismatch keeps the old zip).
+- Guide PDF (owner, 2026-11-02, PDF only): `tools/wiki_pdf.py` (wiki
+  clone -> one PDF in sidebar order: cover, contents with page numbers,
+  in-PDF links, local screenshots, Inter) via `tools/make_guide_pdf.sh`
+  (venv with markdown 3.9 + weasyprint 70.0, CI build tools only, never
+  shipped). ci.yml `windows-test-release` and windows-release.yml
+  `release` put `XBTune-Guide.pdf` in the zip and attach it to the
+  release; a failure only warns. It is the wiki at build time: wiki-only
+  edits reach it with the next push.
 - Not yet: Windows
   crash handler (SetUnhandledExceptionFilter), installer.
 
