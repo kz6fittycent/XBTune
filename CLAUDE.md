@@ -861,10 +861,14 @@ Resume here (2026-11-02, end of session): PAUSED, waiting for testing
 from riders actively tuning bikes (owner installed 0.3.1, nothing to do
 on his end). Releases stay on `latest/candidate` until everyone's
 testing buy-in; only then `/promote` to stable. State:
-- Store candidate = 0.3.1 (17b5e9a). main = bef2765 (simulator fix: the
-  demo now sets Flags2 bit 7 in closed loop, reports its EEPROM's AFV,
-  WUE 100% by 170 °C; wideband dialog wording); no bump, so it ships
-  with the next release (0.3.2).
+- Store candidate = 0.3.1 (17b5e9a). main = 438082f, unreleased (no
+  bump), ships with the next release (0.3.2): bef2765 simulator fix (the
+  demo sets Flags2 bit 7 in closed loop, reports its EEPROM's AFV, WUE
+  100% by 170 °C; wideband dialog wording) and 438082f guide PDF in the
+  Windows zips (verified in CI run 41550645637: windows-test zip has
+  XBTune-Guide.pdf, 41 pages; Nextcloud synced with VERSION.txt). The
+  versioned-release path (windows-release.yml) hasn't run with it yet:
+  check v0.3.2 has the PDF. Cover date is UTC.
 - Issue #12: owner posted the follow-up himself. Owner confirmed the
   Support XBTune link opens Ko-fi from the snap.
 - Security Rebuild fails every week (stable is empty): EXPECTED, leave
