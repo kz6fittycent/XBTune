@@ -4,10 +4,8 @@ name: 🚀 Promote to Stable
 # "/promote ..." comment, from someone with write access, on an actual
 # issue (not a PR) - the "Parse revisions" step does the real, exact
 # match against "/promote <revision>[,<revision>...] stable [done]" and
-# fails loudly if the comment doesn't match that. The real gate is the
-# `environment:` on the job itself though - matching those conditions
-# only lets the run start and sit waiting for manual approval, it
-# doesn't release anything by itself.
+# fails loudly if the comment doesn't match that. The comment is the
+# approval: the `promote-stable` environment has no required reviewer.
 on:
   issue_comment:
     types: [created]
