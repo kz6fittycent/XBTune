@@ -33,9 +33,9 @@ on:
         type: boolean
         default: false
 
-# Store publishing is OFF until the repo may go public (docs/KICKOFF.md
-# section 2, and ecmdroid.db licensing in docs/PROVENANCE.md). Set the
-# repository variable XBTUNE_STORE_PUBLISH=true to turn it on.
+# Runs only while the repository variable XBTUNE_STORE_PUBLISH=true (store
+# publishing on). While nothing has been released to stable yet, there is
+# nothing to check: the run says so and ends green.
 permissions:
   contents: read
 
@@ -64,7 +64,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check for a stable release
+        id: has_stable
+        run: |
+          # Nothing is on stable until XBTune is ready for it - there is
+          # nothing to rebuild then, so skip the rest of the job.
+          # A store outage must fail the job, not look like "no stable".
+          info="$(curl -fsS --retry 5 --retry-all-errors -H 'Snap-Device-Series: 16' \
+              "https://api.snapcraft.io/v2/snaps/info/${SNAP_NAME}")"
+          if jq -e '[."channel-map"[] | select(.channel.risk == "stable")] | length > 0' <<<"$info" >/dev/null; then
+            echo "stable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "stable=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::${SNAP_NAME} has no stable release - nothing to rebuild."
+          fi
+
       - name: Install review-tools
+        if: steps.has_stable.outputs.stable == 'true'
         run: |
           # Retried: the Snap Store's CDN has had transient failures.
           for attempt in 1 2 3; do
@@ -75,6 +91,7 @@ jobs:
 
       - name: Download the stable snap
         id: stable
+        if: steps.has_stable.outputs.stable == 'true'
         run: |
           snap download "$SNAP_NAME" --channel=stable --basename=stable
           version="$(unsquashfs -cat stable.snap meta/snap.yaml | sed -n 's/^version: *//p' | tr -d "'\"")"
@@ -84,6 +101,7 @@ jobs:
           echo "Stable: version $version, revision $revision"
 
       - name: Check for security notices
+        if: steps.has_stable.outputs.stable == 'true'
         run: |
           review-tools.snap-check-notices stable.snap | tee notices-raw.json
           # {"<snap>": {"<revision>": {"<package>": ["USN-...", ...]}}} - empty when none.
@@ -97,6 +115,7 @@ jobs:
 
       - name: Find the commit that released this version
         id: commit
+        if: steps.has_stable.outputs.stable == 'true'
         run: |
           # The newest commit that set the workspace version to exactly the
           # released version (the snap version is "<version>"; older
@@ -115,6 +134,7 @@ jobs:
 
       - name: Decide
         id: decide
+        if: steps.has_stable.outputs.stable == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           FORCE: ${{ inputs.force }}
@@ -137,6 +157,7 @@ jobs:
           echo "rebuild=$rebuild" >> "$GITHUB_OUTPUT"
 
       - name: Keep the notices for the next job
+        if: steps.has_stable.outputs.stable == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: notices
@@ -243,7 +264,7 @@ jobs:
           /promote ${REVISION} stable done
           \`\`\`
 
-          That queues \`promote-to-stable.yml\`, which waits for your approval (the \`promote-stable\` environment) and closes this issue once released. Until this issue is closed, the daily check won't rebuild again.
+          That queues \`promote-to-stable.yml\`, which waits for your approval (the \`promote-stable\` environment) and closes this issue once released. Until this issue is closed, the weekly check won't rebuild again.
 
           ---
           _Opened automatically by \`security-rebuild.yml\`._
