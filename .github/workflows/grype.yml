@@ -1,0 +1,42 @@
+name: 🛡️ Grype
+
+# Known CVEs in dependencies (lockfiles and pinned actions). Fails on high
+# or critical findings that have a fix available; results also go to the
+# repo's Security tab. Weekly, to catch new CVEs in unchanged dependencies.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  grype:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Scan dependencies
+        id: scan
+        uses: anchore/scan-action@v7
+        with:
+          path: .
+          only-fixed: true
+          severity-cutoff: high
+          fail-build: true
+          output-format: sarif
+
+      - name: Upload results to the Security tab
+        if: ${{ !cancelled() && steps.scan.outputs.sarif != '' }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+          category: grype

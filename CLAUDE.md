@@ -1216,3 +1216,7 @@ Ignition ON, engine OFF, kill switch RUN, adapter on the diagnostic connector.
    `Runtime: 107-byte frame (matches definition)`, `State: idle`, few retries.
 5. `xbtune.cli info --serial /dev/ttyUSB0` with a USB cable: same result.
 6. Compare the version string with EcmDroid's home screen.
+
+- **Grype** (`.github/workflows/grype.yml`, added 2026-11-18): on pushes, PRs and
+  weekly, it fails on high or critical CVEs with a fix and uploads SARIF to the
+  Security tab.

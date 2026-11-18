@@ -1,0 +1,802 @@
+2026-10-15T16:36:55.622681Z  INFO xbtune::report: === XBTune 0.1.0+git31eeddf starting · Ubuntu Core 24 · x86_64 · snap rev x8
+2026-10-15T16:37:40.692865Z  INFO xbtune::app: safety locks changed u=Unlocks { ecm_commands: true, eeprom_writes: true } path=/home/james/snap/xbtune/common/config/hardware.toml
+2026-10-15T16:37:40.692906Z  INFO xbtune::app: shown to user: Writing to the ECM unlocked.
+2026-10-15T16:38:02.608253Z  INFO xbtune::app: connecting to Bluetooth 00:19:10:00:6C:DC channel 1
+2026-10-15T16:38:07.558831Z  INFO xbtune::app: ECM BUEIB310 12-11-03 (BUEIB, DDFI-2)
+2026-10-15T16:38:07.559002Z  INFO xbtune::app: link state=Live
+2026-10-15T16:38:43.093613Z  INFO xbtune::app: shown to user: EEPROM read, verified and saved to /home/james/snap/xbtune/common/data/images/BUEIB_20261015-163843.xbt
+2026-10-15T16:40:27.977508Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T16:40:29.634779Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T16:40:29.634919Z  INFO xbtune_core::session: link lost; reconnecting reason=gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T16:40:29.635110Z  INFO xbtune::app: link state=Reconnecting { reason: "gave up after 3 attempts; last error: no reply within 400ms", delay: 250ms }
+2026-10-15T16:40:29.885724Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:40:29.885796Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 500ms }
+2026-10-15T16:40:30.386806Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:40:30.386917Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 1s }
+2026-10-15T16:40:31.388316Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:40:31.388434Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:40:33.390073Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:40:33.390219Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:40:35.390680Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:40:35.390781Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:40:37.392391Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:40:37.392484Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:40:39.394599Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:40:39.394666Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:40:41.396282Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:40:41.396382Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:40:43.397901Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:40:43.398001Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:40:45.399016Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:40:45.413468Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:40:49.234181Z  INFO xbtune::app: link state=Live
+2026-10-15T16:42:02.725796Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T16:42:04.382994Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T16:42:04.383099Z  INFO xbtune_core::session: link lost; reconnecting reason=gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T16:42:04.383313Z  INFO xbtune::app: link state=Reconnecting { reason: "gave up after 3 attempts; last error: no reply within 400ms", delay: 250ms }
+2026-10-15T16:42:04.633797Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:42:04.633908Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 500ms }
+2026-10-15T16:42:05.134879Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:42:05.134952Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 1s }
+2026-10-15T16:42:06.136416Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:42:06.136490Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:42:08.138139Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:42:08.138255Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:42:10.138645Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:42:10.138724Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:42:12.140410Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:42:12.140514Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:42:14.141993Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:42:14.142071Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:42:16.142750Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:42:16.142852Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:42:18.144347Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:42:18.144453Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:42:20.146158Z  INFO xbtune_core::session: link lost; reconnecting reason=Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Is the adapter powered (ignition on) and paired? To pair:
+    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)
+    bluetoothctl trust 00:19:10:00:6C:DC
+2026-10-15T16:42:20.146339Z  INFO xbtune::app: link state=Reconnecting { reason: "Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)\n\nIs the adapter powered (ignition on) and paired? To pair:\n    bluetoothctl pair 00:19:10:00:6C:DC   (BuellTooth PIN is usually 1234)\n    bluetoothctl trust 00:19:10:00:6C:DC", delay: 2s }
+2026-10-15T16:42:26.495855Z  INFO xbtune::app: link state=Live
+2026-10-15T16:42:35.050547Z  INFO xbtune_core::session: session stopped reason=None
+2026-10-15T18:26:35.904370Z  INFO xbtune::report: === XBTune closed normally
+2026-10-15T20:02:49.378969Z  INFO xbtune::report: === XBTune 0.1.0+git2aad16b starting · Ubuntu Core 24 · x86_64 · snap rev x10
+2026-10-15T20:02:49.833203Z  INFO xbtune::app: moved earlier files files=11 to=/home/james/XBTune
+2026-10-15T20:02:49.837580Z  INFO xbtune::app: shown to user: Your tunes, backups and logs now live in /home/james/XBTune
+2026-10-15T20:03:00.691607Z  INFO xbtune::app: connecting to Bluetooth 00:19:10:00:6C:DC channel 1
+2026-10-15T20:03:05.457763Z  INFO xbtune::app: ECM BUEIB310 12-11-03 (BUEIB, DDFI-2)
+2026-10-15T20:03:05.457891Z  INFO xbtune::app: link state=Live
+2026-10-15T20:03:26.002586Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:03:27.661158Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:03:27.661251Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:03:27.661271Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:03:28.357593Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:03:30.161848Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:03:30.161895Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:03:30.161921Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:03:31.411579Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:03:33.273453Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:03:35.568536Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:03:38.417572Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:03:41.402562Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:03:42.797476Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:03:44.951538Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:03:45.714572Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:03:45.714616Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:03:45.714642Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:03:46.855432Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:03:47.835586Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:03:48.160627Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:03:48.160688Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:03:48.160715Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:03:49.873511Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:03:52.281507Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:03:52.900549Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:03:52.900595Z  INFO xbtune_core::session: 2 failed attempt(s) (corrupt 1, nak 1)
+2026-10-15T20:03:52.900622Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:03:54.931492Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:03:56.916512Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:03:59.630594Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:01.893510Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:04:08.311545Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:09.009559Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:10.069504Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:04:10.069549Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:04:10.069575Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:04:10.973495Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:04:10.973553Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:04:10.973578Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:04:11.700561Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:04:13.868515Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:04:14.567544Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:14.893522Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:04:14.893569Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:04:14.893594Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:04:17.030571Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:17.877543Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:18.859503Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:20.132574Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:21.111575Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:25.103576Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:26.522581Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:26.562474Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:04:26.562498Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:04:26.562505Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:04:29.703484Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:31.332492Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:04:31.332557Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:04:31.332584Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:04:34.125885Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:04:34.125967Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:04:34.125977Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:04:35.376577Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:04:36.978572Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:04:38.956507Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:04:39.144534Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:04:39.144611Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:04:39.144620Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:04:43.256324Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:44.237554Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:45.373535Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:46.255584Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:04:47.100562Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:48.809585Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:51.669580Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:54.382560Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:55.951574Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:04:57.757974Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:04:57.758020Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:04:57.758073Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:04:59.006539Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:04:59.704506Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:00.548566Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:01.021585Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:01.021664Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:05:01.021691Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:05:01.218609Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:01.218695Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:05:01.218716Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:05:01.914579Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:02.610454Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:03.736560Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:05.564504Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:05:05.889627Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:05.889672Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:05:05.889699Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:05:06.729506Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:08.445557Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:10.150546Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:13.441580Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:14.980529Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:05:18.112524Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:18.814446Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:20.675421Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:21.440564Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:21.440658Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:05:21.440683Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:05:22.207547Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:22.207625Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:05:22.207646Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:05:23.773399Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:25.494496Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:26.774424Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:28.023495Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:05:28.927574Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:28.927636Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:05:28.927662Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:05:30.231587Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:05:33.090544Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:34.070565Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:34.915590Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:36.517542Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:36.517600Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:05:36.517613Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:05:38.511488Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:39.250557Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:39.250600Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:05:39.250626Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:05:39.867508Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:39.867565Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:05:39.867591Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:05:40.997527Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:43.283497Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:43.324533Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:43.324581Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:05:43.324593Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:05:44.750529Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:46.166516Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:47.440575Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:48.020582Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:05:50.160587Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:51.694519Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:05:51.734425Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:51.734469Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:05:51.734494Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:05:52.787509Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:52.787553Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:05:52.787560Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:05:54.501557Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:55.198572Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:55.524541Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:05:55.524620Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:05:55.524627Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:05:56.226524Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:05:57.936515Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:00.509507Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:02.797557Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:04.713429Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:06:04.713476Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:06:04.713521Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:06:05.468472Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:06:05.468527Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:06:05.468538Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:06:06.165546Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:08.659385Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:06:08.659437Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:06:08.659448Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:06:10.336448Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:11.031515Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:11.875499Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:14.107463Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:06:14.107517Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:06:14.107543Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:06:15.359573Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:06:16.201519Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:17.046517Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:19.470447Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:20.053476Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:06:24.032575Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:06:24.930468Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:06:24.930502Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:06:24.930531Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:06:28.626555Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:29.461382Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:30.436455Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:33.837930Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:06:33.837984Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:06:33.838022Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:06:34.533450Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:37.349430Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:06:37.349480Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:06:37.349507Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:06:38.048501Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:39.028546Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:42.766586Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:47.521480Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:49.324723Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:06:49.324769Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:06:49.324797Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:06:50.021578Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:52.036590Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:52.081570Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:06:52.081613Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:06:52.081638Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:06:53.363553Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:54.062474Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:55.046580Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:58.207594Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:06:58.987469Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:06:58.987518Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:06:58.987543Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:07:00.115412Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:00.959226Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:02.958499Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:03.937512Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:05.057503Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:05.755389Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:08.066493Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:07:09.926603Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:11.062573Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:11.914605Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:12.896594Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:13.372487Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:07:13.372540Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:07:13.372548Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:07:17.136538Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:07:17.834599Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:18.170569Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:07:18.170626Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:07:18.170633Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:07:20.899492Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:22.181503Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:23.159437Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:23.348585Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:07:23.348629Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:07:23.348651Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:07:24.108536Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:07:24.108596Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:07:24.108608Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:07:25.816494Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:07:26.660589Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:28.058485Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:07:28.671475Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:07:28.671542Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:07:28.671556Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:07:29.362518Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:30.356503Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:31.339425Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:32.998586Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:07:32.998632Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:07:32.998658Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:07:33.696435Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:34.540493Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:36.548565Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:36.589587Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:07:36.589634Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:07:36.589659Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:07:37.773601Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:07:38.759583Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:40.621590Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:41.466562Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:42.163469Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:43.010568Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:43.708480Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:44.550499Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:45.397575Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:48.442861Z  INFO xbtune_core::session: logging path=/home/james/XBTune/Logs/BUEIB_20261015-200748.csv
+2026-10-15T20:07:49.834488Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:07:51.309584Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:07:51.309664Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:07:51.309689Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:07:53.036491Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:54.832620Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:07:54.832698Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:07:54.832723Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:07:55.533561Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:56.382501Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:57.519443Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:07:58.004581Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:07:58.004626Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:07:58.004643Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:07:58.848579Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:00.127510Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:01.816484Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:08:02.513482Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:04.308873Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:08:04.308934Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:08:04.308949Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:08:05.966398Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:08:05.966459Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:08:05.966474Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:08:05.966518Z  INFO xbtune_core::session: reconnecting in 250 ms: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:08:06.993764Z  INFO xbtune::app: link state=Live
+2026-10-15T20:08:07.038537Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:07.038601Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:07.038616Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:07.917483Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:08:09.657561Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:09.702508Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:09.702566Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:09.702580Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:10.036568Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:10.036612Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:10.036626Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:11.121607Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:11.121665Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:11.121680Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:12.222570Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:12.222616Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:12.222630Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:13.770747Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:08:13.770800Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 2, corrupt 1)
+2026-10-15T20:08:13.770830Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:08:14.612577Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:14.652490Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:14.652547Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:14.652561Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:16.459463Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:08:16.459512Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:08:16.459542Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:08:16.493526Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:16.493571Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:16.493585Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:16.493673Z  INFO xbtune_core::session: reconnecting in 250 ms: ECM rejected the request (status 0x15)
+2026-10-15T20:08:17.061787Z  INFO xbtune::app: link state=Live
+2026-10-15T20:08:17.390599Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:17.390644Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:17.390671Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:17.438589Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:17.438634Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:17.438661Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:17.438720Z  INFO xbtune_core::session: reconnecting in 250 ms: ECM rejected the request (status 0x15)
+2026-10-15T20:08:18.471788Z  INFO xbtune::app: link state=Live
+2026-10-15T20:08:18.658585Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:18.658629Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:18.658656Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:19.359496Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:20.063508Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:21.516495Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:21.850450Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:21.850495Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:21.850509Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:22.551501Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:24.494824Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:08:24.494884Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:08:24.494899Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:08:25.491519Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:26.190418Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:27.330501Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:27.383480Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:27.383525Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:27.383552Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:27.576511Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:27.576569Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:27.576584Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:27.914527Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:27.914571Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:27.914599Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:28.800573Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:28.800618Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:08:28.800647Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:08:30.491581Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:08:31.083509Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:31.083568Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:08:31.083584Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:08:32.225584Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:34.172680Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:08:34.172729Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:08:34.172772Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:08:35.830195Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:08:35.830240Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:08:35.830284Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:08:35.830339Z  INFO xbtune_core::session: reconnecting in 250 ms: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:08:36.344583Z  WARN xbtune_link::client: ECM request failed request=Version error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:36.344702Z  INFO xbtune_core::session: reconnecting in 500 ms: no answer to the version request: ECM rejected the request (status 0x15). If this is a factory race ECM (RACE USE ONLY engraved on the case), choose "Factory race" (CLI: --race).
+2026-10-15T20:08:37.116750Z  INFO xbtune::app: link state=Live
+2026-10-15T20:08:37.312568Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:37.312617Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:37.312629Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:39.860607Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:08:39.860669Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:08:39.860684Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:08:41.815605Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:08:41.815665Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:08:41.815681Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:08:42.515593Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:43.951497Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:44.937442Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:46.372451Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:08:47.838345Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:08:48.913572Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:48.913632Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:48.913649Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:49.104428Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:08:49.104497Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:08:49.104513Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:08:50.654469Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:08:55.933583Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:08:57.518469Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:00.556465Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:04.591451Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:05.290515Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:08.614450Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:09.455415Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:11.623349Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:13.933487Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:16.683585Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:17.274604Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:17.274665Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:09:17.274680Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:09:19.217221Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:09:19.217282Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:09:19.217301Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:09:20.468477Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:09:21.652568Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:09:21.834369Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:21.834415Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:09:21.834445Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:09:23.194518Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:23.194566Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:09:23.194595Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:09:25.352489Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:25.941596Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:25.941644Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:09:25.941684Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:09:26.789486Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:27.483482Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:29.575738Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:09:29.575801Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:09:29.575817Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:09:30.274537Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:31.528572Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:09:31.569470Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:31.569535Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:09:31.569548Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:09:31.611502Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:31.611547Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:09:31.611561Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:09:31.611632Z  INFO xbtune_core::session: reconnecting in 250 ms: ECM rejected the request (status 0x15)
+2026-10-15T20:09:32.669768Z  INFO xbtune::app: link state=Live
+2026-10-15T20:09:33.006514Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:33.006559Z  INFO xbtune_core::session: 2 failed attempt(s) (corrupt 1, nak 1)
+2026-10-15T20:09:33.006587Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:09:33.198518Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:33.198593Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:09:33.198617Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:09:33.681617Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:33.681659Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:09:33.681686Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:09:34.381507Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:34.973497Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:34.973543Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:09:34.973571Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:09:35.672586Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:37.347601Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:09:38.693484Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:38.693548Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 1, corrupt 1, nak 1)
+2026-10-15T20:09:38.693563Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:09:39.981596Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:40.462586Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:40.462660Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:09:40.462670Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:09:41.161576Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:43.027487Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:44.462450Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:45.203512Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:45.203557Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:09:45.203586Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:09:46.793611Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:48.738710Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:09:48.738801Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:09:48.738830Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:09:48.780524Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:48.780573Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:09:48.780602Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:09:48.780667Z  INFO xbtune_core::session: reconnecting in 250 ms: ECM rejected the request (status 0x15)
+2026-10-15T20:09:49.288702Z  INFO xbtune::app: link state=Live
+2026-10-15T20:09:49.987564Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:51.391562Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:09:52.966579Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:53.848491Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:53.848558Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:09:53.848634Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:09:53.888460Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:53.888503Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:09:53.888530Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:09:53.888608Z  INFO xbtune_core::session: reconnecting in 250 ms: ECM rejected the request (status 0x15)
+2026-10-15T20:09:54.923837Z  INFO xbtune::app: link state=Live
+2026-10-15T20:09:57.048509Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:09:57.670504Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:57.670555Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:09:57.670568Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:09:58.548458Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:09:58.548536Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:09:58.548547Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:09:59.246518Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:00.380559Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:01.625502Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:10:02.610576Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:03.595514Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:04.219508Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:10:04.219560Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:10:04.219573Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:10:04.916549Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:05.096521Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:10:05.096580Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:10:05.096595Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:10:05.794511Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:06.635579Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:07.888549Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:10:09.170516Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:10.425584Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:10:11.265562Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:13.136457Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:15.224007Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:10:15.224067Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:10:15.224082Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:10:16.880546Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:10:16.880593Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:10:16.880608Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:10:16.880668Z  INFO xbtune_core::session: reconnecting in 250 ms: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:10:17.404655Z  INFO xbtune::app: link state=Live
+2026-10-15T20:10:18.250577Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:19.501597Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:10:21.589784Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:10:21.589832Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:10:21.589863Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:10:22.729560Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:23.209467Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:10:23.209511Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:10:23.209540Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:10:24.459467Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:10:25.709584Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:10:26.754515Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:10:26.754562Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:10:26.754607Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:10:28.440445Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:10:29.858453Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:31.150567Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:31.191586Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:10:31.191639Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:10:31.191654Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:10:31.884628Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:32.730474Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:33.427569Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:34.168645Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:10:34.168690Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:10:34.168720Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:10:34.868574Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:36.390490Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:10:36.431496Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:10:36.431555Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:10:36.431570Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:10:37.559599Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:38.398612Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:39.099582Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:39.140503Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:10:39.140554Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:10:39.140566Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:10:40.970467Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:10:41.451445Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:10:41.451493Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:10:41.451505Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:10:42.736511Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:44.532682Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:10:44.532735Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:10:44.532750Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:10:45.379572Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:46.511551Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:47.911570Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:10:49.899337Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:10:51.180499Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, corrupt 1)
+2026-10-15T20:10:53.189514Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:54.325516Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:10:57.335587Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:00.062472Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:04.500464Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:06.067593Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:07.372465Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:11:08.362458Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:09.490410Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:11.356460Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:12.202379Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:15.497290Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:11:15.687489Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:11:15.687534Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:11:15.687549Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:11:16.387279Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:17.522430Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:18.112513Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:11:18.112574Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, nak 1)
+2026-10-15T20:11:18.112602Z  INFO xbtune_core::session: request gave up: gave up after 2 attempts; last error: ECM rejected the request (status 0x15)
+2026-10-15T20:11:18.702447Z  INFO xbtune_core::session: 1 failed attempt(s) (corrupt 1)
+2026-10-15T20:11:23.108442Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:11:23.108491Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:11:23.108506Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:11:23.811392Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:24.801462Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:25.789562Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:26.768367Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:27.460524Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:27.460867Z  INFO xbtune::app: shown to user: Saved 691 rows to /home/james/XBTune/Logs/BUEIB_20261015-200748.csv
+2026-10-15T20:11:28.306448Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:30.826521Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:11:30.826565Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:11:30.826591Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:11:32.831553Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 1, corrupt 1)
+2026-10-15T20:11:34.991514Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:37.416602Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:11:38.815585Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:11:39.512469Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:40.900640Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:11:41.381046Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:11:41.381121Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:11:41.381130Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:11:41.423452Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:11:41.423497Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:11:41.423505Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:11:41.423602Z  INFO xbtune_core::session: reconnecting in 250 ms: ECM rejected the request (status 0x15)
+2026-10-15T20:11:41.948684Z  INFO xbtune::app: link state=Live
+2026-10-15T20:11:42.411583Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=ECM rejected the request (status 0x15)
+2026-10-15T20:11:42.411663Z  INFO xbtune_core::session: 1 failed attempt(s) (nak 1)
+2026-10-15T20:11:42.411703Z  INFO xbtune_core::session: request gave up: ECM rejected the request (status 0x15)
+2026-10-15T20:11:43.540590Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:46.681518Z  INFO xbtune_core::session: 2 failed attempt(s) (timeout 2)
+2026-10-15T20:11:47.807595Z  INFO xbtune_core::session: 1 failed attempt(s) (timeout 1)
+2026-10-15T20:11:49.613533Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:11:49.613582Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:11:49.613610Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:11:51.270382Z  WARN xbtune_link::client: ECM request failed request=RuntimeData error=no reply within 400ms
+2026-10-15T20:11:51.270443Z  INFO xbtune_core::session: 3 failed attempt(s) (timeout 3)
+2026-10-15T20:11:51.270472Z  INFO xbtune_core::session: request gave up: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:11:51.270525Z  INFO xbtune_core::session: reconnecting in 250 ms: gave up after 3 attempts; last error: no reply within 400ms
+2026-10-15T20:11:51.522019Z  INFO xbtune_core::session: reconnecting in 500 ms: Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Bluetooth is still closing the last connection (usually because the adapter lost power: ignition off). XBTune keeps trying; it clears within about 20 seconds once the ignition is on.
+2026-10-15T20:11:52.022356Z  INFO xbtune_core::session: reconnecting in 1000 ms: Bluetooth 00:19:10:00:6C:DC channel 1: Device or resource busy (os error 16)
+
+Bluetooth is still closing the last connection (usually because the adapter lost power: ignition off). XBTune keeps trying; it clears within about 20 seconds once the ignition is on.
+2026-10-15T20:11:52.721422Z  INFO xbtune_core::session: session stopped reason=None
+2026-10-15T20:13:07.724651Z  INFO xbtune::logs_view: log opened path=/home/james/XBTune/Logs/BUEIB_20261015-200748.csv samples=691
+2026-10-15T20:13:24.483577Z  INFO xbtune::autotune_view: auto-tune analysed cells=8 logs=1
+2026-10-15T20:13:59.730097Z  INFO xbtune::autotune_view: auto-tune applied cells=8
+2026-10-15T20:13:59.730134Z  INFO xbtune::app: shown to user: Auto-tune changed 8 cell(s) in the tune (Undo reverts it). Nothing was written to the ECM.
+2026-10-15T20:16:39.377778Z  INFO xbtune::app: connecting to Bluetooth 00:19:10:00:6C:DC channel 1
+2026-10-15T20:16:44.061828Z  INFO xbtune::app: ECM BUEIB310 12-11-03 (BUEIB, DDFI-2)
+2026-10-15T20:16:44.061979Z  INFO xbtune::app: link state=Live
+2026-10-15T20:16:57.808527Z  INFO xbtune_core::session: session stopped reason=None
+2026-10-15T20:17:04.678777Z  INFO xbtune::app: connecting to Bluetooth 00:19:10:00:6C:DC channel 1
+2026-10-15T20:17:08.616800Z  INFO xbtune::app: ECM BUEIB310 12-11-03 (BUEIB, DDFI-2)
+2026-10-15T20:17:08.616951Z  INFO xbtune::app: link state=Live
+2026-10-15T20:17:16.152610Z  INFO xbtune_core::session: session stopped reason=None
+2026-10-15T20:17:22.277074Z  INFO xbtune::app: connecting to Bluetooth 00:19:10:00:6C:DC channel 1
+2026-10-15T20:17:26.962759Z  INFO xbtune::app: ECM BUEIB310 12-11-03 (BUEIB, DDFI-2)
+2026-10-15T20:17:26.962910Z  INFO xbtune::app: link state=Live
+2026-10-15T20:17:33.597629Z  INFO xbtune_core::session: session stopped reason=None
