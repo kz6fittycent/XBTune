@@ -201,7 +201,7 @@ The brief is `docs/KICKOFF.md`. Read it first. Its rules on clean-room work
   repo-local git `user.email` is the GitHub noreply address).
   Store publishing ON since 2026-10-22 (docs/STORE.md): a push to main
   that passes Snap Builds AND carries a version not yet in the store goes
-  to `latest/candidate` (call-for-testing.yml `gate` job); stable needs
+  to `latest/candidate` (snap-builds.yml `gate` job); stable needs
   the owner's `/promote` + approval.
 - Versions (owner, 2026-10-22): plain `0.x.y`, no `+git` suffix; releases
   count in threes, 0.1.0 -> 0.1.1 -> 0.1.2 -> 0.2.0. `tools/bump_version.sh`

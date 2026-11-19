@@ -2,7 +2,7 @@ name: 🪟 Windows Release
 
 # Builds the Windows zip for a release and attaches it to a GitHub
 # pre-release `v<version>` (phase 10: one version for every platform).
-# Called by call-for-testing.yml when its gate finds a new version, as a
+# Called by snap-builds.yml when its gate finds a new version, as a
 # job of its own: a failure here never blocks the snap. promote-to-stable
 # turns the pre-release into the latest full release; only then does the
 # app's update notice (releases/latest) offer it.

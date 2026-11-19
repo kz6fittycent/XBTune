@@ -62,7 +62,7 @@ account. The store description is `description:` in `snap/snapcraft.yaml`
   Demo dump and log: `xbtune.cli dump --sim -o demo.xbt`,
   `xbtune.cli log --sim --wideband sim --duration 120 -o demo.csv`.
 - **Grade/channel:** `grade: devel` until release; first upload to `edge`,
-  then candidate via `call-for-testing.yml`, stable via
+  then candidate via `snap-builds.yml`, stable via
   `promote-to-stable.yml` (gated by `XBTUNE_STORE_PUBLISH`).
 
 ## Before the first upload
