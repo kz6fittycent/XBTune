@@ -873,8 +873,8 @@ testing buy-in; only then `/promote` to stable. State:
   Support XBTune link opens Ko-fi from the snap.
 - Security Rebuild: 2026-11-16 (owner's go) it checks the store's info
   API first and skips everything while xbtune has no stable release
-  (ends green); a store outage still fails it. Supersedes the parked
-  local branch `hold/security-rebuild-empty-stable` (d98a065).
+  (ends green); a store outage still fails it. Supersedes the old parked
+  local branch `hold/security-rebuild-empty-stable` (d98a065, deleted 2026-11-19).
 - Wiki current as of 0.3.1 (ec14394, all 27 screenshots retaken). Shots
   are made by a script (scratchpad, not kept): one XBTUNE_HOME per shot
   copied from a base with the "2005 XB9SX" profile, BUEIB_stock.xpr =
